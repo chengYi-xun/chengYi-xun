@@ -1,0 +1,156 @@
+# Hexo Configuration
+## Docs: https://hexo.io/docs/configuration.html
+## Source: https://github.com/hexojs/hexo/
+
+# Site
+title: AAA高老庄旺铺招租的个人博客
+subtitle: 分享编程与生活
+description: '个人技术博客，记录学习与生活'
+keywords: 编程,技术,博客,生活
+author: AAA高老庄旺铺招租
+language: zh-CN
+timezone: 'Asia/Shanghai'
+
+# URL
+## If your site is put in a subdirectory, set url as 'http://example.com/child' and root as '/child/'
+# Site
+url: https://chengyi-xun.github.io/chengYi-xun
+root: /chengYi-xun/
+permalink: posts/:title/
+permalink_defaults:
+pretty_urls:
+  trailing_index: true # Set to false to remove trailing 'index.html' from permalinks
+  trailing_html: true # Set to false to remove trailing '.html' from permalinks
+
+# Directory
+source_dir: source
+public_dir: public
+tag_dir: tags
+archive_dir: archives
+category_dir: categories
+code_dir: downloads/code
+i18n_dir: :lang
+skip_render:
+  - 'js/**'
+
+# Writing
+new_post_name: :title.md # File name of new posts
+default_layout: post
+titlecase: false # Transform title into titlecase
+external_link:
+  enable: true # Open external links in new tab
+  field: site # Apply to the whole site
+  exclude: ''
+filename_case: 0
+render_drafts: false
+post_asset_folder: true
+relative_link: false
+future: true
+highlight:
+  enable: true
+  line_number: true
+  auto_detect: false
+  tab_replace: ''
+  wrap: true
+  hljs: false
+prismjs:
+  enable: false
+  preprocess: true
+  line_number: true
+  tab_replace: ''
+
+# Home page setting
+# path: Root path for your blogs index page. (default = '')
+# per_page: Posts displayed per page. (0 = disable pagination)
+# order_by: Posts order. (Order by date descending by default)
+index_generator:
+  path: ''
+  per_page: 10
+  order_by: -date
+
+# Category & Tag
+default_category: 技术
+category_map:
+tag_map:
+
+# Metadata elements
+## https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta
+meta_generator: true
+
+# Date / Time format
+## Hexo uses Moment.js to parse and display date
+## You can customize the date format as defined in
+## http://momentjs.com/docs/#/displaying/format/
+date_format: YYYY-MM-DD
+time_format: HH:mm:ss
+## updated_option supports 'mtime', 'date', 'empty'
+updated_option: 'mtime'
+
+# Pagination
+## Set per_page to 0 to disable pagination
+per_page: 10
+pagination_dir: page
+
+# Include / Exclude file(s)
+## include:/exclude: options only apply to the 'source/' folder
+include:
+exclude:
+ignore:
+
+# Extensions
+## Plugins: https://hexo.io/plugins/
+## Themes: https://hexo.io/themes/
+theme: butterfly
+
+# Deployment
+## Docs: https://hexo.io/docs/one-command-deployment
+deploy:
+  type: git
+  repository: git@github.com:chengYi-xun/chengYi-xun.git
+  branch: deploy
+
+# Music Player Settings
+## Docs: https://github.com/MoePlayer/hexo-tag-aplayer
+aplayer:
+  script_dir: js
+  style_dir: css
+  meting: true
+
+# RSS Feed
+## Docs: https://github.com/hexojs/hexo-generator-feed
+feed:
+  enable: true
+  type: atom
+  path: atom.xml
+  limit: 20
+  content: false
+  content_limit: 140
+  content_limit_delim: '。'
+  order_by: -date
+  icon: /img/favicon64x64.png
+  autodiscovery: true
+
+# hexo-renderer-pandoc
+pandoc:
+  extensions:
+    - '-implicit_figures' # disable figcaption generation
+
+# hexo-hide-posts
+hide_posts:
+  # Should hexo-hide-posts be enabled.
+  enable: true
+
+  # The front-matter key for flagging hidden posts.
+  # You can change the filter name if you like.
+  filter: hidden
+
+  # Add "noindex" meta tag to prevent hidden posts from being indexed by search engines.
+  noindex: true
+
+  # Generators in the allowlist will have access to the hidden posts.
+  # Common generators in Hexo: 'index', 'tag', 'category', 'archive', 'sitemap', 'feed'
+  # allowlist_generators: []
+
+  # Generators in the blocklist can *not* access the hidden posts.
+  # The allowlist has higher priority than the blocklist, if both set.
+  # blocklist_generators: ['*']

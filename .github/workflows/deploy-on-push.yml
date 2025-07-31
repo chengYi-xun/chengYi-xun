@@ -1,0 +1,72 @@
+name: deploy-on-push
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  GIT_USER: AAA高老庄旺铺招租
+  GIT_EMAIL: ldq4399@163.com
+  DEPLOY_REPO: chengYi-xun/chengYi-xun
+  DEPLOY_BRANCH: deploy
+  PANDOC_URL: https://github.com/jgm/pandoc/releases/download/3.2/pandoc-3.2-1-amd64.deb
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH key
+        env:
+          DEPLOY_SECRET: ${{ secrets.GH_PAGES_DEPLOY_SECRET }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SECRET" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Checkout source code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure git user
+        run: |
+          git config --global user.name "${{ env.GIT_USER }}"
+          git config --global user.email "${{ env.GIT_EMAIL }}"
+
+      - name: Set timezone to Asia/Shanghai
+        run: sudo timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Replace DISQUS API key in config
+        env:
+          DISQUS_PUBLIC: ${{ secrets.DISQUS_APIKEY_PUBLIC }}
+        run: |
+          ESCAPED_DISQUS_PUBLIC=$(printf '%s\n' "$DISQUS_PUBLIC" | sed 's/[\/&]/\\&/g')
+          sed -i "s#__DISQUS_APIKEY_PUBLIC__#${ESCAPED_DISQUS_PUBLIC}#g" _config.butterfly.yml
+      - name: Install pandoc
+        env:
+          PANDOC_URL: ${{ env.PANDOC_URL }}
+        run: |
+          wget -c $PANDOC_URL -O /tmp/pandoc.deb
+          sudo dpkg -i /tmp/pandoc.deb
+          pandoc -v
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure git remote to use SSH
+        run: |
+          git remote set-url origin git@github.com:${{ env.DEPLOY_REPO }}.git
+
+      - name: Clean site
+        run: npx hexo clean
+
+      - name: Generate site
+        run: npx hexo generate
+
+      - name: Deploy site
+        env:
+          DEPLOY_BRANCH: ${{ env.DEPLOY_BRANCH }}
+        run: npx hexo deploy

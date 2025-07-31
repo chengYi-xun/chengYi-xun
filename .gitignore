@@ -1,0 +1,32 @@
+# MacOS files
+.DS_Store
+Thumbs.db
+
+# Windows files
+*.tmp
+*.bak
+
+# Hexo generated files
+db.json
+public/
+.deploy*/
+
+# Loggings
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log*
+clean.sh
+# Ignore git directories of theme
+themes/butterfly/.git/
+themes/butterfly/.github/
+
+# Backup files
+backup_posts/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
