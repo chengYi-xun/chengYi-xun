@@ -789,7 +789,7 @@ medium_zoom: false
 
 # fancybox
 # https://fancyapps.com/fancybox/
-fancybox: true
+fancybox: false
 
 # Tag Plugins settings (標籤外掛)
 # --------------------------------------

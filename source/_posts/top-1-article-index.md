@@ -28,6 +28,7 @@ tags:
 ## 通用理论
 1. [笔记｜扩散模型（一）：一些概率论的基础概念和理论](../0-generation-basic-theory)
 2. [笔记｜扩散模型（二）：生成模型的技术路线总览](../1-generation-basic-theory)
+3. [笔记｜扩散模型（二）：生成对抗理论](../1-generation-basic-theory)
 
 <!-- # 
 
