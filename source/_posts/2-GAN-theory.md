@@ -68,7 +68,7 @@ GAN 的损失函数核心思想在于 **对抗训练**，生成器 G 和判别�
 最后，整个训练的损失函数可以整合为对抗损失函数（Adversarial Loss Function / Minimax Objective）
 
 $$
-\min_G \max_D \; V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}(x)} \left[ \log D(x) \right] + \mathbb{E}_{z \sim p_g(z)} \left[ \log \left( 1 - D(G(z)) \right) \right]
+\min_G \max_D \; V(D, G) = E_{x \sim p_{\text{data}}(x)} \left[ \log D(x) \right] + E_{z \sim p_g(z)} \left[ \log \left( 1 - D(G(z)) \right) \right]
 $$
 
 其中：
@@ -76,45 +76,212 @@ $$
 - $D(x)$ 表示判别器对真实样本 $x$ 判定为真的概率；
 - $D(G(z))$ 表示判别器对生成样本为真的概率；
 - $G(z)$ 是生成器对输入噪声 $z$ 的映射输出；
-- $\mathbb{E}_{x \sim p_{\text{data}}(x)}$ 是对真实数据分布的期望；
-- $\mathbb{E}_{z \sim p_g(z)}$ 是对生成器输入噪声分布的期望。
+- $E_{x \sim p_{\text{data}}(x)}$ 是对真实数据分布的期望；
+- $E_{z \sim p_g(z)}$ 是对生成器输入噪声分布的期望。
 
 
-**GAN能达到平衡背后的数学证明**
+## GAN能达到平衡的原因以及背后的数学证明
 
-在理想情况下，当训练达到纳什均衡时：
+**平衡原因的直观解释**
+
+这里首先给出作者画的图来解释为什么对抗训练能够收敛。图中绿色线代表生成器的概率分布，蓝色虚线代表判别器的分布，黑色虚线代表真实数据分布。字母 $z$ 代表采样的高斯噪声，$x$ 代表真实数据，我们从 $z$ 中采样，通过生成器将 $z$ 的样本映射成符合 $x$ 分布的样本。在图$(a)$ 中，判别器和生成器的概率分布都是随机设定，大部分样本的映射都不正确。首先训练判别器，既让判别器能够识别出哪些是映射过来的数据，哪些是真实样本数据。训练完成之后就是图$(b)$ 所展示的分布。真实数据判别接近1，生成数据判别接近0。然后再训练生成器，让生成器朝着让判别器无法判别的方向移动，即为图$(c)$ ，最后经过循环拉扯，达到了图$(d)$ 的平衡。即生成器的分布和真实数据的分布相同。
+
+![GAN theroy](/chengYi-xun/img/gan_theroy.png)
+
+
+**背后的数学原理**
+
+在深入理解GAN的数学基础之前，我们需要先回顾KL散度（Kullback-Leibler Divergence）的两个关键局限性：
+
+**KL散度的局限性：**
+
+之前我们有讨论到KL散度的非负性，其实它还具有其他两个特性，即：
+
+1. **非对称性**：KL散度不满足对称性
+$$KL(P\|Q) \neq KL(Q\|P)$$
+
+2. **数值不稳定性**：当两个分布的支撑集不重叠时，KL散度趋向于无穷大
+$$\text{当 } P(x) > 0 \text{ 且 } Q(x) = 0 \text{ 时，} KL(P\|Q) \to +\infty$$
+$$\text{当 } Q(x) > 0 \text{ 且 } P(x) = 0 \text{ 时，} KL(P\|Q) \to -\infty$$
+
+这两个问题在GAN训练中会导致严重的梯度消失和数值不稳定问题。因此，引入Jensen-Shannon散度（JS散度）作为更适合的距离度量。
+
+**JS 散度**
+
+$$
+JS(P \| Q) = \frac{1}{2} KL(P \| M) + \frac{1}{2} KL(Q \| M)
+$$
+其中 $M = \frac{1}{2}(P + Q)$ 。
+
+**积分形式**
+$$
+JS(P\|Q) = \frac{1}{2}\int p(x)\log\frac{2p(x)}{p(x)+q(x)}dx + \frac{1}{2}\int q(x)\log\frac{2q(x)}{p(x)+q(x)}dx
+$$
+
+**JS散度的重要特性：**
+1. **对称性**：$JS(P\|Q) = JS(Q\|P)$
+2. **非负性**：$JS(P\|Q) \geq 0$，当且仅当 $P = Q$ 时等号成立
+3. **有界性**：$0 \leq JS(P\|Q) \leq \log 2$
+4. **平滑性**：相比KL散度，JS散度在处理不重叠分布时更加稳定
+
+但其实以上两种概率分布度量方式都有局限性，在 $PQ$ 不重叠的情况下，KL散度趋于无穷，这会导致梯度爆炸，而JS散度趋于常值，导致梯度消失。更多感兴趣的可以看：[两者分布不重合JS散度为log2的数学证明](https://blog.csdn.net/Invokar/article/details/88917214)
+
+另外，我们再介绍一下狄拉克函数：
+
+**狄拉克函数 $\delta(x)$ 与生成器的概率分布 $p_g(x)$ 表示**
+
+狄拉克函数 $\delta(x)$ 并不是数学中一个严格意义上的函数，而是在泛函分析中被称为广义函数（generalized function）或分布（distribution），它在除零以外的点上都等于零，且其在整个定义域上的积分等于1。用数学定义的方式可以写为：
+$$
+\delta(x) =
+\begin{cases}
+0, & x \neq 0, \\
+\infty, & x = 0,
+\end{cases}
+\quad\text{且}\quad
+\int_{-\infty}^{\infty} \delta(x) \, dx = 1.
+$$
+
+以上定义方式并不严谨，感兴趣的朋友请移步泛函分析，（再展开就没完没了了）。它具有抽样性质（Sifting Property）：
+
+$$
+\int_{-\infty}^{\infty} f(x) \, \delta(x-a) \, dx = f(a).
+$$
+
+没错，学过信号系统的同学立马反应过来了，**这他么不就是脉冲函数吗**！是的，只是在不同领域叫法不同。
+
+生成器 $G$ 将噪声 $z \sim p_z(z)$ 映射为样本 $x$，那么生成的样本 $x$ 的概率密度可以通过以下方式计算：
+
+$$p_g(x) = \int_z p_z(z)\delta(x-G(z))dz$$
+对于确定性映射 $G$，只有在 $x = G(z)$ 的某个 $z$ 值处才有非零概率密度。狄拉克δ函数 $\delta(x-G(z))$ 正好捕获了这一点：
+
+   - 当 $x = G(z)$ 时，$\delta(x-G(z)) = \infty$
+   - 当 $x \neq G(z)$ 时，$\delta(x-G(z)) = 0$
+
+意思是我们先按 $p_z(z)$ 采样一个潜变量 $z$，生成器 $G(z)$ 会把这个 $z$ 映射成一个数据样本 $x' = G(z)$，δ 函数 $\delta(x - G(z))$ 表示：只有当 $x$ 恰好等于 $G(z)$ 时（生成的样本符合真实图像概率分布），这个积分才有贡献，所以积分结果就是——**所有能生成 $x$ 的 $z$ 的概率质量总和**。
+
+也就是说，$p_g(x)$ 是 **通过生成器将潜空间的分布 $p_z(z)$ 推送（pushforward）到数据空间后得到的分布**。
+
+**更数学化的理解（推送分布）**
+
+这个公式本质上是 **概率分布的变换公式**，在测度论的语言里就是：
+$$
+p_g = G_\# p_z
+$$
+其中 $G_\#$ 表示 **推送测度**（pushforward measure）——用生成器 $G$ 把 $z$ 空间的概率分布搬到 $x$ 空间。如果生成器是确定性的（没有噪声），那么：
+
+* 每个 $z$ 只会映射到一个 $x$
+* δ 函数就表示了这种确定映射关系
+
+举个简单例子
+
+假设：
+
+* $p_z(z)$ 是均匀分布在区间 $[0,1]$
+* $G(z) = 2z$
+
+那么：
+
+$$
+p_g(x) = \int_{z=0}^1 1 \cdot \delta(x - 2z) \, dz
+$$
+
+用 δ 函数的性质，解得：
+
+$$
+p_g(x) = \frac{1}{2} \quad \text{当 } x \in [0, 2] \quad \text{否则 } 0
+$$
+
+这正是把 $[0,1]$ 的均匀分布线性拉伸到 $[0,2]$ 后的概率密度。
+
+**回归GAN的正题，在理想情况下，当GAN训练达到纳什均衡时**：
 
 - 判别器无法区分真假样本，即 $D(x) = 0.5$
 - 生成器的生成分布与真实数据分布一致，即 $p_g = p_{data}$
 
-从理论上可以证明，在最优判别器的情况下，生成器的优化目标等价于最小化生成分布与真实分布之间的JS散度（Jensen-Shannon Divergence）。
-[JS散度与KL散度的定义](https://blog.csdn.net/Invokar/article/details/88917214)
+用数学表达有：
+
+- 对于固定生成器 $G$，判别器的最优解为
+  $$
+  D^*(x)=\frac{p_{data}(x)}{p_{data}(x)+p_g(x)}.
+  $$
+
+把该最优判别器代回目标函数后，生成器的目标等价于最小化真实分布与生成分布之间的JS散度：
+$$
+  C(G)\equiv V\big(G,D^*\big) = -\log 4 + 2\,\mathrm{JS}\big(p_{data}\parallel p_g\big).
+$$
+
+因为 $JS \ge 0$ 且当且仅当 $p_g=p_{data}$ 时为 0，所以在纳什均衡处 $p_g=p_{data}$，此时 $D^*(x)=\tfrac{1}{2}$。
 
 
 #### 详细证明
 **步骤1：求解最优判别器**
 
 对于固定的生成器G，判别器D的目标是最大化：
+
+$$V(G,D) = E_{x \sim p_{data}}[\log D(x)] + E_{z \sim p_z}[\log(1-D(G(z)))]$$
+
+
+其中 $E$ 表示数学期望，展开得：
+
 $$V(G,D) = \int_x p_{data}(x)\log D(x)dx + \int_z p_z(z)\log(1-D(G(z)))dz$$
 
-由于 $p_g(x) = \int_z p_z(z)\delta(x-G(z))dz$，可以重写为：
+因此把第二项用狄拉克函数展开有：  
+$$
+  \log(1 - D(G(z))) = \int_x \log(1 - D(x)) \, \delta\big(x - G(z)\big) \, dx.
+$$
+把上面的表达式代回原积分：
+
+$$
+\begin{aligned}
+&\int_z p_z(z) \log(1 - D(G(z))) \, dz \\
+&= \int_z p_z(z) \left[ \int_x \log(1 - D(x)) \, \delta(x - G(z)) \, dx \right] dz.
+\end{aligned}
+$$
+
+交换积分顺序（Fubini 定理，在广义函数意义下成立）：
+
+$$
+= \int_x \log(1 - D(x)) \left[ \int_z p_z(z) \, \delta(x - G(z)) \, dz \right] dx.
+$$
+
+又因为 $p_g(x) = \int_z p_z(z)\delta(x-G(z))dz$，代入有：
+
 $$V(G,D) = \int_x p_{data}(x)\log D(x) + p_g(x)\log(1-D(x))dx$$
 
-对于任意固定的x，最优的D(x)应该最大化：
-$$f(D) = p_{data}(x)\log D(x) + p_g(x)\log(1-D(x))$$
+写成期望的形式：
+$$V(G,D) = E_{x \sim p_{data}}[\log D(x)] + E_{x \sim p_g}[\log(1-D(x))]$$
+
+注意：$D(x)$ 在每个 $x$ 处独立出现，因此对于固定的 $G$，求使 $V(G,D)$ 最大化的 $D$ 可以逐点（对每个 $x$）独立求解，因此可以通过求被积函数的极值点来最大化概率。
+
+$$\text{令} f(D) = p_{data}(x)\log D(x) + p_g(x)\log(1-D(x))$$
 
 对D求导并令其为0：
 $$\frac{\partial f}{\partial D} = \frac{p_{data}(x)}{D(x)} - \frac{p_g(x)}{1-D(x)} = 0$$
 
+二阶导数为
+
+$$\frac{\partial^2 f}{\partial D^2} = -\frac{p_{data}(x)}{D(x)^2} - \frac{p_g(x)}{(1-D(x))^2} < 0$$
+
+因此该临界点是全局最大值（对每个 $x$）。若 $p_{data}(x)=p_g(x)=0$，则该点在积分意义上不影响结果（可任意定义）。
+
 解得最优判别器：
 $$D^*_G(x) = \frac{p_{data}(x)}{p_{data}(x) + p_g(x)}$$
 
-**步骤2：将最优判别器代入目标函数**
+**步骤2：将最优判别器代回目标函数**
 
 将 $D^*_G(x)$ 代入原始目标函数：
-$$C(G) = \max_D V(G,D) = V(G,D^*_G)$$
+$$
+\begin{aligned}
+C(G) \equiv V\big(G,D^*\big)
+&= \int \Big[ p_{data}(x)\log D^*(x) + p_g(x)\log\big(1-D^*(x)\big) \Big] dx \\
+&= \int \Big[ p_{data}\log\frac{p_{data}}{p_{data}+p_g}
+            + p_g\log\frac{p_g}{p_{data}+p_g} \Big] dx \\
+&= \int \Big[ p_{data}\log p_{data} + p_g\log p_g
+            - (p_{data}+p_g)\log(p_{data}+p_g) \Big] dx \\
+&= E_{x\sim p_{data}}\left[\log\frac{p_{data}(x)}{p_{data}(x) + p_g(x)}\right] + E_{x\sim p_g}\left[\log\frac{p_g(x)}{p_{data}(x) + p_g(x)}\right]
+\end{aligned}
+$$
 
-$$= \mathbb{E}_{x\sim p_{data}}\left[\log\frac{p_{data}(x)}{p_{data}(x) + p_g(x)}\right] + \mathbb{E}_{x\sim p_g}\left[\log\frac{p_g(x)}{p_{data}(x) + p_g(x)}\right]$$
 
 **步骤3：变换为JS散度**
 
@@ -127,19 +294,18 @@ $$\log\frac{p_{data}(x)}{p_{data}(x) + p_g(x)} = \log\frac{p_{data}(x)}{2 \cdot 
 $$C(G) = \log 4 + KL(p_{data} \| M) + KL(p_g \| M)$$
 
 根据JS散度的定义：
+
 $$JS(p_{data} \| p_g) = \frac{1}{2}KL(p_{data} \| M) + \frac{1}{2}KL(p_g \| M)$$
 
-我们得到：
-$$C(G) = \log 4 + 2 \cdot JS(p_{data} \| p_g)$$
+我们得到
 
-**步骤4：生成器的优化目标**
+$$C(G) = \log 4 + 2 \cdot JS(p_{data} \| p_g)$$
 
 由于生成器G要最小化 $C(G)$，而 $\log 4$ 是常数，因此：
 $$\min_G C(G) \Leftrightarrow \min_G JS(p_{data} \| p_g)$$
 
-**关键洞察：**
-
-1. 当且仅当 $p_g = p_{data}$ 时，JS散度为0，达到全局最小值
+根据JS散度的性质和公式，有：
+1. 当且仅当 $p_g=p_{data}$ 时，JS散度为0，达到全局最小值
 2. 此时最优判别器 $D^*_G(x) = \frac{1}{2}$，无法区分真假样本
 3. 这证明了GAN在理论上能够学习到真实数据分布
 
@@ -149,7 +315,7 @@ $$\min_G C(G) \Leftrightarrow \min_G JS(p_{data} \| p_g)$$
 2. **判别器的作用**：判别器不仅仅是一个分类器，它实际上在估计两个分布的密度比
 3. **收敛性保证**：在理想条件下（无限容量、充分训练），GAN能够收敛到真实数据分布
 
-然而，这个理论分析基于几个理想假设（如无限容量的模型、全局最优等），在实践中可能难以满足，这也是GAN训练不稳定的原因之一。
+然而，这个理论分析基于几个理想假设（如无限容量的模型、全局最优等），在实践中难以满足，这也是GAN训练不稳定的原因之一。
 
 ### GAN的优势与挑战
 
