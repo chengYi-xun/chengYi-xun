@@ -70,11 +70,13 @@ $$x \xrightarrow{\text{Encoder}} q_\phi(z|x) \xrightarrow{\text{Sample}} z \xrig
 编码器根据输入图像预测对应先验分布的均值和协方差，经过重采样得到隐变量$z$，隐变量通过解码器得到原始的数据分布$x$。
 
 **编码器（Encoder/Recognition Network）**：
+
 - 输入：观测数据 $x$
 - 输出：隐变量后验分布的参数 $\mu_\phi(x)$ 和 $\sigma_\phi(x)$
 - 功能：学习近似后验分布 $q_\phi(z|x) = \mathcal{N}(\mu_\phi(x), \sigma^2_\phi(x))$
 
 **解码器（Decoder/Generative Network）**：
+
 - 输入：隐变量 $z$
 - 输出：重构数据的条件分布 $p_\theta(x|z)$
 - 功能：学习从隐变量空间到数据空间的映射，生成与原始数据相似的样本
@@ -98,18 +100,15 @@ $$\mathcal{L}_{VAE} = -ELBO = -\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] + \t
    **为什么VAE的逐像素优化不会产生均值灾难？**
    
    虽然VAE在实践中也使用逐像素的MSE或BCE损失，但它巧妙地避免了[均值灾难](../2-generation-model.md)问题。关键原因如下：
-   
+
    - **概率建模**：VAE将解码器建模为条件概率分布 $p_\theta(x|z)$，而不是确定性函数。每个隐变量 $z$ 对应一个输出分布，而非单一图像
-   
    - **隐变量采样**：通过从 $q_\phi(z|x)$ 采样不同的 $z$，同一输入可以产生多样化的重构结果，避免了输出单一"平均图像"
-   
    - **分布约束**：KL散度项迫使编码器学习结构化的隐空间，使得相似的输入映射到相似的隐变量区域，但仍保持足够的变异性
-   
    - **变分框架**：重构损失是对期望的优化：$\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]$，这意味着模型在多个采样的 $z$ 上平均优化，而非对固定输出优化
-   
    - 本质上，VAE通过概率建模和隐变量的随机性，将"一对一的确定性重构"转化为"一对多的概率性生成"，从而绕过了均值灾难的陷阱。
   
 2. **KL散度正则化项（KL Divergence Regularization）**：
+
    $$\mathcal{L}_{KL} = \text{KL}(q_\phi(z|x) \| p(z))$$
    - 约束编码器输出的隐变量分布接近先验分布，不让编码后的空间过于发散。一般选用标准高斯分布作为先验分布$p(z) = \mathcal{N}(0, I)$ ，又因为编码器估计了输入图像的协方差和均值 $$q_\phi(z|x) = \mathcal{N}(\mu_\phi(x), \sigma^2_\phi(x))$$ 因此这两个高斯分布的KL散度有解析形式：
    $$\text{KL}(q_\phi(z|x) \| p(z)) = \frac{1}{2}\sum_{j=1}^{J}(1 + \log(\sigma^2_j) - \mu^2_j - \sigma^2_j)$$
