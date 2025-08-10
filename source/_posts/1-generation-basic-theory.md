@@ -165,11 +165,11 @@ $$\mathrm{KL}(q(z)\parallel P(z\mid x)) = E_q[\log q(z)] - E_q[\log P(x,z)] + \l
 
 这里我们定义
 
-$$ELBO =E_q[\log P(x,z)] - E_q[\log q(z)]$$
+$$ELBO = {E_q}[\log P(x,z)] - {E_q}[\log q(z)] = {E_q}\left( {\log (x|z)} \right)$$
 
 因此就有
 
-$$\log P(x)=ELBO+\mathrm{KL}(q(z)\parallel P(z\mid x))$$
+$$\log P(x)=ELBO-\mathrm{KL}(q(z)\parallel P(z\mid x))$$
 
 又因为KL散度的非负性，因此我们得出了生成领域非常著名公式：
 
