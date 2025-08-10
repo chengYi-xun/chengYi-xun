@@ -6,9 +6,8 @@ mathjax: true
 categories:
  - Notes
 tags:
- - Deep learning
- - Generative models theory
-series: Diffusion Models theory
+ - thinking
+series: other talk
 ---
 
 # 写作的目的
