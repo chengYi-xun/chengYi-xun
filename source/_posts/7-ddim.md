@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（五）：DDPM理论
+title: 笔记｜生成模型（六）：DDIM理论
 date: 2025-08-12 23:08:30
 cover: false
 mathjax: true
