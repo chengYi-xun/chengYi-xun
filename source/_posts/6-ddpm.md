@@ -24,16 +24,47 @@ series: Diffusion Models theory
 
 # 前向过程
 
-我们从比较简单的前向过程开始，第一个问题是如何向图像中添加高斯噪声。在 DDPM 中，加噪的方式是直接对图像和标准高斯噪声 $\epsilon_{t-1}\sim\mathcal{N}(0,\mathbf{I})$ 进行加权求和：
+
+我们从比较简单的前向过程开始。首先回顾一下线性组合的方差公式：对于常数 $a, b$ 和**独立随机变量** $X, Y$，有
+
 $$
-\mathbf{x}_{t}=\sqrt{1-\beta_t}\mathbf{x}_{t-1}+\sqrt{\beta_t}\epsilon_{t-1}
+\mathrm{Var}(aX+bY) = a^2\mathrm{Var}(X) + b^2\mathrm{Var}(Y)。
 $$
+
+如果 $X, Y$ 不独立，还需要加上 $2ab\,\mathrm{Cov}(X,Y)$ 的交叉协方差项。
+
+另外，一个常用的概念是**马尔科夫链**：设 $\{X_t\}_{t=0}^\infty$ 是一个随机过程，如果对于任意时刻 $t$ 和状态 $i_0, i_1, \ldots, i_{t+1}$，都有
+
+$$
+P(X_{t+1} \mid X_0, X_1, \ldots, X_t) = P(X_{t+1} \mid X_t)，
+$$
+
+那么称 $\{X_t\}$ 为马尔科夫链，即未来状态只依赖于当前状态，与过去状态无关。
+
+在前向加噪过程中，我们希望对图像逐步添加高斯噪声，并且在设定条件下保持总体方差不变。令初始图像为 $x_0$，标准高斯噪声为 $\epsilon_t \sim \mathcal{N}(0,\mathbf{I})$，且假设 $\epsilon_t$ 与 $x_{t-1}$ 独立。我们构造递推：
+
+$$
+x_t = \sqrt{1-\beta_t}\,x_{t-1} + \sqrt{\beta_t}\,\epsilon_t，
+$$
+
+此时协方差满足：
+
+$$
+\mathrm{Cov}(x_t) = (1-\beta_t)\,\mathrm{Cov}(x_{t-1}) + \beta_t\,\mathbf{I}。
+$$
+
+如果初始协方差 $\mathrm{Cov}(x_0) = \mathbf{I}$，那么递推可保证对所有 $t$ 有 $\mathrm{Cov}(x_t) = \mathbf{I}$。
+
+将上式写成条件概率分布的形式，可以得到：
+
+$$
+q(x_t \mid x_{t-1}) = \mathcal{N}\!\big(x_t;\ \sqrt{1-\beta_t}\,x_{t-1},\ \beta_t\,\mathbf{I} \big)，
+$$
+
+其中均值是 $\sqrt{1-\beta_t}\,x_{t-1}$，协方差矩阵是 $\beta_t\mathbf{I}$，每个维度的标准差为 $\sqrt{\beta_t}$。
+
 这里的 $\beta_t$ 就是每一步加噪使用的方差，在实际上进行加噪时，起始时使用的方差比较小，随着加噪步骤增加，方差会逐渐增大。例如在 DDPM 的原文中，使用的方差是从 $\beta_1=10^{-4}$ 随加噪时间步线性增大到 $\beta_T=0.02$。这样设置主要是为了方便模型进行学习，如果在最开始就加入很大的噪声，对图像信息的破坏会比较严重，不利于模型学习图像的信息。这个过程也可以从反向进行理解，即去噪时先去掉比较大的噪音得到图像的雏形，再去掉小噪音进行细节的微调。
 
-在上边的公式里，我们可以认为 $\mathbf{x}_t$ 满足均值为 $\sqrt{1-\beta_t}\mathbf{x}_{t-1}$，标准差为 $\sqrt{\beta_t}\mathbf{I}$ 的高斯分布。这样可以把上述加权求和的过程写成条件概率分布的形式：
-$$
-q(\mathbf{x}_t|\mathbf{x}_{t-1})=\mathcal{N}(\mathbf{x}_t;\sqrt{1-\beta_t}\mathbf{x}_{t-1},\beta_t\mathbf{I})
-$$
 上边等号的右边表示的就是当前的变量 $\mathbf{x}_t$ 满足一个 $\mathcal{N}(\sqrt{1-\beta_t}\mathbf{x}_{t-1},\beta_t\mathbf{I})$ 的概率分布。通过上边的公式我们可以看到，每一个时间步的 $\mathbf{x}_t$ 都只和 $\mathbf{x}_{t-1}$ 有关，因此这个扩散过程是一个马尔可夫过程。在前向过程中，每一步的 $\beta$ 都是固定的，真正的变量只有 $\mathbf{x}_{t-1}$，那么我们可以将公式中的 $\mathbf{x}_{t-1}$ 进一步展开：
 $$
 \begin{aligned}
