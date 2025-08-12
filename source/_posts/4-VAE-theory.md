@@ -84,38 +84,112 @@ $$x \xrightarrow{\text{Encoder}} q_\phi(z|x) \xrightarrow{\text{Sample}} z \xrig
 
 **损失函数**：
 
-VAE的损失函数基于证据下界（ELBO，Evidence Lower BOund），通过最大化ELBO来间接最大化对数边际似然：
+### VAE的损失函数推导
 
-$$\mathcal{L}_{VAE} = -ELBO = -\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] + \text{KL}(q_\phi(z|x) \| p(z))$$
+VAE使用一个encoder将高维数据$x$编码为低维隐变量$z$，再用一个decoder将$z$还原回$p(x|z)$：
 
-损失函数由两个关键部分组成：
+$$Loss = \mathbb{E}_{z \sim q(z|x)}[-\log p_\theta(x|z)] + \text{KL}(q_\phi(z|x) \| p(z))$$
 
-1. **重构损失（Reconstruction Loss）**：
+- 第一项是基于encoder得到的$z$经过decoder后的重建损失（类似于正则项）
+- 第二项是encoder预测分布与先验分布之间的KL散度
 
-   $$\mathcal{L}_{recon} = -\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]
-   = \|x - \hat{x}\|_2^2$$
-   衡量编码器编码高维数据的能力和解码器重构原始输入的能力，一般求输入图像和输出
-   图像之间的$BCE-LOSS$或者$MSE-LOSS$（逐像素误差）
+### 分布假设与公式详解
 
-   **为什么VAE的逐像素优化不会产生均值灾难？**
+为了使VAE的损失函数具有解析形式，我们需要对各个分布做出合理假设：
+
+1. **先验分布 $p(z)$**：假设为标准正态分布 $\mathcal{N}(0, I)$
+
+2. **编码器输出 $q(z|x)$**：输出为正态分布 $\mathcal{N}(\mu_\phi(x), \Sigma_\phi(x))$，并简化假设各维度独立，即 $\Sigma_\phi(x) = \text{diag}(\sigma^2_\phi(x))$，最终形式为 $\mathcal{N}(\mu_\phi(x), \sigma_\phi(x))$
+
+3. **解码器输出 $p(x|z)$**：同样假设为正态分布 $\mathcal{N}(\mu_\theta(z), \Sigma_\theta(z))$，并简化假设各维度独立且方差为常数，即 $\Sigma_\theta(x) = \text{diag}(\sigma^2_\theta(x)) = \sigma^2 I$
+
+### 损失函数的具体形式
+
+基于上述假设，我们可以推导出损失函数的解析形式：
+
+1. **KL散度项**：
    
-   虽然VAE在实践中也使用逐像素的MSE或BCE损失，但它巧妙地避免了[均值灾难](../2-generation-model.md)问题。关键原因如下：
+   两个高斯分布之间的KL散度有解析解。对于 $q_\phi(z|x) = \mathcal{N}(\mu_\phi(x), \Sigma_\phi(x))$ 和 $p(z) = \mathcal{N}(0, I)$：
+   
+   $$\begin{align*}
+   \text{KL}(q_\phi(z|x) \| p(z)) &= \int q_\phi(z|x) \log \frac{q_\phi(z|x)}{p(z)} dz \\
+   &= \mathbb{E}_{z \sim q_\phi(z|x)}\left[\log q_\phi(z|x) - \log p(z)\right]
+   \end{align*}$$
+   
+   对于两个多维高斯分布 $\mathcal{N}(\mu_1, \Sigma_1)$ 和 $\mathcal{N}(\mu_2, \Sigma_2)$，KL散度的通用公式为：
+   
+   $$\text{KL}(\mathcal{N}(\mu_1, \Sigma_1) \| \mathcal{N}(\mu_2, \Sigma_2)) = \frac{1}{2}\left[\text{tr}(\Sigma_2^{-1}\Sigma_1) + (\mu_2-\mu_1)^T\Sigma_2^{-1}(\mu_2-\mu_1) - d + \log\frac{\det(\Sigma_2)}{\det(\Sigma_1)}\right]$$
+   
+   在我们的情况下，$\mu_1 = \mu_\phi(x)$，$\Sigma_1 = \Sigma_\phi(x)$，$\mu_2 = 0$，$\Sigma_2 = I$，代入得：
+   
+   $$\begin{align*}
+   \text{KL}(q_\phi(z|x) \| p(z)) &= \frac{1}{2}\left[\text{tr}(I^{-1}\Sigma_\phi(x)) + (0-\mu_\phi(x))^T I^{-1}(0-\mu_\phi(x)) - d + \log\frac{\det(I)}{\det(\Sigma_\phi(x))}\right] \\
+   &= \frac{1}{2}\left[\text{tr}(\Sigma_\phi(x)) + \mu_\phi(x)^T\mu_\phi(x) - d + \log 1 - \log\det(\Sigma_\phi(x))\right] \\
+   &= \frac{1}{2}\left[\text{tr}(\Sigma_\phi(x)) + \mu_\phi(x)^T\mu_\phi(x) - d - \log\det(\Sigma_\phi(x))\right]
+   \end{align*}$$
+   
+   当假设各维度独立时，$\Sigma_\phi(x) = \text{diag}(\sigma^2_\phi(x)_1, ..., \sigma^2_\phi(x)_d)$，则：
+   - $\text{tr}(\Sigma_\phi(x)) = \sum_{i=1}^{d} \sigma^2_\phi(x)_i$
+   - $\mu_\phi(x)^T\mu_\phi(x) = \sum_{i=1}^{d} \mu^2_\phi(x)_i$
+   - $\log\det(\Sigma_\phi(x)) = \sum_{i=1}^{d} \log\sigma^2_\phi(x)_i$
+   
+   因此最终得到：
+   $$\text{KL}(q_\phi(z|x) \| p(z)) = \frac{1}{2}\sum_{i=1}^{d}(\mu^2_\phi(x)_i + \sigma^2_\phi(x)_i - 1 - \log\sigma^2_\phi(x)_i)$$
 
-   - **概率建模**：VAE将解码器建模为条件概率分布 $p_\theta(x|z)$，而不是确定性函数。每个隐变量 $z$ 对应一个输出分布，而非单一图像
-   - **隐变量采样**：通过从 $q_\phi(z|x)$ 采样不同的 $z$，同一输入可以产生多样化的重构结果，避免了输出单一"平均图像"
-   - **分布约束**：KL散度项迫使编码器学习结构化的隐空间，使得相似的输入映射到相似的隐变量区域，但仍保持足够的变异性
-   - **变分框架**：重构损失是对期望的优化：$\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]$，这意味着模型在多个采样的 $z$ 上平均优化，而非对固定输出优化
-   - 本质上，VAE通过概率建模和隐变量的随机性，将"一对一的确定性重构"转化为"一对多的概率性生成"，从而绕过了均值灾难的陷阱。
-  
-2. **KL散度正则化项（KL Divergence Regularization）**：
 
-   $$\mathcal{L}_{KL} = \text{KL}(q_\phi(z|x) \| p(z))$$
-   - 约束编码器输出的隐变量分布接近先验分布，不让编码后的空间过于发散。一般选用标准高斯分布作为先验分布$p(z) = \mathcal{N}(0, I)$ ，又因为编码器估计了输入图像的协方差和均值 $$q_\phi(z|x) = \mathcal{N}(\mu_\phi(x), \sigma^2_\phi(x))$$ 因此这两个高斯分布的KL散度有解析形式：
-   $$\text{KL}(q_\phi(z|x) \| p(z)) = \frac{1}{2}\sum_{j=1}^{J}(1 + \log(\sigma^2_j) - \mu^2_j - \sigma^2_j)$$
-   - 其中 $J$ 是隐变量的维度。这个解析形式使得VAE的训练非常高效。
+   为避免乘法麻烦，可让encoder直接预测 $\log\sigma^2_\phi(x)$ 而非 $\sigma^2_\phi(x)$，避免加激活函数：
+   $$\sigma_\phi(x) = \exp(0.5 * (\log\sigma^2_\phi(x)))$$
 
-实际训练中的损失函数会有一个平衡重构质量和正则化强度的超参数 $\beta$ ，但是据我经验 $\beta$ 值一般都较小：
-$$\mathcal{L}_{VAE} = \mathcal{L}_{recon} + \beta \cdot \mathcal{L}_{KL}$$
+2. **重建损失项**：
+
+   由于我们假设解码器输出 $p_\theta(x|z) = \mathcal{N}(\mu_\theta(z), \Sigma_\theta(z))$，即给定隐变量$z$时，$x$服从均值为$\mu_\theta(z)$、协方差为$\Sigma_\theta(z)$的高斯分布。
+   
+   对于D维高斯分布，其概率密度函数为：
+   $$p_\theta(x|z) = \frac{1}{(2\pi)^{D/2}|\Sigma_\theta(z)|^{1/2}} \exp\left(-\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\right)$$
+   
+   取负对数：
+   $$-\log p_\theta(x|z) = -\log\left[\frac{1}{(2\pi)^{D/2}|\Sigma_\theta(z)|^{1/2}} \exp\left(-\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\right)\right]$$
+   
+   利用对数性质 $\log(ab) = \log a + \log b$ 和 $\log(1/a) = -\log a$：
+   $$= \log(2\pi)^{D/2} + \log|\Sigma_\theta(z)|^{1/2} + \frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))$$
+   
+   进一步化简：
+   $$= \frac{D}{2}\log(2\pi) + \frac{1}{2}\log|\Sigma_\theta(z)| + \frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))$$
+   
+   因此得到：
+   $$-\log p_\theta(x|z) = \frac{D}{2}\log(2\pi) + \frac{1}{2}\log\det(\Sigma_\theta(z)) + \frac{1}{2}(x - \mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x - \mu_\theta(z))$$
+
+   其中：
+   - **D** 是数据的维度（例如，对于28×28的MNIST图像，D=784）
+   - 第一项 $\frac{D}{2}\log(2\pi)$ 是归一化常数项
+   - 第二项是协方差矩阵行列式的对数
+   - 第三项是马氏距离（Mahalanobis distance）
+
+在简化假设下（各维度独立且方差为常数），这等价于：
+$$= \frac{D}{2}\log(2\pi) + \frac{D}{2}\log\sigma^2 + \frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2$$
+
+进一步简化，重建损失可以表示为：
+$$\Rightarrow \frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2 \quad \text{(MSE Loss!)}$$
+
+**注意事项**：
+1. nn.MSELoss在计算均方误差时默认是对所有维度上取平均的，返回值是针对一个像素维度的平均值。也就是对每个样本的所有元素的平方差进行求和，然后除以元素总数，这意味着在每个样本的所有预测值和目标值之间的所有元素上都会计算平均值。
+2. 但是二项KL散度的结果是在latent维度上的和，两loss在量级上容易失衡
+3. 方法一：MSELoss在batch维度算平均；方法二：KL项前加系数缩小
+
+最终，完整的损失函数为：
+$$Loss = \frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2 + \frac{1}{2}\sum_{i=1}^{d}(\mu^2_\phi(x)_i + \sigma^2_\phi(x)_i - 1 - \log\sigma^2_\phi(x)_i), z \in \mathcal{N}(\mu_\phi(x), \text{diag}(\sigma_\phi(x)))$$
+
+其中一般 $\sigma^2 = 1$
+
+**为什么VAE的逐像素优化不会产生均值灾难？**
+
+虽然VAE在实践中也使用逐像素的MSE或BCE损失，但它巧妙地避免了[均值灾难](../2-generation-model.md)问题。关键原因如下：
+
+- **概率建模**：VAE将解码器建模为条件概率分布 $p_\theta(x|z)$，而不是确定性函数。每个隐变量 $z$ 对应一个输出分布，而非单一图像
+- **隐变量采样**：通过从 $q_\phi(z|x)$ 采样不同的 $z$，同一输入可以产生多样化的重构结果，避免了输出单一"平均图像"
+- **分布约束**：KL散度项迫使编码器学习结构化的隐空间，使得相似的输入映射到相似的隐变量区域，但仍保持足够的变异性
+- **变分框架**：重构损失是对期望的优化：$\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]$，这意味着模型在多个采样的 $z$ 上平均优化，而非对固定输出优化
+- 本质上，VAE通过概率建模和隐变量的随机性，将"一对一的确定性重构"转化为"一对多的概率性生成"，从而绕过了均值灾难的陷阱。
 
 聪明的同学可能会注意到，估计均值和方差再随机采样的方式是不可导的，梯度如何反传到编码器上？这就不得不提重参数化技巧的重要性了。
 
