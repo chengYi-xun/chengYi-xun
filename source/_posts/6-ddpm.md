@@ -53,17 +53,15 @@ $$
 \mathrm{Cov}(x_t) = (1-\beta_t)\,\mathrm{Cov}(x_{t-1}) + \beta_t\,\mathbf{I}。
 $$
 
-如果初始协方差 $\mathrm{Cov}(x_0) = \mathbf{I}$，那么递推可保证对所有 $t$ 有 $\mathrm{Cov}(x_t) = \mathbf{I}$。
-
 将上式写成条件概率分布的形式，可以得到：
 
 $$
 q(x_t \mid x_{t-1}) = \mathcal{N}\!\big(x_t;\ \sqrt{1-\beta_t}\,x_{t-1},\ \beta_t\,\mathbf{I} \big)，
 $$
 
-其中均值是 $\sqrt{1-\beta_t}\,x_{t-1}$，协方差矩阵是 $\beta_t\mathbf{I}$，每个维度的标准差为 $\sqrt{\beta_t}$。
+其中均值是 $\sqrt{1-\beta_t}\,x_{t-1}$，协方差是 $\beta_t$，每个维度的标准差为 $\sqrt{\beta_t}$。
 
-这里的 $\beta_t$ 就是每一步加噪使用的方差，在实际上进行加噪时，起始时使用的方差比较小，随着加噪步骤增加，方差会逐渐增大。例如在 DDPM 的原文中，使用的方差是从 $\beta_1=10^{-4}$ 随加噪时间步线性增大到 $\beta_T=0.02$。这样设置主要是为了方便模型进行学习，如果在最开始就加入很大的噪声，对图像信息的破坏会比较严重，不利于模型学习图像的信息。这个过程也可以从反向进行理解，即去噪时先去掉比较大的噪音得到图像的雏形，再去掉小噪音进行细节的微调。
+在实际上进行加噪时，起始时使用的方差比较小，随着加噪步骤增加，方差会逐渐增大。例如在 DDPM 的原文中，使用的方差是从 $\beta_1=10^{-4}$ 随加噪时间步线性增大到 $\beta_T=0.02$。这样设置主要是为了方便模型进行学习，如果在最开始就加入很大的噪声，对图像信息的破坏会比较严重，不利于模型学习图像的信息。这个过程也可以从反向进行理解，即去噪时先去掉比较大的噪音得到图像的雏形，再去掉小噪音进行细节的微调。
 
 上边等号的右边表示的就是当前的变量 $\mathbf{x}_t$ 满足一个 $\mathcal{N}(\sqrt{1-\beta_t}\mathbf{x}_{t-1},\beta_t\mathbf{I})$ 的概率分布。通过上边的公式我们可以看到，每一个时间步的 $\mathbf{x}_t$ 都只和 $\mathbf{x}_{t-1}$ 有关，因此这个扩散过程是一个马尔可夫过程。在前向过程中，每一步的 $\beta$ 都是固定的，真正的变量只有 $\mathbf{x}_{t-1}$，那么我们可以将公式中的 $\mathbf{x}_{t-1}$ 进一步展开：
 $$
@@ -73,13 +71,36 @@ $$
 &=\sqrt{(1-\beta_t)(1-\beta_{t-1})}\mathbf{x}_{t-2}+\sqrt{(1-\beta_t)\beta_{t-1}}\epsilon_{t-2}+\sqrt{\beta_t}\epsilon_{t-1}
 \end{aligned}
 $$
-在上边的公式里，实际上 $\epsilon_{t-2}$ 和 $\epsilon_{t-1}$ 是同分布的，都是 $\mathcal{N}(0,1)$，因此可以进行合并：
+在上边的公式里，实际上 $\epsilon_{t-2}$ 和 $\epsilon_{t-1}$ 是同分布的，都是 $\mathcal{N}(0,1)$，因此可以进行合并（**两个高斯分布的线性加权公式**）：
+
+
+{% note info %}
+**两个高斯分布线性加权的公式**
+
+**一般情况：**
+
+设 $X \sim \mathcal{N}(\mu_X, \sigma_X^2)$，$Y \sim \mathcal{N}(\mu_Y, \sigma_Y^2)$，且 $X \perp Y$（独立），则：
+
+$$aX + bY \ \sim\  \mathcal{N}\big(a\mu_X + b\mu_Y,\ a^2\sigma_X^2 + b^2\sigma_Y^2 \big)$$
+
+**零均值同分布的特例：**
+
+若 $X, Y \stackrel{i.i.d.}{\sim} \mathcal{N}(0, 1)$，则：
+
+$$aX + bY \ \sim\  \mathcal{N}\big(0,\ a^2 + b^2 \big)$$
+
+或者写作：
+
+$$aX + bY \ \stackrel{d}{=}\ \sqrt{a^2 + b^2}\,\epsilon, \quad \epsilon \sim \mathcal{N}(0, 1)$$
+{% endnote %}
+因此有
 $$
 \begin{aligned}
 \mathbf{x}_t&=\sqrt{(1-\beta_t)(1-\beta_{t-1})}\mathbf{x}_{t-2}+\sqrt{(\sqrt{(1-\beta_t)\beta_{t-1}})^2+(\sqrt{\beta_t})^2}\bar{\epsilon}_{t-2}\\
 &=\sqrt{(1-\beta_t)(1-\beta_{t-1})}\mathbf{x}_{t-2}+\sqrt{1-(1-\beta_t)(1-\beta_{t-1})}\bar{\epsilon}_{t-2}
 \end{aligned}
 $$
+
 令 $\alpha_t=1-\beta_t$，$\bar{\alpha}_t=\prod_{i=1}^t\alpha_i$，继续推导，可以得到：
 $$
 \begin{aligned}
@@ -143,7 +164,7 @@ $$
 $$
 注意在反向过程中我们并不知道在前向过程中加入的噪声 $\epsilon$ 是 $\mathcal{N}(0,1)$ 中的具体哪一个噪声，而噪声也没有办法继续转换成其他的形式。因此我们使用神经网络在反向过程中估计的目标就是 $\tilde{\epsilon}$。在这个网络中，输入除了 $\mathbf{x}_t$ 之外还需要 $t$，可以简单理解为：加噪过程中 $\mathbf{x}_t$ 的噪声含量是由 $t$ 决定的，因此在预测噪声时也需要知道时间步 $t$​ 作为参考，以降低预测噪声的难度。
 
-注：关于反向过程为什么要这样做，Lilian Weng 基于变分推断给出了[一个复杂的证明](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)，因为过于难以理解，这里暂且把它跳过。（以后有可能会填坑，也有可能不会x）
+注：关于反向过程为什么要这样做，Lilian Weng 基于变分推断给出了[一个复杂的证明](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)，因为过于难以理解，这里暂且把它跳过。
 
 # 具体的训练过程
 
