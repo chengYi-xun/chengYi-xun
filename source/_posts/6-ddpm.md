@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 论文链接：*[Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239)*
 
-之前我们讨论过，生成模型的目的是：给定从真实分布 $P(x)$ 中采样的观测数据 $x$，训练得到一个由参数 $\theta$ 控制、能够逼近真实分布的模型 $p_\theta(x)$。通过学习真实数据的概率分布，使模型能够生成与训练数据相似但又不完全相同的新数据样本，从而实现数据的生成和创造。其中一个影响最大的实现方式，就是**扩散模型。**
+之前我们讨论过，生成模型的目的是：给定从真实分布 $P(x)$ 中采样的观测数据 $x$，训练得到一个由参数 $\theta$ 控制、能够逼近真实分布的模型 $p_\theta(x)$，这个任务太难了，所以使用变分推断去逼近，即为从一个标准高斯分布出发，经过某种映射或推导得到真实分布。而这个“某种映射”，并不要求一步到位，可以分多步执行。其中一个影响最大的实现方式，就是**扩散模型。**
 
 扩散模型的名字来源于物理中的扩散过程，对于一张图像来说，类比扩散过程，向这张图像逐渐加入高斯噪声，当加入的次数足够多的时候，图像中像素的分布也会逐渐变成一个高斯分布。当然这个过程也可以反过来，如果我们设计一个神经网络，每次能够从图像中去掉一个高斯噪声，那么最后就能从一个高斯噪声得到一张图像。虽然一张有意义的图像不容易获得，但高斯噪声很容易采样，如果能实现这个逆过程，就能实现图像的生成。
 
@@ -52,6 +52,8 @@ $$
 $$
 \mathrm{Cov}(x_t) = (1-\beta_t)\,\mathrm{Cov}(x_{t-1}) + \beta_t\,\mathbf{I}。
 $$
+
+
 
 将上式写成条件概率分布的形式，可以得到：
 
@@ -172,9 +174,22 @@ $$
 
 ![DDPM 训练](/chengYi-xun/img/ddpm-training.jpg)
 
-在上面的算法中，首先从数据集 $q(\mathbf{x}_0)$ 中采样出 $\mathbf{x}_0$，从 1 到 T 的均匀分布中采样出 $t$，从标准高斯分布中采样出 $\epsilon$。然后根据 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$ 将 $\mathbf{x}_0$ 与 $\epsilon$ 加权求和得到噪声图，最后将噪声图和时间步输入到网络中预测噪声，并用真实的噪声计算出 L2 损失进行优化。
+该算法的核心步骤如下：
 
-这里比较难理解的是 $\epsilon$ 本身就是从标准高斯分布中采样出的，为什么还需要一个网络专门对其进行预测。我个人的理解是：尽管每次添加的噪声都是从固定的分布中采样出的，但如果用同一个分布中的另一个采样出的样本将其代替，就会向去噪过程引入一定的误差，最后这些误差积累的结果会破坏最终生成的图像。
+1. **数据采样**：从训练数据分布 $q(\mathbf{x}_0)$ 中随机采样一个样本 $\mathbf{x}_0$
+2. **时间步采样**：从均匀分布中随机采样时间步 $t$
+3. **噪声采样**：从标准高斯分布 $\mathcal{N}(0, \mathbf{I})$ 中采样噪声 $\epsilon$
+4. **前向扩散**：利用重参数化技巧，通过公式 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$ 直接计算第 $t$ 步的噪声图像
+5. **噪声预测**：将 $\mathbf{x}_t$ 和时间步 $t$ 输入去噪网络 $\epsilon_\theta(\mathbf{x}_t, t)$，预测添加的噪声
+6. **损失计算**：计算预测噪声与真实噪声之间的 L2 损失：$\mathcal{L} = \|\epsilon - \epsilon_\theta(\mathbf{x}_t, t)\|^2$
+
+**关键理解**：这里需要澄清一个重要概念——为什么要预测"特定的"噪声 $\epsilon$ 而不是任意的高斯噪声？
+
+原因在于：虽然 $\epsilon$ 确实是从标准高斯分布中采样的，但在给定 $\mathbf{x}_0$ 和 $\mathbf{x}_t$ 的情况下，将 $\mathbf{x}_0$ 变换到 $\mathbf{x}_t$ 的噪声 $\epsilon$ 是唯一确定的。网络学习的是这种从噪声图像 $\mathbf{x}_t$ 到其对应的"噪声成分" $\epsilon$ 的映射关系。在反向去噪过程中，准确预测这个特定的噪声至关重要，因为：
+
+- 它决定了反向过程中每一步的去噪方向
+- 任何预测误差都会在多步去噪过程中累积，导致生成质量下降
+- 这种噪声预测实际上隐含地学习了数据分布的梯度信息（score function）
 
 # 具体的采样过程
 
@@ -183,11 +198,33 @@ $$
 ![DDPM 采样](/chengYi-xun/img/ddpm-sampling.jpg)
 
 
-具体来说，首先从标准正态分布中采样出 $\mathbf{x}_T$ 作为初始的图像，然后重复 $T$ 步去噪过程。在每一步去噪过程中，由于我们已经推导出：
-$$
-q(\mathbf{x}_{t-1}|\mathbf{x}_t)=\mathcal{N}\left(\mathbf{x}_{t-1};\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\tilde{\epsilon}\right),\sigma_t^2\right)
-$$
-利用一个重参数化技巧：从 $\mathcal{N}(\mu,\sigma^2)$ 采样可以实现为从 $\mathcal{N}(0,1)$ 采样出 $\epsilon$，再计算 $\mu+\epsilon\cdot\sigma$。这样即可实现从上述的高斯分布中采样出 $\mathbf{x}_{t-1}$。如此重复 $T$ 次即可得到最终的结果，注意最后一步的时候没有采样，而是只加上了均值。
+采样算法通过迭代反向去噪过程生成新样本，具体步骤如下：
+
+**算法输入**：训练好的噪声预测网络 $\epsilon_\theta(\mathbf{x}_t, t)$
+
+**算法步骤**：
+
+1. **初始化**：从标准高斯分布采样初始噪声 $\mathbf{x}_T \sim \mathcal{N}(0, \mathbf{I})$
+
+2. **迭代去噪**：对于 $t = T, T-1, ..., 1$，执行以下步骤：
+   
+   a) **噪声预测**：使用神经网络预测当前步的噪声
+      $$\hat{\epsilon} = \epsilon_\theta(\mathbf{x}_t, t)$$
+   
+   b) **计算去噪均值**：根据后验分布公式计算
+      $$\mu_\theta(\mathbf{x}_t, t) = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\hat{\epsilon}\right)$$
+   
+   c) **采样下一步**：
+      - 当 $t > 1$ 时，添加随机噪声：
+        $$\mathbf{x}_{t-1} = \mu_\theta(\mathbf{x}_t, t) + \sigma_t \mathbf{z}, \quad \text{其中} \quad \mathbf{z} \sim \mathcal{N}(0, \mathbf{I})$$
+      - 当 $t = 1$ 时，直接输出均值：
+        $$\mathbf{x}_0 = \mu_\theta(\mathbf{x}_1, 1)$$
+
+其中，方差 $\sigma_t^2$ 可以设置为：
+- $\sigma_t^2 = \beta_t$（DDPM原论文选择）
+- $\sigma_t^2 = \tilde{\beta}_t = \frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_t}\beta_t$（理论最优后验方差）
+
+**数学原理**：该算法基于重参数化技巧，将从 $\mathcal{N}(\mu, \sigma^2)$ 的采样分解为确定性的均值计算和随机的噪声添加两部分。最后一步不添加噪声是为了获得确定性的输出，避免在生成的最终图像中引入不必要的随机性。
 
 # DDPM 的代码实现
 
@@ -195,106 +232,11 @@ $$
 
 ![去噪网络的结构](/chengYi-xun/img/denoising-unet.jpg)
 
-为了降低理解的难度，我们这里不关心这个去噪网络的具体实现，只需要知道这个网络接收一个噪声图 $\mathbf{x}_t$ 和一个时间步 $t$ 作为参数，并输出一个噪声的预测结果 $\epsilon_\theta(\mathbf{x}_t,t)$。在 `diffusers` 库中已经实现了一个 2D UNet 网络，我们直接使用即可。下面我们也主要使用 `diffusers` 实现 DDPM 模型。
+在此我们不关心网络的架构，感兴趣的同学可以自己去阅读源码。这个网络接收一个噪声图 $\mathbf{x}_t$ 和一个时间步 $t$ 作为参数，并输出一个噪声的预测结果 $\epsilon_\theta(\mathbf{x}_t,t)$。
 
-## 训练参数
 
-首先配置训练的参数：
 
-```python
-from dataclasses import dataclass
-
-@dataclass
-class TrainingConfig:
-    image_size = 64
-    train_batch_size = 16
-    eval_batch_size = 16
-    num_epochs = 50
-    gradient_accumulation_steps = 1
-    learning_rate = 1e-4
-    lr_warmup_steps = 500
-    mixed_precision = "fp16"
-    output_dir = "ddpm-animefaces-64"
-    overwrite_output_dir = True
-
-config = TrainingConfig()
-```
-
-## 训练数据
-
-我们使用 `huggan/anime-faces` 数据集，这个数据集由 21551 张分辨率为 64x64 的动漫人物头像组成。我们加载这个数据集：
-
-```python
-from datasets import load_dataset
-
-dataset = load_dataset("huggan/anime-faces", split="train")
-dataset = dataset.select(range(21551))
-```
-
-由于这个数据集的作者组织数据的方式不太规范，所以最后加载进来实际上数据集的长度是 86204，也就是 21551 张图片每张重复了 4 次，我们只需要保留前 21551 个样本即可。
-
-然后为数据集设置预处理函数：
-
-```python
-from torchvision import transforms
-
-def get_transform():
-    preprocess = transforms.Compose([
-        transforms.Resize(config.image_size),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5]),
-    ])
-    def transform(samples):
-        images = [preprocess(img.convert("RGB")) for img in samples["image"]]
-        return dict(images=images)
-    return transform
-
-dataset.set_transform(get_transform())
-```
-
-最后创建 dataloader：
-
-```python
-from torch.utils.data import DataLoader
-
-dataloader = DataLoader(dataset, batch_size=config.train_batch_size, shuffle=True)
-```
-
-## 降噪网络
-
-我们可以直接用 `diffusers` 创建降噪网络：
-
-```python
-from diffusers import UNet2DModel
-
-model = UNet2DModel(
-    sample_size=config.image_size,
-    in_channels=3,
-    out_channels=3,
-    layers_per_block=2,
-    block_out_channels=(128, 128, 256, 256, 512, 512),
-    down_block_types=(
-        "DownBlock2D",
-        "DownBlock2D",
-        "DownBlock2D",
-        "DownBlock2D",
-        "AttnDownBlock2D",
-        "DownBlock2D",
-    ),
-    up_block_types=(
-        "UpBlock2D",
-        "AttnUpBlock2D",
-        "UpBlock2D",
-        "UpBlock2D",
-        "UpBlock2D",
-        "UpBlock2D",
-    ),
-)
-```
-
-## 核心代码
-
-前边的三个部分分别配置了一些训练参数，以及训练数据和模型，这些都是比较工程化的部分，而我们在上面推导的 DDPM 核心算法还没有实现。在这一小节我们主要来实现核心的算法。
+## DDPM 核心算法
 
 首先我们需要先定义 $\beta$、$\alpha$，以及 $\bar\alpha$ 等最基本的常量，这里我们保持 DDPM 原论文的配置，也就是 $\beta$ 初始为 $1\times10^{-4}$，最终为 $0.02$，且共有 $1000$ 个时间步：
 
@@ -394,81 +336,12 @@ class DDPM:
         return images
 ```
 
-## 训练与推理
-
-最后是训练和推理的代码，这部分也比较工程，直接套用现成代码即可：
-
-```python
-from accelerate import Accelerator
-from diffusers.optimization import get_cosine_schedule_with_warmup
-from diffusers.utils import make_image_grid, numpy_to_pil
-import torch.nn.functional as F
-import os
-
-model = model.cuda()
-ddpm = DDPM()
-optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
-lr_scheduler = get_cosine_schedule_with_warmup(
-    optimizer=optimizer,
-    num_warmup_steps=config.lr_warmup_steps,
-    num_training_steps=(len(dataloader) * config.num_epochs),
-)
-accelerator = Accelerator(
-    mixed_precision=config.mixed_precision,
-    gradient_accumulation_steps=config.gradient_accumulation_steps,
-    log_with="tensorboard",
-    project_dir=os.path.join(config.output_dir, "logs"),
-)
-model, optimizer, dataloader, lr_scheduler = accelerator.prepare(
-    model, optimizer, dataloader, lr_scheduler
-)
-global_step = 0
-for epoch in range(config.num_epochs):
-    progress_bar = tqdm(total=len(dataloader), disable=not accelerator.is_local_main_process, desc=f'Epoch {epoch}')
-
-    for step, batch in enumerate(dataloader):
-        clean_images = batch["images"]
-        # Sample noise to add to the images
-        noise = torch.randn(clean_images.shape, device=clean_images.device)
-        bs = clean_images.shape[0]
-        # Sample a random timestep for each image
-        timesteps = torch.randint(
-            0, ddpm.num_train_timesteps, (bs,), device=clean_images.device,
-            dtype=torch.int64
-        )
-        # Add noise to the clean images according to the noise magnitude at each timestep
-        noisy_images = ddpm.add_noise(clean_images, noise, timesteps)
-        with accelerator.accumulate(model):
-            # Predict the noise residual
-            noise_pred = model(noisy_images, timesteps, return_dict=False)[0]
-            loss = F.mse_loss(noise_pred, noise)
-            accelerator.backward(loss)
-            accelerator.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
-        progress_bar.update(1)
-        logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0], "step": global_step}
-        progress_bar.set_postfix(**logs)
-        accelerator.log(logs, step=global_step)
-        global_step += 1
-
-    if accelerator.is_main_process:
-        # evaluate
-        images = ddpm.sample(model, config.eval_batch_size, 3, config.image_size)
-        image_grid = make_image_grid(numpy_to_pil(images), rows=4, cols=4)
-        samples_dir = os.path.join(config.output_dir, 'samples')
-        os.makedirs(samples_dir, exist_ok=True)
-        image_grid.save(os.path.join(samples_dir, f'{global_step}.png'))
-        # save models
-        model.save_pretrained(config.output_dir)
-```
 
 # 总结
 
 本文总结了 DDPM 的理论和实现方式，在代码部分我们是完全根据推导出的公式实现的采样过程。实际上在很多代码库中，采样过程并没有严格按照论文中的公式实现，而是先从 $\mathbf{x}_t$、$t$ 和预测的噪声反向计算出 $\mathbf{x}_0$，再基于 $\mu=\frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}\mathbf{x}_t+\frac{\sqrt{\bar\alpha_{t-1}}\beta_t}{1-\bar\alpha_t}\mathbf{x}_0$ 计算均值，这样的好处在于可以对 $\mathbf{x}_0$ 进一步规范化，控制输出的范围。
 
-可以看出 DDPM 虽然理论比较复杂，但实现起来还是比较简单直接的。因为作者本人对 diffusion models 的理解也不算非常深入，所以如果文章有问题的话欢迎各位读者来讨论，后续（如果没有鸽掉的话）还会更新一些其他的 diffusion models 的文章，欢迎追更）
+可以看出 DDPM 虽然理论比较复杂，但实现起来还是比较简单直接的。
 
 
 > 参考资料：
