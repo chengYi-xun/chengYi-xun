@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 论文链接：*[Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502)*
 
-在[上一篇文章](https://littlenyima.github.io/posts/13-denoising-diffusion-probabilistic-models/)中我们进行了 DDPM 的理论推导，并且自己编写代码实现了 DDPM 的训练和采样过程。虽然取得了还不错的效果，但 DDPM 有一个非常明显的问题：采样过程很慢。因为 DDPM 的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了 1000 个时间步，所以我们在采样时也需要循环 1000 次去噪过程，这个过程是非常慢的。
+在[DDPM理论](../6-ddpm)中我们进行了 DDPM 的理论推导以及给出了核心代码。但 DDPM 有一个非常明显的问题：采样过程很慢。因为 DDPM 的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了 1000 个时间步，所以我们在采样时也需要循环 1000 次去噪过程，这个过程是非常慢的。
 
 为了加速 DDPM 的采样过程，DDIM 在不利用马尔可夫假设的情况下推导出了 diffusion 的反向过程，最终可以实现仅采样 20～100 步的情况下达到和 DDPM 采样 1000 步相近的生成效果，也就是提速 10～50 倍。这篇文章将对 DDIM 的理论进行讲解，并实现 DDIM 采样的代码。
 
@@ -94,63 +94,72 @@ $$
 \end{aligned}
 $$
 
-## 方差的取值
+## 方差参数化与模型变体
 
-正如我们前文中所说，我们得到的实际上是 $\mathbf{x}_\tau$ 的一组解，其中的 $\sigma_t$ 并没有固定的取值。在论文中，作者参照 DDPM 的方差的形式给出了一个 $\sigma_t$ 的形式：
+由于方差 $\sigma_t^2$ 在推导过程中未被唯一确定，DDIM论文提出了一个参数化形式：
 $$
 \sigma_t=\eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alpha_t}
 $$
 
-1. 当 $\eta=1$，生成过程与 DDPM 一致。这个感觉还是可以理解的，因为在待定系数法求解时，本身就是假定均值的形式和 DDPM 相同，如果再假定方差和 DDPM 相同，那么最后的整体形式也会变成 DDPM。
-2. 当 $\eta=0$，此时生成过程不再添加随机噪声项，唯一带有随机性的因素就是采样初始的 $\mathbf{x}_T\sim\mathcal{N}(0,1)$，因此采样的过程是确定的，每个 $\mathbf{x}_T$ 对应唯一的 $\mathbf{x}_0$，这个模型就是 DDIM。
+其中 $\eta \in [0, 1]$ 是一个控制随机性的超参数：
 
-## 采样加速
+1. **$\eta = 1$（DDPM等价）**：此时方差与DDPM的后验方差一致，采样过程完全等同于DDPM的马尔可夫过程。
 
-我们知道 DDIM 的反向过程并不依赖于马尔可夫假设，因此去噪的过程并不需要在相邻的时间步之间进行，也就是跳过一些中间的步骤。形式化地来说，DDPM 的采样时间步应当是 $[T,T-1,...,2,1]$，而 DDIM 可以直接从其中抽取一个子序列 $[\tau_S,\tau_{S-1},...,\tau_2,\tau_1]$ 进行采样。
+2. **$\eta = 0$（确定性DDIM）**：此时 $\sigma_t = 0$，采样过程变为确定性映射：
+   $$\mathbf{x}_\tau = \sqrt{\bar{\alpha}_\tau}\hat{\mathbf{x}}_0 + \sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t)$$
+   
+   其中 $\hat{\mathbf{x}}_0 = \frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}$ 是网络预测的原始图像。
 
-在 DDIM 论文的附录中，给出了两种子序列的选取方式：
+   这种确定性映射使得每个初始噪声 $\mathbf{x}_T$ 都对应唯一的生成结果 $\mathbf{x}_0$，这是DDIM的核心特性。
 
-- 线性选取：令 $\tau_i=\lfloor ci\rfloor$
-- 二次方选取：令 $\tau_i=\lfloor ci^2\rfloor$
+## 非马尔可夫采样与加速
 
-其中 $c$ 是一个常量，制定这个常量的规则是让 $\tau_{-1}$ 也就是最后一个采样时间步尽可能与 $T$ 接近。在原文的实验中，CIFAR10 使用的是二次方选取，其他数据集都使用的是线性选取方式。
+DDIM的关键优势在于其反向过程不依赖于马尔可夫假设，这意味着采样可以在任意时间步序列上进行，而不必严格按照相邻时间步的顺序。
 
-# DDIM 区别于 DDPM 的两个特性
+**理论基础**：由于DDIM的采样公式不依赖于前一时间步的具体值，我们可以从完整的时间步序列 $[T, T-1, ..., 2, 1]$ 中选择任意子序列 $[\tau_S, \tau_{S-1}, ..., \tau_2, \tau_1]$ 进行采样，其中 $S \ll T$。
 
-1. **采样一致性**：我们知道 DDIM 的采样过程是确定的，生成结果只受 $\mathbf{x}_T$ 影响。作者经过实验发现对于同一个 $\mathbf{x}_T$，使用不同的采样过程，最终生成的 $\mathbf{x}_0$ 比较相近，因此 $\mathbf{x}_T$ 在一定程度上可以看作 $\mathbf{x}_0$ 的一种嵌入。
+**子序列选择策略**：论文提出了两种时间步子序列的构造方法：
 
-   因为这个性质的存在，在生成图像时也有一个 trick。也就是一开始先选取一个较小的时间步数量生成比较粗糙的图像，如果大致样子符合预期，再使用大时间步数量进行精细生成。
+1. **线性采样**：$\tau_i = \lfloor ci \rfloor$，其中 $c = \frac{T}{S}$
+2. **二次采样**：$\tau_i = \lfloor ci^2 \rfloor$，其中 $c = \frac{T}{S^2}$
 
-2. **语义插值效应**：根据上一条性质，$\mathbf{x}_T$ 可以看作 $\mathbf{x}_0$ 的嵌入，那么它可能也具有其他隐概率模型所具有的语义差值效应。作者首先选取两个隐变量 $\mathbf{x}_T^{(0)}$ 和 $\mathbf{x}_T^{(1)}$，对其分别采样得到结果，然后使用球面线性插值得到一系列中间隐变量，这个插值定义为：
-   $$
-   \mathbf{x}_T^{(\alpha)}=\frac{\sin(1-\alpha)\theta}{\sin\theta}\mathbf{x}_T^{(0)}+\frac{\sin\alpha\theta}{\sin\theta}\mathbf{x}_T^{(1)}
-   $$
-   其中 $\theta=\arccos\left(\frac{(\mathbf{x}_T^{(0)})^T\mathbf{x}_T^{(1)}}{||\mathbf{x}_T^{(0)}||~||\mathbf{x}_T^{(1)}||}\right)$。最终也在 DDIM 上观察到了语义插值效应，我们下面也将复现这一实验。
+**加速效果**：通过选择合适的子序列，可以将采样步数从 $T$（通常为1000）减少到 $S$（通常为10-50），实现10-100倍的采样加速，同时保持生成质量。
+
+
+# DDIM 的核心特性
+
+## 1. 采样一致性（Sampling Consistency）
+
+DDIM的确定性采样过程（$\eta = 0$）赋予了模型一个独特性质：对于给定的初始噪声 $\mathbf{x}_T$，无论使用何种时间步子序列进行采样，最终生成的图像 $\mathbf{x}_0$ 都高度一致。
+
+**数学表述**：设 $\mathcal{S}_1$ 和 $\mathcal{S}_2$ 为两个不同的时间步子序列，则：
+$$\|\mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_1) - \mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_2)\| \ll \|\mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_1)\|$$
+
+**实际应用**：这一特性使得 $\mathbf{x}_T$ 可以被视为 $\mathbf{x}_0$ 的隐空间表示，类似于VAE中的隐变量。在生成过程中，可以先使用较少时间步快速生成草图预览，确认大致方向后再使用更多时间步进行精细生成。
+
+## 2. 语义插值（Semantic Interpolation）
+
+基于采样一致性，DDIM支持在隐空间中进行语义插值。给定两个隐变量 $\mathbf{x}_T^{(0)}$ 和 $\mathbf{x}_T^{(1)}$，可以通过球面线性插值（Spherical Linear Interpolation, SLERP）构造中间隐变量：
+
+$$\mathbf{x}_T^{(\alpha)} = \frac{\sin((1-\alpha)\theta)}{\sin\theta}\mathbf{x}_T^{(0)} + \frac{\sin(\alpha\theta)}{\sin\theta}\mathbf{x}_T^{(1)}$$
+
+其中 $\alpha \in [0, 1]$ 是插值参数，$\theta$ 是两向量间的夹角：
+$$\theta = \arccos\left(\frac{\langle\mathbf{x}_T^{(0)}, \mathbf{x}_T^{(1)}\rangle}{\|\mathbf{x}_T^{(0)}\| \cdot \|\mathbf{x}_T^{(1)}\|}\right)$$
+
+**插值效果**：通过这种方式生成的中间图像序列展现出平滑的语义过渡，而不是简单的像素级插值，这证明了DDIM隐空间具有良好的语义结构。
 
 # DDIM 的代码实现
 
-从上面的推导过程可以发现，DDIM 假设的前向过程和 DDPM 相同，只有采样过程不同。因此想把 DDPM 改成 DDIM 并不需要重新训练，只要修改采样过程就可以了。在[上一篇文章](https://littlenyima.github.io/posts/13-denoising-diffusion-probabilistic-models/)中我们已经训练好了一个 DDPM 模型，这里我们继续用这个训练好的模型来构造 DDIM 的采样过程。
+从上面的推导过程可以发现，DDIM 假设的前向过程和 DDPM 相同，只有采样过程不同。因此想把 DDPM 改成 DDIM 并不需要重新训练，只要修改采样过程就可以了。
 
-{% note info %}
+## 核心代码实现
 
-如果你没有看上一篇文章，也可以直接在[这个链接](https://huggingface.co/LittleNyima/ddpm-anime-faces-64)直接下载训练好的权重。
-
-{% endnote %}
-
-我们把训练好的 DDPM 模型的权重加载进来用作噪声预测网络：
-
-```python
-from diffusers import UNet2DModel
-
-model = UNet2DModel.from_pretrained('ddpm-anime-faces-64').cuda()
-```
-
-## 核心代码
-
-首先我们依然是定义一系列常量，$\alpha$、$\beta$ 等都和 DDPM 相同，只有采样的时间步不同。我们在这里直接线性选取 20 个时间步，最大的为 999，最小的为 0：
+### 1. 初始化与参数设置
 
 ```python
 import torch
+import math
+from tqdm import tqdm
 
 class DDIM:
     def __init__(
@@ -160,90 +169,132 @@ class DDIM:
         beta_end: float = 0.02,
         sample_steps: int = 20,
     ):
+        """
+        DDIM采样器初始化
+        
+        Args:
+            num_train_timesteps: 训练时的时间步数（通常为1000）
+            beta_start: β调度的起始值
+            beta_end: β调度的结束值
+            sample_steps: 采样时的时间步数（通常为10-50）
+        """
         self.num_train_timesteps = num_train_timesteps
+        
+        # 定义β调度：β_t从beta_start线性增长到beta_end
         self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
+        
+        # 计算α_t = 1 - β_t
         self.alphas = 1.0 - self.betas
+        
+        # 计算累积α：ᾱ_t = ∏_{i=1}^t α_i
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+        
+        # 定义采样时间步序列（线性采样策略）
+        # 从T-1到0，均匀选择sample_steps个时间步
         self.timesteps = torch.linspace(num_train_timesteps - 1, 0, sample_steps).long()
 ```
 
-然后是实现采样过程，和 DDPM 一样，我们把需要的公式复制到这里，然后对照着实现：
-$$
-\begin{aligned}
-\mathbf{x}_\tau&=\sqrt{\bar{\alpha}_\tau}\frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}+\sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t)+\sigma_t\epsilon\\
-\sigma_t&=\eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alpha_t}
-\end{aligned}
-$$
+### 2. DDIM采样算法
+
+DDIM的核心采样公式为：
+$$\mathbf{x}_\tau = \sqrt{\bar{\alpha}_\tau}\hat{\mathbf{x}}_0 + \sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t) + \sigma_t\epsilon$$
+
+其中方差参数化：
+$$\sigma_t = \eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alpha_t}$$
 
 ```python
-import math
-from tqdm import tqdm
-
-class DDIM:
-    ...
-
     @torch.no_grad()
     def sample(
         self,
-        unet: UNet2DModel,
+        unet,  # 预训练的噪声预测网络
         batch_size: int,
         in_channels: int,
         sample_size: int,
-        eta: float = 0.0,
+        eta: float = 0.0,  # 控制随机性的参数，η=0为确定性DDIM
     ):
+        """
+        DDIM采样过程
+        
+        Args:
+            unet: 预训练的UNet模型，用于预测噪声
+            batch_size: 批次大小
+            in_channels: 输入通道数
+            sample_size: 图像尺寸
+            eta: 随机性控制参数，η∈[0,1]
+        """
+        # 将参数转移到设备上
         alphas = self.alphas.to(unet.device)
         alphas_cumprod = self.alphas_cumprod.to(unet.device)
         timesteps = self.timesteps.to(unet.device)
-        images = torch.randn((batch_size, in_channels, sample_size, sample_size), device=unet.device)
-        for t, tau in tqdm(list(zip(timesteps[:-1], timesteps[1:])), desc='Sampling'):
-            pred_noise: torch.Tensor = unet(images, t).sample
-
-            # sigma_t
+        
+        # 初始化：从标准高斯分布采样 x_T ~ N(0, I)
+        images = torch.randn(
+            (batch_size, in_channels, sample_size, sample_size), 
+            device=unet.device
+        )
+        
+        # 迭代去噪：从T到1，使用预定义的时间步子序列
+        for t, tau in tqdm(list(zip(timesteps[:-1], timesteps[1:])), desc='DDIM Sampling'):
+            # 步骤1：使用网络预测噪声 ε_θ(x_t, t)
+            pred_noise = unet(images, t).sample
+            
+            # 步骤2：计算方差 σ_t
+            # σ_t = η * √[(1-ᾱ_τ)/(1-ᾱ_t)] * √(1-α_t)
             if not math.isclose(eta, 0.0):
-                one_minus_alpha_prod_tau = 1.0 - alphas_cumprod[tau]
-                one_minus_alpha_prod_t = 1.0 - alphas_cumprod[t]
-                one_minus_alpha_t = 1.0 - alphas[t]
-                sigma_t = eta * (one_minus_alpha_prod_tau * one_minus_alpha_t / one_minus_alpha_prod_t) ** 0.5
+                # 计算方差参数化的各个组成部分
+                one_minus_alpha_prod_tau = 1.0 - alphas_cumprod[tau]  # 1 - ᾱ_τ
+                one_minus_alpha_prod_t = 1.0 - alphas_cumprod[t]      # 1 - ᾱ_t
+                one_minus_alpha_t = 1.0 - alphas[t]                   # 1 - α_t
+                
+                sigma_t = eta * torch.sqrt(
+                    (one_minus_alpha_prod_tau * one_minus_alpha_t) / one_minus_alpha_prod_t
+                )
             else:
+                # η = 0 时，σ_t = 0，实现确定性采样
                 sigma_t = torch.zeros_like(alphas[0])
-
-            # first term of x_tau
-            alphas_cumprod_tau = alphas_cumprod[tau]
-            sqrt_alphas_cumprod_tau = alphas_cumprod_tau ** 0.5
-            alphas_cumprod_t = alphas_cumprod[t]
-            sqrt_alphas_cumprod_t = alphas_cumprod_t ** 0.5
-            sqrt_one_minus_alphas_cumprod_t = (1.0 - alphas_cumprod_t) ** 0.5
-            first_term = sqrt_alphas_cumprod_tau * (images - sqrt_one_minus_alphas_cumprod_t * pred_noise) / sqrt_alphas_cumprod_t
-
-            # second term of x_tau
-            coeff = (1.0 - alphas_cumprod_tau - sigma_t ** 2) ** 0.5
+            
+            # 步骤3：计算预测的原始图像 x̂_0
+            # x̂_0 = (x_t - √(1-ᾱ_t) * ε_θ(x_t,t)) / √ᾱ_t
+            sqrt_alphas_cumprod_t = torch.sqrt(alphas_cumprod[t])           # √ᾱ_t
+            sqrt_one_minus_alphas_cumprod_t = torch.sqrt(1.0 - alphas_cumprod[t])  # √(1-ᾱ_t)
+            
+            predicted_x0 = (images - sqrt_one_minus_alphas_cumprod_t * pred_noise) / sqrt_alphas_cumprod_t
+            
+            # 步骤4：计算DDIM采样公式的三个组成部分
+            
+            # 第一项：√ᾱ_τ * x̂_0
+            sqrt_alphas_cumprod_tau = torch.sqrt(alphas_cumprod[tau])  # √ᾱ_τ
+            first_term = sqrt_alphas_cumprod_tau * predicted_x0
+            
+            # 第二项：√(1-ᾱ_τ-σ_t²) * ε_θ(x_t,t)
+            coeff = torch.sqrt(1.0 - alphas_cumprod[tau] - sigma_t ** 2)
             second_term = coeff * pred_noise
-
-            epsilon = torch.randn_like(images)
-            images = first_term + second_term + sigma_t * epsilon
+            
+            # 第三项：σ_t * ε（随机噪声项）
+            if not math.isclose(eta, 0.0):
+                epsilon = torch.randn_like(images)
+                third_term = sigma_t * epsilon
+            else:
+                third_term = 0.0
+            
+            # 步骤5：更新图像 x_τ = 第一项 + 第二项 + 第三项
+            images = first_term + second_term + third_term
+        
+        # 后处理：将图像从[-1,1]范围转换到[0,1]范围
         images = (images / 2.0 + 0.5).clamp(0, 1).cpu().permute(0, 2, 3, 1).numpy()
         return images
 ```
 
-上面的内容和 DDPM 大同小异，只有计算公式变了，应该没有太多坑，只要看清楚变量就可以了。最后我们执行采样过程：
+### 3. 关键实现要点
 
-```python
-ddim = DDIM()
-images = ddim.sample(model, 32, 3, 64)
-
-from diffusers.utils import make_image_grid, numpy_to_pil
-image_grid = make_image_grid(numpy_to_pil(images), rows=4, cols=8)
-image_grid.save('ddim-sample-results.png')
-```
-
-
-
-
-
-
-
+1. **时间步子序列**：使用线性采样策略，从1000个训练时间步中选择20个进行采样
+2. **方差控制**：通过η参数控制随机性，η=0实现确定性采样
+3. **公式对应**：代码中的每个步骤都严格对应DDIM的数学公式
+4. **设备管理**：确保所有张量都在同一设备上计算
+5. **数值稳定性**：使用`math.isclose()`进行浮点数比较，避免精度问题
 
 > 参考资料：
 >
-> 1. [diffusion model(二)：DDIM技术小结 (denoising diffusion implicit model)](http://www.myhz0606.com/article/ddim)
-> 2. [扩散模型（一）| DDPM & DDIM](https://lichtung612.github.io/posts/1-diffusion-models/)
+> 1. [DDIM 理论与实现](https://littlenyima.github.io/posts/14-denoising-diffusion-implicit-models/)
+> 2. [diffusion model(二)：DDIM技术小结 (denoising diffusion implicit model)](http://www.myhz0606.com/article/ddim)
+> 3. [扩散模型（一）| DDPM & DDIM](https://lichtung612.github.io/posts/1-diffusion-models/)
