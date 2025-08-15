@@ -1,0 +1,434 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（六）：Score-Base理论 | AAA高老庄旺铺招租的个人博客</title><meta name="author" content="AAA高老庄旺铺招租"><meta name="copyright" content="AAA高老庄旺铺招租"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="Score-based 模型理论基础 生成模型通常从某个已有的概率分布中进行采样以生成样本。Score-based 模型的关键在于对概率分布的对数梯度，即 score function 的建模。为了学习这个对象，我们需要使用一种称为 score matching 的技术，这是 Score-based 模型名称的由来。 Score Function 和 Score-based Models 考虑一个">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（六）：Score-Base理论">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/index.html">
+<meta property="og:site_name" content="AAA高老庄旺铺招租的个人博客">
+<meta property="og:description" content="Score-based 模型理论基础 生成模型通常从某个已有的概率分布中进行采样以生成样本。Score-based 模型的关键在于对概率分布的对数梯度，即 score function 的建模。为了学习这个对象，我们需要使用一种称为 score matching 的技术，这是 Score-based 模型名称的由来。 Score Function 和 Score-based Models 考虑一个">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-15T15:08:30.000Z">
+<meta property="article:modified_time" content="2025-08-15T03:25:17.462Z">
+<meta property="article:author" content="AAA高老庄旺铺招租">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（六）：Score-Base理论',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2025-08-15 11:25:17'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 5.4.2"><link rel="alternate" href="/chengYi-xun/atom.xml" title="AAA高老庄旺铺招租的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">9</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="AAA高老庄旺铺招租的个人博客"><span class="site-name">AAA高老庄旺铺招租的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（六）：Score-Base理论</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-15T15:08:30.000Z" title="发表于 2025-08-15 23:08:30">2025-08-15</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-08-15T03:25:17.462Z" title="更新于 2025-08-15 11:25:17">2025-08-15</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（六）：Score-Base理论"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h1 id="score-based-模型理论基础">Score-based 模型理论基础</h1>
+<p>生成模型通常从某个已有的概率分布中进行采样以生成样本。Score-based
+模型的关键在于对概率分布的对数梯度，即 <strong>score function</strong>
+的建模。为了学习这个对象，我们需要使用一种称为 <strong>score
+matching</strong> 的技术，这是 Score-based 模型名称的由来。</p>
+<h2 id="score-function-和-score-based-models">Score Function 和
+Score-based Models</h2>
+<p>考虑一个数据集 <span class="math inline">\(\{\mathbf{x}_1,
+\mathbf{x}_2, \ldots, \mathbf{x}_N\}\)</span> 的概率分布 <span
+class="math inline">\(p(\mathbf{x})\)</span>，我们旨在建模此分布。我们可以使用以下形式表示这个概率分布，该形式来源于能量模型（Energy-based
+model）：</p>
+<p><span class="math display">\[
+p_\theta(\mathbf{x}) = \frac{\exp(-f_\theta(\mathbf{x}))}{Z_\theta}
+\]</span> <div class="note info no-icon flat"><p>能量模型是一种基于能量的概率分布建模方法，其核心思想是通过能量函数来定义概率分布，而不是直接参数化概率密度函数。
+对于数据 <span class="math inline">\(\mathbf{x} \in
+\mathbb{R}^D\)</span>，能量模型将其概率分布定义为： <span
+class="math display">\[p_\theta(\mathbf{x}) =
+\frac{e^{-E_\theta(\mathbf{x})}}{Z_\theta}\]</span> 其中： <span
+class="math inline">\(E_\theta(\mathbf{x})\)</span> 是能量函数（Energy
+Function），由参数 <span class="math inline">\(\theta\)</span> 参数化
+<span class="math inline">\(Z_\theta = \int e^{-E_\theta(\mathbf{x})}
+d\mathbf{x}\)</span> 是配分函数（Partition Function），用于归一化</p>
+<p><strong>能量函数的性质:</strong></p>
+<ul>
+<li>低能量对应高概率：<span
+class="math inline">\(E_\theta(\mathbf{x})\)</span> 越小，<span
+class="math inline">\(p_\theta(\mathbf{x})\)</span> 越大</li>
+<li>高能量对应低概率：<span
+class="math inline">\(E_\theta(\mathbf{x})\)</span> 越大，<span
+class="math inline">\(p_\theta(\mathbf{x})\)</span> 越小</li>
+<li>连续性：能量函数通常是连续可微的</li>
+</ul>
+<p>其中，<span class="math inline">\(f_\theta(\mathbf{x})\)</span>
+是具有可学习参数 <span class="math inline">\(\theta\)</span>
+的函数，通常表示为神经网络。<span
+class="math inline">\(Z_\theta\)</span> 是归一化因子，定义为：</p>
+</div></p>
+<p><span class="math display">\[
+Z_\theta = \int \exp(-f_\theta(\mathbf{x})) \mathrm{d} \mathbf{x}
+\]</span></p>
+<p>由于 <span class="math inline">\(p_\theta(\mathbf{x})\)</span>
+是一个概率分布，因此必须满足归一化条件 <span class="math inline">\(\int
+p_\theta(\mathbf{x}) \mathrm{d} \mathbf{x} =
+1\)</span>。接下来，我们可以对 <span
+class="math inline">\(\theta\)</span>
+进行训练以进行极大似然估计，目标为：</p>
+<p><span class="math display">\[
+\max_{\theta} \sum_{i=1}^N \log p_\theta(\mathbf{x}_i)
+\]</span></p>
+<p>然而，<span class="math inline">\(Z_\theta\)</span>
+的确切值通常是未知的，尤其是对于任意分布。这一问题的一种解法是通过学习
+score function 来规避 <span class="math inline">\(Z_\theta\)</span>
+的问题。score function 定义为：</p>
+<p><span class="math display">\[
+\mathbf{s}_\theta(\mathbf{x}) = \nabla_\mathbf{x} \log
+p_\theta(\mathbf{x})
+\]</span></p>
+<p>因为 <span class="math inline">\(Z_\theta\)</span>
+是常数，所以它的梯度为零，从而有：</p>
+<p><span class="math display">\[
+\mathbf{s}_\theta(\mathbf{x}) = \nabla_\mathbf{x} \log
+p_\theta(\mathbf{x}) = -\nabla_\mathbf{x} f_\theta(\mathbf{x})
+\]</span></p>
+<p>这表明 score function
+实际上对应于神经网络的梯度。我们可以构建优化目标：</p>
+<p><span class="math display">\[
+\theta = \arg\min_{\theta} \mathbb{E}_{p(\mathbf{x})}\left[ \left\|
+\nabla_\mathbf{x} \log p(\mathbf{x}) - \mathbf{s}_\theta(\mathbf{x})
+\right\|_2^2 \right]
+\]</span></p>
+<p>真实分布的 log 梯度 <span class="math inline">\(\nabla_\mathbf{x}
+\log p(\mathbf{x})\)</span> 是未知的，因此我们需要利用 <strong>score
+matching</strong> 方法。</p>
+<h2 id="score-matching">Score Matching</h2>
+<p>为了避免使用真实分布 <span
+class="math inline">\(p(\mathbf{x})\)</span>，我们对优化目标进行分析。首先展开
+L2 的平方：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\left\| \nabla_x \log p(x) - \mathbf{s}_\theta(x) \right\|_2^2 &amp;=
+\left\| \nabla_x \log p(x) - \nabla_x \log p_\theta(x) \right\|_2^2 \\
+&amp;= \underbrace{(\nabla_x \log p(x))^2}_{\text{const}} - 2 \nabla_x
+\log p(x) \nabla_x \log p_\theta(x) + \left(\nabla_x \log
+p_\theta(x)\right)^2
+\end{aligned}
+\]</span></p>
+<p>其中第一项是常量，可以忽略。最后一项可以通过数据集的样本估计。现在只需关注第二项：</p>
+<p><span class="math display">\[
+\mathbb{E}_{p(x)}[-\nabla_x \log p(x) \nabla_x \log p_\theta(x)]
+\]</span></p>
+<p>使用分部积分法，这一项可以进一步推导为：</p>
+<p><span class="math display">\[
+\begin{aligned}
+&amp;\mathbb{E}_{p(x)}[-\nabla_x \log p(x) \nabla_x \log p_\theta(x)] \\
+&amp;= -\int_{-\infty}^{\infty} \nabla_x \log p(x) \nabla_x \log
+p_\theta(x) p(x) \, \mathrm{d} x \\
+&amp;= -\int_{-\infty}^{\infty} \frac{\nabla_x p(x)}{p(x)} \nabla_x \log
+p_\theta(x) p(x) \, \mathrm{d} x \\
+&amp;= -\int_{-\infty}^{\infty} \nabla_x p(x) \nabla_x \log p_\theta(x)
+\, \mathrm{d} x \\
+&amp;= -p(x)\nabla_x \log p_\theta(x) \bigg|_{-\infty}^\infty +
+\int_{-\infty}^{\infty} p(x) \nabla_x^2 \log p_\theta(x) \, \mathrm{d} x
+\end{aligned}
+\]</span></p>
+<p>假设对于真实的数据分布，当 <span class="math inline">\(|x|
+\rightarrow \infty\)</span>，有 <span class="math inline">\(p(x)
+\rightarrow 0\)</span>，所以第一项为 0，因此得到：</p>
+<p><span class="math display">\[
+\mathbb{E}_{p(x)}[-\nabla_x \log p(x) \nabla_x \log p_\theta(x)] =
+\mathbb{E}_{p(x)}[\nabla_x^2 \log p_\theta(x)]
+\]</span></p>
+<p>最终的优化目标为：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathbb{E}_{p(x)}\left[ \left\| \nabla_x \log p(x) -
+\mathbf{s}_\theta(x) \right\|_2^2 \right] &amp;=
+2\mathbb{E}_{p(x)}\left[ \nabla_x^2 \log p_\theta(x) \right] +
+\mathbb{E}_{p(x)}\left[ \left( \nabla_x \log p_\theta(x) \right)^2
+\right] + \text{const}
+\end{aligned}
+\]</span></p>
+<p>对于多元情况，优化目标变为：</p>
+<p><span class="math display">\[
+\mathbb{E}_{p(\mathbf{x})} \left[ 2 \mathrm{tr}(\nabla_{\mathbf{x}}^2
+\log p_\theta(\mathbf{x})) + \left\| \nabla_{\mathbf{x}} \log
+p_\theta(\mathbf{x}) \right\|_2^2 \right] + \text{const}
+\]</span></p>
+<p>这使得优化目标不再依赖于真实分布 <span
+class="math inline">\(p(x)\)</span>，可以直接用于优化。</p>
+<h2 id="从分布采样langevin-dynamics">从分布采样：Langevin Dynamics</h2>
+<p>通过上述步骤，我们得到了 <span
+class="math inline">\(\mathbf{s}_\theta(\mathbf{x}) \approx
+\nabla_\mathbf{x} \log
+p(\mathbf{x})\)</span>。要从这样的分布进行采样，可以使用 Langevin
+Dynamics（朗之万动力学）过程。其基本步骤为：</p>
+<ol type="1">
+<li>从任意先验分布中采样初始状态 <span
+class="math inline">\(\mathbf{x}_0 \sim \pi(\mathbf{x})\)</span>。</li>
+<li>迭代更新：</li>
+</ol>
+<p><span class="math display">\[
+\mathbf{x}_{i+1} \leftarrow \mathbf{x}_i + \epsilon \nabla_{\mathbf{x}}
+\log p(\mathbf{x}) + \sqrt{2\epsilon} \mathbf{z}_i, \quad i = 0, 1,
+\ldots, K
+\]</span></p>
+<p>其中 $ _i (0, I)$，当 <span class="math inline">\(\epsilon
+\rightarrow 0\)</span> 且 <span class="math inline">\(K \rightarrow
+\infty\)</span> 时，<span class="math inline">\(\mathbf{x}_K\)</span>
+会收敛到从 <span class="math inline">\(p(\mathbf{x})\)</span>
+直接采样的结果。</p>
+<h2 id="存在的问题与改进方案">存在的问题与改进方案</h2>
+<p>尽管 Score-based
+模型解决了许多问题，但依然存在一些挑战，如低概率密度区域建模不准确的问题。为了解决这一问题，可以使用各向同性高斯噪声的扰动。这意味着使用不同方差的高斯噪声以平衡概率密度区域，从而提高模型的准确性。对于每个分布
+<span
+class="math inline">\(p_{\sigma_i}(\mathbf{x})\)</span>，我们有：</p>
+<p><span class="math display">\[
+p_{\sigma_i}(\mathbf{x}) = \int p(\mathbf{y}) \mathcal{N}(\mathbf{x};
+\mathbf{y}, \sigma_i^2 I) \, \mathrm{d} \mathbf{y}
+\]</span></p>
+<p>通过对使用高斯噪声扰动的分布进行 score
+matching，可以定义加权目标：</p>
+<p><span class="math display">\[
+\sum_{i=1}^L \lambda(i) \mathbb{E}_{p_{\sigma_i}(\mathbf{x})} \left[
+\left\| \nabla_{\mathbf{x}} \log p_{\sigma_i}(\mathbf{x}) -
+\mathbf{s}_\theta(\mathbf{x}, i) \right\|_2^2 \right]
+\]</span></p>
+<p>通常选择 <span class="math inline">\(\lambda(i) =
+\sigma_i^2\)</span>，这样能够组合不同噪声水平的信息，增强模型的表现。</p>
+<h2 id="总结">总结</h2>
+<p>如上所述，Score-based 模型遵循学习与采样的范式。学习过程通过 score
+matching 来间接学习概率分布，采样过程则采用 Langevin
+dynamics。在优化过程中，解决了低概率密度区域学习不足的问题，同时通过多种高斯噪声扰动和退火
+Langevin 动力学的组合来提高采样效果。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">AAA高老庄旺铺招租</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/">https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">AAA高老庄旺铺招租的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（六）：DDIM理论</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-12</div><div class="title">笔记｜生成模型（六）：DDIM理论</div></div></a></div><div><a href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-10</div><div class="title">笔记｜生成模型（五）：DDPM理论</div></div></a></div><div><a href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-09</div><div class="title">笔记｜生成模型（四）：变分自编码器</div></div></a></div><div><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-07</div><div class="title">笔记｜生成模型（三）：生成对抗理论</div></div></a></div><div><a href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-04</div><div class="title">笔记｜生成模型（二）：生成模型的技术路线总览</div></div></a></div><div><a href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-31</div><div class="title">笔记｜生成模型（一）：一些概率论的基础概念和理论</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">AAA高老庄旺铺招租</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">9</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到AAA高老庄旺铺招租的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#score-based-%E6%A8%A1%E5%9E%8B%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80"><span class="toc-number">1.</span> <span class="toc-text">Score-based 模型理论基础</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#score-function-%E5%92%8C-score-based-models"><span class="toc-number">1.1.</span> <span class="toc-text">Score Function 和
+Score-based Models</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#score-matching"><span class="toc-number">1.2.</span> <span class="toc-text">Score Matching</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%8E%E5%88%86%E5%B8%83%E9%87%87%E6%A0%B7langevin-dynamics"><span class="toc-number">1.3.</span> <span class="toc-text">从分布采样：Langevin Dynamics</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AD%98%E5%9C%A8%E7%9A%84%E9%97%AE%E9%A2%98%E4%B8%8E%E6%94%B9%E8%BF%9B%E6%96%B9%E6%A1%88"><span class="toc-number">1.4.</span> <span class="toc-text">存在的问题与改进方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">1.5.</span> <span class="toc-text">总结</span></a></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（六）：Score-Base理论">笔记｜生成模型（六）：Score-Base理论</a><time datetime="2025-08-15T15:08:30.000Z" title="发表于 2025-08-15 23:08:30">2025-08-15</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（六）：Score-Base理论">笔记｜生成模型（六）：Score-Base理论</a><time datetime="2025-08-15T15:08:30.000Z" title="发表于 2025-08-15 23:08:30">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-10T15:08:30.000Z" title="发表于 2025-08-10 23:08:30">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-some_think/" title="杂谈｜写作的目的">杂谈｜写作的目的</a><time datetime="2025-08-10T09:08:30.000Z" title="发表于 2025-08-10 17:08:30">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器">笔记｜生成模型（四）：变分自编码器</a><time datetime="2025-08-08T17:37:31.000Z" title="发表于 2025-08-09 01:37:31">2025-08-09</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 By AAA高老庄旺铺招租</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/8-score-match/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/',
+      title: '笔记｜生成模型（六）：Score-Base理论',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
