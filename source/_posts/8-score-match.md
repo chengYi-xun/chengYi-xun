@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（六）：score-base理论
+title: 笔记｜生成模型（六）：Score-Base理论
 date: 2025-08-15 23:08:30
 cover: false
 mathjax: true
