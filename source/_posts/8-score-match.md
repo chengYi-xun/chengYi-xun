@@ -23,6 +23,7 @@ $$
 p_\theta(\mathbf{x}) = \frac{\exp(-f_\theta(\mathbf{x}))}{Z_\theta}
 $$
 {% note info no-icon %}
+
 能量模型是一种基于能量的概率分布建模方法，其核心思想是通过能量函数来定义概率分布，而不是直接参数化概率密度函数。
 对于数据 $\mathbf{x} \in \mathbb{R}^D$，能量模型将其概率分布定义为：
 $$p_\theta(\mathbf{x}) = \frac{e^{-E_\theta(\mathbf{x})}}{Z_\theta}$$
@@ -31,6 +32,7 @@ $E_\theta(\mathbf{x})$ 是能量函数（Energy Function），由参数 $\theta$
 $Z_\theta = \int e^{-E_\theta(\mathbf{x})} d\mathbf{x}$ 是配分函数（Partition Function），用于归一化
 
 **能量函数的性质:**
+
  - 低能量对应高概率：$E_\theta(\mathbf{x})$ 越小，$p_\theta(\mathbf{x})$ 越大
  - 高能量对应低概率：$E_\theta(\mathbf{x})$ 越大，$p_\theta(\mathbf{x})$ 越小
  - 连续性：能量函数通常是连续可微的
