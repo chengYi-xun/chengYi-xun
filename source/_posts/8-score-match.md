@@ -1,6 +1,6 @@
 ---
-title: 笔记｜生成模型（六）：Score-Base理论
-date: 2025-08-15 23:08:30
+title: 笔记｜生成模型（七）：Score-Base理论
+date: 2025-08-16 23:08:30
 cover: false
 mathjax: true
 categories:
@@ -36,6 +36,7 @@ $$p_\theta(x) = \frac{\exp(-E_\theta(x))}{Z_\theta}$$
 - $Z_\theta = \int \exp(-E_\theta(x)) \mathrm{d}x$ 为配分函数，确保归一化条件 $\int p_\theta(x) \mathrm{d}x = 1$ 成立
 
 **性质：**
+
 - 低能量对应高概率：$E_\theta(x)$ 越小，$p_\theta(x)$ 越大
 - 高能量对应低概率：$E_\theta(x)$ 越大，$p_\theta(x)$ 越小
 - 连续性：能量函数通常是连续可微的
