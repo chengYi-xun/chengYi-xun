@@ -26,13 +26,17 @@ tags:
 
 # 生成式人工智能
 ## 通用理论
-1. [笔记｜扩散模型（一）：一些概率论的基础概念和理论](../1-generation-basic-theory)
-2. [笔记｜扩散模型（二）：生成模型的技术路线总览](../2-generation-model)
-3. [笔记｜扩散模型（三）：生成对抗理论](../3-GAN-theory)
-4. [笔记｜扩散模型（四）：变分自编码器理论](../4-VAE-theory)
-5. [笔记｜扩散模型（五）：DDPM理论](../6-ddpm)
-6. [笔记｜扩散模型（六）：DDIM理论](../7-ddim)
-7. [笔记｜扩散模型（六）：Score-Base理论](../8-score-match)
+1. [笔记｜生成模型（一）：一些概率论的基础概念和理论](../1-generation-basic-theory)
+2. [笔记｜生成模型（二）：生成模型的技术路线总览](../2-generation-model)
+3. [笔记｜生成模型（三）：生成对抗理论](../3-GAN-theory)
+4. [笔记｜生成模型（四）：变分自编码器理论](../4-VAE-theory)
+5. [笔记｜生成模型（五）：DDPM理论](../6-ddpm)
+6. [笔记｜生成模型（六）：DDIM理论](../7-ddim)
+7. [笔记｜生成模型（七）：Score-Base理论](../8-score-match)
+8. [笔记｜生成模型（八）：SDE统一DDPM和SMLD](../9-SDE)
+9. [笔记｜生成模型（九）：Classifier Guidance 理论与实现](../10-classifier-guidance-for-diffusion-models)
+10. [笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](../11-classifier-free-guidance-for-diffusion-models)
+
 
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)
