@@ -80,15 +80,26 @@ $$
 
 ## 使用反向 SDE 进行采样
 
-在上一章节中，我们推导了Score Matching 的离散过程（离散形式的SDE），可用朗之万动力学采样进行采样生成新样本。然而当正向过程改为连续形态的 SDE 描述后，逆向过程也需相应变化。对于给定 SDE，其逆向过程同样是一个 SDE，表示为：
+在上一章节中，我们推导了Score Matching 的离散过程（离散形式的SDE），可用朗之万动力学采样进行生成新样本。然而当正向过程改为连续形态的 SDE 描述后，逆向过程也需相应变化。对于给定 SDE，其逆向过程同样是一个 SDE，表示为（推导过程见[这个链接](https://kexue.fm/archives/9209)）：
 
 $$
 \mathrm{d}x=\left[f(x,t)-g^2(t)\textcolor{green}{\nabla_x\log p_t(x)}\right]\mathrm{d}t+g(t)\mathrm{d}w
 $$
 
-此处 $\mathrm{d}t$ 表示反向时间梯度，即从 $t=T$ 到 $t=0$ 的方向。上式中绿色部分正是我们在上一篇文章中介绍的 score function $s_\theta(x,t)$。这表明，虽从离散形式变为连续形式，但学习目标仍然一致——用网络学习分布的 score function。
+此处 $\mathrm{d}t$ 表示反向时间梯度，即从 $t=T$ 到 $t=0$ 的方向。上式中绿色部分正是我们在上一篇文章中介绍的 score function $s_\theta(x,t)$。这表明，虽从离散形式变为连续形式，但学习目标仍然一致的——即用网络学习分布的 score function。
 
 获得 score function 后，可从反向 SDE 中采样，最简单的方法是欧拉–丸山方法（Euler-Maruyama） 方法：
+$$
+\begin{aligned}
+\Delta x &\leftarrow[f(x,t)-g^2(t)s_\theta(x,t)]\Delta t+g(t)\sqrt{|\Delta t|}z_t\\
+x &\leftarrow x+\Delta x\\
+t &\leftarrow t+\Delta t
+\end{aligned}
+$$
+
+其中 $z\sim\mathcal{N}(0,I)$，可通过直接对高斯噪声采样得到。上式中 $f(x,t)$ 和 $g(t)$ 均有解析形式，$\Delta t$ 可选取较小值，仅 $s_\theta(x,t)$ 为参数模型。采样过程可通过下图直观感受：
+
+![通过反向扰动过程进行采样](/chengYi-xun/img/rever_ode.gif)
 
 {% note info no-icon %}
 
@@ -121,27 +132,21 @@ $$x_{t+\Delta t} = x_t + f(x_t,t)\Delta t + g(t)\sqrt{\Delta t}z_t$$
 
 **维纳过程与 $\sqrt{\Delta t}$ 缩放因子的关系：**
 
-维纳过程（Wiener process）是布朗运动的数学模型，具有以下关键性质：
-
-1. **二次变差性质**：维纳过程 $w_t$ 在时间间隔 $\Delta t$ 内的变化量的方差与 $\Delta t$ 成正比，即：
-   $$\text{Var}(w_{t+\Delta t} - w_t) = \Delta t$$
-
-2. **增量独立性**：不相交时间区间上的增量是独立的随机变量
-
-3. **增量平稳性**：增量的统计特性仅依赖于时间间隔长度 $\Delta t$，而不依赖于起始时间 $t$
-
-维纳过程的增量可表示为：
+维纳过程（Wiener process）是布朗运动的数学模型，具有如下性质：
+$$\text{Var}(w_{t+\Delta t} - w_t) = \Delta t$$
+即维纳过程 $w_t$ 在时间间隔 $\Delta t$ 内的变化量的方差与 $\Delta t$ 成正比，这意味着增量服从均值为 0，方差为 $\Delta t$ 的正态分布：
 $$w_{t+\Delta t} - w_t \sim \mathcal{N}(0, \Delta t)$$
-
-这意味着增量服从均值为 0，方差为 $\Delta t$ 的正态分布。
 
 将标准正态随机变量 $z \sim \mathcal{N}(0,1)$ 转换为维纳过程的增量，需要：
 $$w_{t+\Delta t} - w_t = \sqrt{\Delta t} \cdot z$$
-
+（根据正态分布的性质，如果 $z \sim \mathcal{N}(0,1)$，那么 $\sqrt{\Delta t} \cdot z \sim \mathcal{N}(0, \Delta t)$ ）
 因此在 Euler-Maruyama 方法中，随机项系数为：
 $$g(t) \mathrm{d}w_t \approx g(t)\sqrt{\Delta t}z_t$$
 
+
+
 **这与常规 Euler 方法的区别**：
+
 - ODE 中的变化率与时间成正比（一阶关系）：$\Delta x \propto \Delta t$
 - 而维纳过程的变化与时间的平方根成正比（二次变差关系）：$\Delta w \propto \sqrt{\Delta t}$
 
@@ -149,18 +154,6 @@ $$g(t) \mathrm{d}w_t \approx g(t)\sqrt{\Delta t}z_t$$
 
 {% endnote %}
 
-
-$$
-\begin{aligned}
-\Delta x &\leftarrow[f(x,t)-g^2(t)s_\theta(x,t)]\Delta t+g(t)\sqrt{|\Delta t|}z_t\\
-x &\leftarrow x+\Delta x\\
-t &\leftarrow t+\Delta t
-\end{aligned}
-$$
-
-其中 $z\sim\mathcal{N}(0,I)$，可通过直接对高斯噪声采样得到。上式中 $f(x,t)$ 和 $g(t)$ 均有解析形式，$\Delta t$ 可选取较小值，仅 $s_\theta(x,t)$ 为参数模型。采样过程可通过下图直观感受：
-
-![通过反向扰动过程进行采样](/chengYi-xun/img/rever_ode.gif)
 
 ## 使用 score matching 进行训练
 
@@ -178,7 +171,7 @@ $$
 \mathrm{KL}(p_0(x)||p_\theta(x))\le\frac{T}{2}\mathbb{E}_{t\in\mathcal{U}(0,T)}\mathbb{E}_{p_t(x)}\left[\lambda(t)||\nabla_x\log p_t(x)-s_\theta(x,t)||_2^2\right]+\mathrm{KL}(p_T||\pi)
 $$
 
-这里的 $\lambda(t)=g^2(t)$ 被称为 likelihood weighting function，通过使用该加权函数，可学习到良好的分布。这表明连续表示方式和离散表示方式在本质上是统一的。
+这里的 $\lambda(t)=g^2(t)$ 被称为 likelihood weighting function，通过使用该加权函数，可学习到良好的分布。这表明连续表示方式和离散表示方式在本质上是统一的。（反向训练关系这里过于抽象，看不懂，抄来的，hhh）
 
 # 讨论
 
