@@ -55,7 +55,7 @@ $$
 $$
 \nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t|y)=\underbrace{\nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t)}_{\textrm{unconditional}~\textrm{score}}+s\underbrace{\nabla_{\mathbf{x}_t}\log p(y|\mathbf{x}_t)}_{\textrm{adversarial}~\textrm{gradient}}
 $$
-这个参数被称为 guidance scale。这个式子也可以直观地进行理解：第一项是无条件生成的 score function，第二项是分类器的梯度，这个梯度表示的是从噪声指向条件 $y$ 的方向，把这个方向加到无条件生成的 score 上，就可以让降噪的方向也指向 $y$ 的方向。
+这个参数被称为 guidance scale。这个式子也可以直观地进行理解：第一项是无条件生成的 score function（梯度分数其实代表着ddpm中广义的噪声），第二项是分类器的梯度，这个梯度表示的是从噪声指向条件 $y$ 的方向，把这个方向加到无条件生成的 score 上，就可以让降噪的方向也指向 $y$ 的方向。
 
 ## 另一种理解思路
 
@@ -96,47 +96,55 @@ $$
 
 ## 获取分类器梯度
 
-获取分类器对 $\mathbf{x}_t$ 的梯度其实也比较直接，可以直接使用 Pytorch 的自动求导工具。先让 $\mathbf{x}$ 带上梯度，然后输入分类器获取概率分布，最后再提取出 $y$ 对应的一项计算梯度。这里有一个比较神奇的点，就是一般来说分类模型的输入都是不计算梯度的，不过这里的输入也是带梯度的，感觉类似于 DETR 里的 learnable query：
+获取分类器对 $\mathbf{x}_t$ 的梯度其实也比较直接，可以直接使用 Pytorch 的自动求导工具。先让 $\mathbf{x}$ 带上梯度，然后输入分类器获取概率分布，最后再提取出 $y$ 对应的一项计算梯度。这一部分也就相当于 $\nabla_{\mathbf{x}_t}\log p(y|\mathbf{x}_t)$ 这一项。
 
 ```python
 import torch
 import torch.nn.functional as F
-
+from tqdm import tqdm
 def classifier_guidance(
     x: torch.Tensor,
     t: torch.Tensor,
     y: torch.Tensor,
     classifier: torch.nn.Module
 ):
+    """
+    Classifier Guidance 梯度计算
+    """
     with torch.enable_grad():
-        # 激活梯度计算
         x_with_grad = x.detach().requires_grad_(True)
-        # 获取 log 形式的概率分布
-        logits = classifier(x_with_grad, t)
+        logits = classifier(x_with_grad, t)  # 分类器输出
         log_prob = F.log_softmax(logits, dim=-1)
-        # 选取出 y 对应的项
-        selected = log_prob[range(len(logits)), y.view(-1)]
-        # 计算梯度
-        return torch.autograd.grad(selected.sum(), x_with_grad)[0]
-```
-
-这一部分也就相当于 $\nabla_{\mathbf{x}_t}\log p(y|\mathbf{x}_t)$ 这一项，这在上一章的两种解释中都是相通的。而如何使用得到的梯度对采样过程进行引导，会根据推导不同有两种实现方式。
-
-## 第一种引导的实现
-
-这种方法相对比较好理解，就是用梯度朝着指向 $y$ 的方向对生成结果进行一个修正：
-
-```python
-for timestep in tqdm(scheduler.timesteps):
-    # 预测噪声
-    with torch.no_grad():
-        noise_pred = unet(images, timestep).sample
-    # 根据噪声和时间步获得 x_{t-1}
-    images = scheduler.step(noise_pred, timestep, images).prev_sample
-    # 计算分类器梯度
-    guidance = classifier_guidance(images, timestep, y, classifier)
-    # 加到 x_{t-1} 上
-    images += guidance_scale * guidance
+        selected = log_prob[range(len(logits)), y.view(-1)]  # 取目标类别
+        grad = torch.autograd.grad(selected.sum(), x_with_grad)[0]
+    return grad
+def sample_with_classifier_guidance(
+    unet,
+    scheduler,
+    classifier,
+    y: torch.Tensor,
+    num_inference_steps: int = 50,
+    guidance_scale: float = 1.5,
+    image_size: tuple = (1, 3, 64, 64),  # (batch, C, H, W)
+    device: str = "cuda"
+):
+    # 初始化噪声
+    images = torch.randn(image_size, device=device)
+    # 设置 scheduler
+    scheduler.set_timesteps(num_inference_steps)
+    for t in tqdm(scheduler.timesteps):
+        # UNet 预测噪声
+        with torch.no_grad():
+            noise_pred = unet(images, t).sample  # [B, C, H, W]
+        # Classifier Guidance 梯度
+        grad = classifier_guidance(images, t, y, classifier)
+        # 修改预测噪声：梯度分数+guidance_scale*类别概率对噪声的梯度
+        # noise_pred
+        noise_pred = noise_pred + guidance_scale * grad
+        # 更新 sample
+        step_output = scheduler.step(noise_pred, t, images)
+        images = step_output.prev_sample
+    return images
 ```
 
 在上边的代码中，`images` 对应 $\mathbf{x}$，先从 $\mathbf{x}_t$ 得到了 $\mathbf{x}_{t-1}$ 和 guidance，再把 guidance 加到 $\mathbf{x}_{t-1}$ 上。
