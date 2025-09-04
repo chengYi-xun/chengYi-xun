@@ -14,6 +14,8 @@ series: Diffusion Models
 
 > 论文链接：*[Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598)*
 > 转载: *[lassifier-Free Guidance](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)
+
+
 上一篇文章我们学习了 Classifier Guidance，这种方法通过引入一个额外的分类器，使用梯度引导的方式成功地实现了条件生成。虽然 Classifier Guidance 可以直接复用训练好的 diffusion models，不过这种方法的问题是很明显的，首先需要额外训练一个分类器，而且这个分类器不仅仅分类一般的图像，还需要分类加噪后的图像，这会给方法带来比较大的额外开销；其次分类器训练完成后类别就固定下来了，如果希望生成新的类别就需要重新训练分类器。这篇文章学习的 Classifier-Free Guidance 则可以比较好地解决这些问题。
 
 # Classifier-Free Guidance
