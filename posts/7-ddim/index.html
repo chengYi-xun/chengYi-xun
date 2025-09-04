@@ -1,0 +1,506 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（六）：DDIM理论 | AAA高老庄旺铺招租的个人博客</title><meta name="author" content="AAA高老庄旺铺招租"><meta name="copyright" content="AAA高老庄旺铺招租"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="论文链接：Denoising Diffusion Implicit Models  在DDPM理论中我们进行了 DDPM 的理论推导以及给出了核心代码。但 DDPM 有一个非常明显的问题：采样过程很慢。因为 DDPM 的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了 1000 个时间步，所以我们在采样时也需要循环 1000 次去噪过程，这">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（六）：DDIM理论">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/index.html">
+<meta property="og:site_name" content="AAA高老庄旺铺招租的个人博客">
+<meta property="og:description" content="论文链接：Denoising Diffusion Implicit Models  在DDPM理论中我们进行了 DDPM 的理论推导以及给出了核心代码。但 DDPM 有一个非常明显的问题：采样过程很慢。因为 DDPM 的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了 1000 个时间步，所以我们在采样时也需要循环 1000 次去噪过程，这">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-12T15:08:30.000Z">
+<meta property="article:modified_time" content="2025-09-04T15:05:45.978Z">
+<meta property="article:author" content="AAA高老庄旺铺招租">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（六）：DDIM理论',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2025-09-04 23:05:45'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 5.4.2"><link rel="alternate" href="/chengYi-xun/atom.xml" title="AAA高老庄旺铺招租的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="AAA高老庄旺铺招租的个人博客"><span class="site-name">AAA高老庄旺铺招租的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（六）：DDIM理论</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-09-04T15:05:45.978Z" title="更新于 2025-09-04 23:05:45">2025-09-04</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（六）：DDIM理论"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>论文链接：<em><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2010.02502">Denoising
+Diffusion Implicit Models</a></em></p>
+</blockquote>
+<p>在<a href="../6-ddpm">DDPM理论</a>中我们进行了 DDPM
+的理论推导以及给出了核心代码。但 DDPM
+有一个非常明显的问题：采样过程很慢。因为 DDPM
+的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了
+1000 个时间步，所以我们在采样时也需要循环 1000
+次去噪过程，这个过程是非常慢的。</p>
+<p>为了加速 DDPM 的采样过程，DDIM 在不利用马尔可夫假设的情况下推导出了
+diffusion 的反向过程，最终可以实现仅采样 20～100 步的情况下达到和 DDPM
+采样 1000 步相近的生成效果，也就是提速 10～50 倍。这篇文章将对 DDIM
+的理论进行讲解，并实现 DDIM 采样的代码。</p>
+<h1 id="ddpm-的反向过程">DDPM 的反向过程</h1>
+<p>首先我们回顾一下 DDPM 反向过程的推导，为了推导出 <span
+class="math inline">\(q(\mathbf{x}_{t-1}|\mathbf{x}_t)\)</span>
+这个条件概率分布，DDPM
+利用贝叶斯公式将其变成了先验分布的组合，并且通过向条件中加入 <span
+class="math inline">\(\mathbf{x}_0\)</span> 将所有的分布转换为已知分布：
+<span class="math display">\[
+q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)=\frac{q(\mathbf{x}_t|\mathbf{x}_{t-1},\mathbf{x}_0)q(\mathbf{x}_{t-1}|\mathbf{x}_0)}{q(\mathbf{x}_t|\mathbf{x}_0)}
+\]</span> 在上边这个等式的右侧，<span
+class="math inline">\(q(\mathbf{x}_{t-1}|\mathbf{x}_0)\)</span> 和 <span
+class="math inline">\(q(\mathbf{x}_t|\mathbf{x}_0)\)</span>
+都是已知的，需要求解的只有 <span
+class="math inline">\(q(\mathbf{x}_t|\mathbf{x}_{t-1},\mathbf{x}_0)\)</span>。在这里
+DDPM 引入<strong>马尔可夫假设</strong>，认为 <span
+class="math inline">\(\mathbf{x}_t\)</span> 只与 <span
+class="math inline">\(\mathbf{x}_{t-1}\)</span> 有关，将其转化成了 <span
+class="math inline">\(q(\mathbf{x}_t|\mathbf{x}_{t-1})\)</span>。最后经过推导，得出条件概率分布：
+<span class="math display">\[
+q(\mathbf{x}_{t-1}|\mathbf{x}_t)=\mathcal{N}(\mathbf{x}_{t-1};\mu_\theta(\mathbf{x}_t,t),\sigma_t^2\mathbf{I})
+\]</span> 我们可以看到之所以 DDPM 很慢，就是因为在推导 <span
+class="math inline">\(q(\mathbf{x}_t|\mathbf{x}_{t-1},\mathbf{x}_0)\)</span>
+的时候引入了马尔可夫假设，使得去噪只能在相邻时间步之间进行。如果我们可以在不依赖马尔可夫假设的情况下推导出
+<span
+class="math inline">\(q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)\)</span>，就可以将上面式子里的
+<span class="math inline">\(t-1\)</span> 替换为任意的中间时间步 <span
+class="math inline">\(\tau\)</span>，从而实现采样加速。总结来说，DDIM
+主要有两个出发点：</p>
+<ol type="1">
+<li>保持前向过程的分布 <span
+class="math inline">\(q(\mathbf{x}_t|\mathbf{x}_{t-1})=\mathcal{N}\left(\mathbf{x}_t;\sqrt{\bar{\alpha}_t}\mathbf{x}_0,(1-\bar{\alpha}_t)\mathbf{I}\right)\)</span>
+不变；</li>
+<li>构建一个不依赖于马尔可夫假设的 <span
+class="math inline">\(q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)\)</span>
+分布。</li>
+</ol>
+<h2 id="qmathbfx_taumathbfx_tmathbfx_0-的推导"><span
+class="math inline">\(q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)\)</span>
+的推导</h2>
+<p>开始推导之前简单说明一下，这个 <span
+class="math inline">\(q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)\)</span>
+实际上就是上一章中提到的 <span
+class="math inline">\(q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)\)</span>，只不过是因为我们的推导不再依赖马尔可夫假设，所以
+<span class="math inline">\(t-1\)</span> 可以替换为任意的 <span
+class="math inline">\(\tau\in(0,t)\)</span>。为了避免混淆，我们在这里使用一个通用的符号
+<span class="math inline">\(\tau\in(0,t)\)</span> 表示中间的时间步。</p>
+<p>另一点需要说明的是，在 DDIM 的论文中，<span
+class="math inline">\(\alpha\)</span> 表示的含义和 DDPM 论文中的 <span
+class="math inline">\(\bar{\alpha}\)</span>
+相同。为了保证前后一致，我们在这里依然使用 DDPM 的符号约定，令 <span
+class="math inline">\(\alpha_t=1-\beta_t\)</span>，<span
+class="math inline">\(\bar{\alpha}_t=\prod_{i=1}^t\alpha_i\)</span>。</p>
+<p>我们在 DDPM 里已经推导出了 <span
+class="math inline">\(q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)\)</span>
+是一个高斯分布，均值和方差为： <span class="math display">\[
+\begin{aligned}
+\mu&amp;=\frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}\mathbf{x}_t+\frac{\sqrt{\bar\alpha_{t-1}}\beta_t}{1-\bar\alpha_t}\mathbf{x}_0\\
+\sigma&amp;=\left(\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar\alpha_{t-1}}\right)^{-1/2}
+\end{aligned}
+\]</span> 可以看到均值是 <span
+class="math inline">\(\mathbf{x}_0\)</span> 与 <span
+class="math inline">\(\mathbf{x}_t\)</span>
+的线性组合，方差是时间步的函数。DDIM 基于这样的规律，使用待定系数法：
+<span class="math display">\[
+q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)=\mathcal{N}(\mathbf{x}_\tau;\lambda\mathbf{x}_0+k\mathbf{x}_t,\sigma_t^2\mathbf{I})
+\]</span> 也就是 <span
+class="math inline">\(\mathbf{x}_\tau=\lambda\mathbf{x}_0+k\mathbf{x}_t+\sigma_t\epsilon_\tau\)</span>。又因为前向过程满足
+<span
+class="math inline">\(\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon_t\)</span>，代入可以得到：
+<span class="math display">\[
+\begin{aligned}
+\mathbf{x}_\tau&amp;=\lambda\mathbf{x}_0+k\mathbf{x}_t+\sigma_t\epsilon_\tau\\
+&amp;=\lambda\mathbf{x}_0+k(\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon_t)+\sigma_t\epsilon_\tau\\
+&amp;=(\lambda+k\sqrt{\bar{\alpha}_t})\mathbf{x}_0+(k\sqrt{1-\bar{\alpha}_t}\epsilon_t+\sigma_t\epsilon_\tau)\\
+&amp;=(\lambda+k\sqrt{\bar{\alpha}_t})\mathbf{x}_0+\sqrt{k^2(1-\bar{\alpha}_t)+\sigma_t^2}\epsilon
+\end{aligned}
+\]</span> 在上面的推导过程中，由于 <span
+class="math inline">\(\epsilon_t\)</span> 和 <span
+class="math inline">\(\epsilon_\tau\)</span>
+都满足标准正态分布，因此两项可以合并。又因为根据前向过程，有 <span
+class="math inline">\(\mathbf{x}_\tau=\sqrt{\bar{\alpha}_\tau}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_\tau}\epsilon_\tau\)</span>，将两个式子的系数对比，可以得到方程组：
+<span class="math display">\[
+\begin{cases}
+\begin{aligned}
+\lambda+k\sqrt{\bar{\alpha}_t}&amp;=\sqrt{\bar{\alpha}_\tau}\\
+\sqrt{k^2(1-\bar{\alpha}_t)+\sigma_t^2}&amp;=\sqrt{1-\bar{\alpha}_\tau}
+\end{aligned}
+\end{cases}
+\]</span> 解方程组得到 <span class="math inline">\(\lambda\)</span> 和
+<span class="math inline">\(k\)</span>： <span class="math display">\[
+\begin{cases}
+\begin{aligned}
+\lambda&amp;=\sqrt{\bar{\alpha}_\tau}-\sqrt{\frac{(1-\bar{\alpha}_\tau-\sigma_t^2)\bar{\alpha}_t}{1-\bar{\alpha}_t}}\\
+k&amp;=\sqrt{\frac{1-\bar{\alpha}_\tau-\sigma_t^2}{1-\bar{\alpha}_t}}
+\end{aligned}
+\end{cases}
+\]</span> 在上边的结果中，我们得到了 <span
+class="math inline">\(q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)\)</span>
+均值中的两个参数，而方差 <span class="math inline">\(\sigma_t^2\)</span>
+并没有唯一定值，因此这个结果对应于一组解，通过规定不同的方差，可以得到不同的采样过程。我们把
+<span class="math inline">\(\mathbf{x}_0\)</span> 用 <span
+class="math inline">\(\mathbf{x}_t\)</span> 替换，可以得到均值的表达式：
+<span class="math display">\[
+\begin{aligned}
+\mu&amp;=\lambda\mathbf{x}_0+k\mathbf{x}_t\\
+&amp;=\left(\sqrt{\bar{\alpha}_\tau}-\sqrt{\frac{(1-\bar{\alpha}_\tau-\sigma_t^2)\bar{\alpha}_t}{1-\bar{\alpha}_t}}\right)\mathbf{x}_0+\sqrt{\frac{1-\bar{\alpha}_\tau-\sigma_t^2}{1-\bar{\alpha}_t}}\mathbf{x}_t\\
+&amp;=\left(\sqrt{\bar{\alpha}_\tau}-\sqrt{\frac{(1-\bar{\alpha}_\tau-\sigma_t^2)\bar{\alpha}_t}{1-\bar{\alpha}_t}}\right)\left(\frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}\right)+\sqrt{\frac{1-\bar{\alpha}_\tau-\sigma_t^2}{1-\bar{\alpha}_t}}\mathbf{x}_t\\
+&amp;=\sqrt{\bar{\alpha}_\tau}\frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}+\sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t)
+\end{aligned}
+\]</span> 因此我们可以得到最终的 <span
+class="math inline">\(\mathbf{x}_\tau\)</span> 的表达式： <span
+class="math display">\[
+\begin{aligned}
+\mathbf{x}_\tau&amp;=\mu+\sigma_t\epsilon\\
+&amp;=\sqrt{\bar{\alpha}_\tau}\underbrace{\frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}}_{预测的\mathbf{x}_0}+\underbrace{\sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t)}_{指向\mathbf{x}_t的方向}+\underbrace{\sigma_t\epsilon}_{随机的噪声}
+\end{aligned}
+\]</span></p>
+<h2 id="方差参数化与模型变体">方差参数化与模型变体</h2>
+<p>由于方差 <span class="math inline">\(\sigma_t^2\)</span>
+在推导过程中未被唯一确定，DDIM论文提出了一个参数化形式： <span
+class="math display">\[
+\sigma_t=\eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alpha_t}
+\]</span></p>
+<p>其中 <span class="math inline">\(\eta \in [0, 1]\)</span>
+是一个控制随机性的超参数：</p>
+<ol type="1">
+<li><p><strong><span class="math inline">\(\eta =
+1\)</span>（DDPM等价）</strong>：此时方差与DDPM的后验方差一致，采样过程完全等同于DDPM的马尔可夫过程。</p></li>
+<li><p><strong><span class="math inline">\(\eta =
+0\)</span>（确定性DDIM）</strong>：此时 <span
+class="math inline">\(\sigma_t = 0\)</span>，采样过程变为确定性映射：
+<span class="math display">\[\mathbf{x}_\tau =
+\sqrt{\bar{\alpha}_\tau}\hat{\mathbf{x}}_0 +
+\sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t)\]</span></p>
+<p>其中 <span class="math inline">\(\hat{\mathbf{x}}_0 =
+\frac{\mathbf{x}_t-\sqrt{1-\bar{\alpha}_t}\epsilon_\theta(\mathbf{x}_t,t)}{\sqrt{\bar{\alpha}_t}}\)</span>
+是网络预测的原始图像。</p>
+<p>这种确定性映射使得每个初始噪声 <span
+class="math inline">\(\mathbf{x}_T\)</span> 都对应唯一的生成结果 <span
+class="math inline">\(\mathbf{x}_0\)</span>，这是DDIM的核心特性。</p></li>
+</ol>
+<h2 id="非马尔可夫采样与加速">非马尔可夫采样与加速</h2>
+<p>DDIM的关键优势在于其反向过程不依赖于马尔可夫假设，这意味着采样可以在任意时间步序列上进行，而不必严格按照相邻时间步的顺序。</p>
+<p><strong>理论基础</strong>：由于DDIM的采样公式不依赖于前一时间步的具体值，我们可以从完整的时间步序列
+<span class="math inline">\([T, T-1, ..., 2, 1]\)</span>
+中选择任意子序列 <span class="math inline">\([\tau_S, \tau_{S-1}, ...,
+\tau_2, \tau_1]\)</span> 进行采样，其中 <span class="math inline">\(S
+\ll T\)</span>。</p>
+<p><strong>子序列选择策略</strong>：论文提出了两种时间步子序列的构造方法：</p>
+<ol type="1">
+<li><strong>线性采样</strong>：<span class="math inline">\(\tau_i =
+\lfloor ci \rfloor\)</span>，其中 <span class="math inline">\(c =
+\frac{T}{S}\)</span></li>
+<li><strong>二次采样</strong>：<span class="math inline">\(\tau_i =
+\lfloor ci^2 \rfloor\)</span>，其中 <span class="math inline">\(c =
+\frac{T}{S^2}\)</span></li>
+</ol>
+<p><strong>加速效果</strong>：通过选择合适的子序列，可以将采样步数从
+<span class="math inline">\(T\)</span>（通常为1000）减少到 <span
+class="math inline">\(S\)</span>（通常为10-50），实现10-100倍的采样加速，同时保持生成质量。</p>
+<h1 id="ddim-的核心特性">DDIM 的核心特性</h1>
+<h2 id="采样一致性sampling-consistency">1. 采样一致性（Sampling
+Consistency）</h2>
+<p>DDIM的确定性采样过程（<span class="math inline">\(\eta =
+0\)</span>）赋予了模型一个独特性质：对于给定的初始噪声 <span
+class="math inline">\(\mathbf{x}_T\)</span>，无论使用何种时间步子序列进行采样，最终生成的图像
+<span class="math inline">\(\mathbf{x}_0\)</span> 都高度一致。</p>
+<p><strong>数学表述</strong>：设 <span
+class="math inline">\(\mathcal{S}_1\)</span> 和 <span
+class="math inline">\(\mathcal{S}_2\)</span>
+为两个不同的时间步子序列，则： <span
+class="math display">\[\|\mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_1) -
+\mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_2)\| \ll
+\|\mathbf{x}_0(\mathbf{x}_T, \mathcal{S}_1)\|\]</span></p>
+<p><strong>实际应用</strong>：这一特性使得 <span
+class="math inline">\(\mathbf{x}_T\)</span> 可以被视为 <span
+class="math inline">\(\mathbf{x}_0\)</span>
+的隐空间表示，类似于VAE中的隐变量。在生成过程中，可以先使用较少时间步快速生成草图预览，确认大致方向后再使用更多时间步进行精细生成。</p>
+<h2 id="语义插值semantic-interpolation">2. 语义插值（Semantic
+Interpolation）</h2>
+<p>基于采样一致性，DDIM支持在隐空间中进行语义插值。给定两个隐变量 <span
+class="math inline">\(\mathbf{x}_T^{(0)}\)</span> 和 <span
+class="math inline">\(\mathbf{x}_T^{(1)}\)</span>，可以通过球面线性插值（Spherical
+Linear Interpolation, SLERP）构造中间隐变量：</p>
+<p><span class="math display">\[\mathbf{x}_T^{(\alpha)} =
+\frac{\sin((1-\alpha)\theta)}{\sin\theta}\mathbf{x}_T^{(0)} +
+\frac{\sin(\alpha\theta)}{\sin\theta}\mathbf{x}_T^{(1)}\]</span></p>
+<p>其中 <span class="math inline">\(\alpha \in [0, 1]\)</span>
+是插值参数，<span class="math inline">\(\theta\)</span>
+是两向量间的夹角： <span class="math display">\[\theta =
+\arccos\left(\frac{\langle\mathbf{x}_T^{(0)},
+\mathbf{x}_T^{(1)}\rangle}{\|\mathbf{x}_T^{(0)}\| \cdot
+\|\mathbf{x}_T^{(1)}\|}\right)\]</span></p>
+<p><strong>插值效果</strong>：通过这种方式生成的中间图像序列展现出平滑的语义过渡，而不是简单的像素级插值，这证明了DDIM隐空间具有良好的语义结构。</p>
+<h1 id="ddim-的代码实现">DDIM 的代码实现</h1>
+<p>从上面的推导过程可以发现，DDIM 假设的前向过程和 DDPM
+相同，只有采样过程不同。因此想把 DDPM 改成 DDIM
+并不需要重新训练，只要修改采样过程就可以了。</p>
+<h2 id="核心代码实现">核心代码实现</h2>
+<h3 id="初始化与参数设置">1. 初始化与参数设置</h3>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">import</span> math</span><br><span class="line"><span class="keyword">from</span> tqdm <span class="keyword">import</span> tqdm</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">DDIM</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params"></span></span><br><span class="line"><span class="params">        self,</span></span><br><span class="line"><span class="params">        num_train_timesteps: <span class="built_in">int</span> = <span class="number">1000</span>,</span></span><br><span class="line"><span class="params">        beta_start: <span class="built_in">float</span> = <span class="number">0.0001</span>,</span></span><br><span class="line"><span class="params">        beta_end: <span class="built_in">float</span> = <span class="number">0.02</span>,</span></span><br><span class="line"><span class="params">        sample_steps: <span class="built_in">int</span> = <span class="number">20</span>,</span></span><br><span class="line"><span class="params">    </span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">        DDIM采样器初始化</span></span><br><span class="line"><span class="string">        </span></span><br><span class="line"><span class="string">        Args:</span></span><br><span class="line"><span class="string">            num_train_timesteps: 训练时的时间步数（通常为1000）</span></span><br><span class="line"><span class="string">            beta_start: β调度的起始值</span></span><br><span class="line"><span class="string">            beta_end: β调度的结束值</span></span><br><span class="line"><span class="string">            sample_steps: 采样时的时间步数（通常为10-50）</span></span><br><span class="line"><span class="string">        &quot;&quot;&quot;</span></span><br><span class="line">        <span class="variable language_">self</span>.num_train_timesteps = num_train_timesteps</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 定义β调度：β_t从beta_start线性增长到beta_end</span></span><br><span class="line">        <span class="variable language_">self</span>.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 计算α_t = 1 - β_t</span></span><br><span class="line">        <span class="variable language_">self</span>.alphas = <span class="number">1.0</span> - <span class="variable language_">self</span>.betas</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 计算累积α：ᾱ_t = ∏_&#123;i=1&#125;^t α_i</span></span><br><span class="line">        <span class="variable language_">self</span>.alphas_cumprod = torch.cumprod(<span class="variable language_">self</span>.alphas, dim=<span class="number">0</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 定义采样时间步序列（线性采样策略）</span></span><br><span class="line">        <span class="comment"># 从T-1到0，均匀选择sample_steps个时间步</span></span><br><span class="line">        <span class="variable language_">self</span>.timesteps = torch.linspace(num_train_timesteps - <span class="number">1</span>, <span class="number">0</span>, sample_steps).long()</span><br></pre></td></tr></table></figure>
+<h3 id="ddim采样算法">2. DDIM采样算法</h3>
+<p>DDIM的核心采样公式为： <span class="math display">\[\mathbf{x}_\tau =
+\sqrt{\bar{\alpha}_\tau}\hat{\mathbf{x}}_0 +
+\sqrt{1-\bar{\alpha}_\tau-\sigma_t^2}\epsilon_\theta(\mathbf{x}_t,t) +
+\sigma_t\epsilon\]</span></p>
+<p>其中方差参数化： <span class="math display">\[\sigma_t =
+\eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alpha_t}\]</span></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@torch.no_grad()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">sample</span>(<span class="params"></span></span><br><span class="line"><span class="params">    self,</span></span><br><span class="line"><span class="params">    unet,  <span class="comment"># 预训练的噪声预测网络</span></span></span><br><span class="line"><span class="params">    batch_size: <span class="built_in">int</span>,</span></span><br><span class="line"><span class="params">    in_channels: <span class="built_in">int</span>,</span></span><br><span class="line"><span class="params">    sample_size: <span class="built_in">int</span>,</span></span><br><span class="line"><span class="params">    eta: <span class="built_in">float</span> = <span class="number">0.0</span>,  <span class="comment"># 控制随机性的参数，η=0为确定性DDIM</span></span></span><br><span class="line"><span class="params"></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    DDIM采样过程</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    Args:</span></span><br><span class="line"><span class="string">        unet: 预训练的UNet模型，用于预测噪声</span></span><br><span class="line"><span class="string">        batch_size: 批次大小</span></span><br><span class="line"><span class="string">        in_channels: 输入通道数</span></span><br><span class="line"><span class="string">        sample_size: 图像尺寸</span></span><br><span class="line"><span class="string">        eta: 随机性控制参数，η∈[0,1]</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 将参数转移到设备上</span></span><br><span class="line">    alphas = <span class="variable language_">self</span>.alphas.to(unet.device)</span><br><span class="line">    alphas_cumprod = <span class="variable language_">self</span>.alphas_cumprod.to(unet.device)</span><br><span class="line">    timesteps = <span class="variable language_">self</span>.timesteps.to(unet.device)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 初始化：从标准高斯分布采样 x_T ~ N(0, I)</span></span><br><span class="line">    images = torch.randn(</span><br><span class="line">        (batch_size, in_channels, sample_size, sample_size), </span><br><span class="line">        device=unet.device</span><br><span class="line">    )</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 迭代去噪：从T到1，使用预定义的时间步子序列</span></span><br><span class="line">    <span class="keyword">for</span> t, tau <span class="keyword">in</span> tqdm(<span class="built_in">list</span>(<span class="built_in">zip</span>(timesteps[:-<span class="number">1</span>], timesteps[<span class="number">1</span>:])), desc=<span class="string">&#x27;DDIM Sampling&#x27;</span>):</span><br><span class="line">        <span class="comment"># 步骤1：使用网络预测噪声 ε_θ(x_t, t)</span></span><br><span class="line">        pred_noise = unet(images, t).sample</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 步骤2：计算方差 σ_t</span></span><br><span class="line">        <span class="comment"># σ_t = η * √[(1-ᾱ_τ)/(1-ᾱ_t)] * √(1-α_t)</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> math.isclose(eta, <span class="number">0.0</span>):</span><br><span class="line">            <span class="comment"># 计算方差参数化的各个组成部分</span></span><br><span class="line">            one_minus_alpha_prod_tau = <span class="number">1.0</span> - alphas_cumprod[tau]  <span class="comment"># 1 - ᾱ_τ</span></span><br><span class="line">            one_minus_alpha_prod_t = <span class="number">1.0</span> - alphas_cumprod[t]      <span class="comment"># 1 - ᾱ_t</span></span><br><span class="line">            one_minus_alpha_t = <span class="number">1.0</span> - alphas[t]                   <span class="comment"># 1 - α_t</span></span><br><span class="line">            </span><br><span class="line">            sigma_t = eta * torch.sqrt(</span><br><span class="line">                (one_minus_alpha_prod_tau * one_minus_alpha_t) / one_minus_alpha_prod_t</span><br><span class="line">            )</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="comment"># η = 0 时，σ_t = 0，实现确定性采样</span></span><br><span class="line">            sigma_t = torch.zeros_like(alphas[<span class="number">0</span>])</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 步骤3：计算预测的原始图像 x̂_0</span></span><br><span class="line">        <span class="comment"># x̂_0 = (x_t - √(1-ᾱ_t) * ε_θ(x_t,t)) / √ᾱ_t</span></span><br><span class="line">        sqrt_alphas_cumprod_t = torch.sqrt(alphas_cumprod[t])           <span class="comment"># √ᾱ_t</span></span><br><span class="line">        sqrt_one_minus_alphas_cumprod_t = torch.sqrt(<span class="number">1.0</span> - alphas_cumprod[t])  <span class="comment"># √(1-ᾱ_t)</span></span><br><span class="line">        </span><br><span class="line">        predicted_x0 = (images - sqrt_one_minus_alphas_cumprod_t * pred_noise) / sqrt_alphas_cumprod_t</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 步骤4：计算DDIM采样公式的三个组成部分</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 第一项：√ᾱ_τ * x̂_0</span></span><br><span class="line">        sqrt_alphas_cumprod_tau = torch.sqrt(alphas_cumprod[tau])  <span class="comment"># √ᾱ_τ</span></span><br><span class="line">        first_term = sqrt_alphas_cumprod_tau * predicted_x0</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 第二项：√(1-ᾱ_τ-σ_t²) * ε_θ(x_t,t)</span></span><br><span class="line">        coeff = torch.sqrt(<span class="number">1.0</span> - alphas_cumprod[tau] - sigma_t ** <span class="number">2</span>)</span><br><span class="line">        second_term = coeff * pred_noise</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 第三项：σ_t * ε（随机噪声项）</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> math.isclose(eta, <span class="number">0.0</span>):</span><br><span class="line">            epsilon = torch.randn_like(images)</span><br><span class="line">            third_term = sigma_t * epsilon</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            third_term = <span class="number">0.0</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 步骤5：更新图像 x_τ = 第一项 + 第二项 + 第三项</span></span><br><span class="line">        images = first_term + second_term + third_term</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 后处理：将图像从[-1,1]范围转换到[0,1]范围</span></span><br><span class="line">    images = (images / <span class="number">2.0</span> + <span class="number">0.5</span>).clamp(<span class="number">0</span>, <span class="number">1</span>).cpu().permute(<span class="number">0</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">1</span>).numpy()</span><br><span class="line">    <span class="keyword">return</span> images</span><br></pre></td></tr></table></figure>
+<h3 id="关键实现要点">3. 关键实现要点</h3>
+<ol type="1">
+<li><strong>时间步子序列</strong>：使用线性采样策略，从1000个训练时间步中选择20个进行采样</li>
+<li><strong>方差控制</strong>：通过η参数控制随机性，η=0实现确定性采样</li>
+<li><strong>公式对应</strong>：代码中的每个步骤都严格对应DDIM的数学公式</li>
+<li><strong>设备管理</strong>：确保所有张量都在同一设备上计算</li>
+<li><strong>数值稳定性</strong>：使用<code>math.isclose()</code>进行浮点数比较，避免精度问题</li>
+</ol>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li><a
+target="_blank" rel="noopener" href="https://littlenyima.github.io/posts/14-denoising-diffusion-implicit-models/">DDIM
+理论与实现</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.myhz0606.com/article/ddim">diffusion
+model(二)：DDIM技术小结 (denoising diffusion implicit model)</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://lichtung612.github.io/posts/1-diffusion-models/">扩散模型（一）|
+DDPM &amp; DDIM</a></li>
+</ol>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">AAA高老庄旺铺招租</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/">https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">AAA高老庄旺铺招租的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（七）：Score-Base理论</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（五）：DDPM理论</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-21</div><div class="title">笔记｜生成模型（八）：SDE统一DDPM和SMLD</div></div></a></div><div><a href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-16</div><div class="title">笔记｜生成模型（七）：Score-Base理论</div></div></a></div><div><a href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-10</div><div class="title">笔记｜生成模型（五）：DDPM理论</div></div></a></div><div><a href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-09</div><div class="title">笔记｜生成模型（四）：变分自编码器</div></div></a></div><div><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-07</div><div class="title">笔记｜生成模型（三）：生成对抗理论</div></div></a></div><div><a href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-04</div><div class="title">笔记｜生成模型（二）：生成模型的技术路线总览</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">AAA高老庄旺铺招租</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到AAA高老庄旺铺招租的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#ddpm-%E7%9A%84%E5%8F%8D%E5%90%91%E8%BF%87%E7%A8%8B"><span class="toc-number">1.</span> <span class="toc-text">DDPM 的反向过程</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#qmathbfx_taumathbfx_tmathbfx_0-%E7%9A%84%E6%8E%A8%E5%AF%BC"><span class="toc-number">1.1.</span> <span class="toc-text">\(q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)\)
+的推导</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B9%E5%B7%AE%E5%8F%82%E6%95%B0%E5%8C%96%E4%B8%8E%E6%A8%A1%E5%9E%8B%E5%8F%98%E4%BD%93"><span class="toc-number">1.2.</span> <span class="toc-text">方差参数化与模型变体</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%9D%9E%E9%A9%AC%E5%B0%94%E5%8F%AF%E5%A4%AB%E9%87%87%E6%A0%B7%E4%B8%8E%E5%8A%A0%E9%80%9F"><span class="toc-number">1.3.</span> <span class="toc-text">非马尔可夫采样与加速</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#ddim-%E7%9A%84%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7"><span class="toc-number">2.</span> <span class="toc-text">DDIM 的核心特性</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%87%87%E6%A0%B7%E4%B8%80%E8%87%B4%E6%80%A7sampling-consistency"><span class="toc-number">2.1.</span> <span class="toc-text">1. 采样一致性（Sampling
+Consistency）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%AD%E4%B9%89%E6%8F%92%E5%80%BCsemantic-interpolation"><span class="toc-number">2.2.</span> <span class="toc-text">2. 语义插值（Semantic
+Interpolation）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#ddim-%E7%9A%84%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="toc-number">3.</span> <span class="toc-text">DDIM 的代码实现</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="toc-number">3.1.</span> <span class="toc-text">核心代码实现</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E4%B8%8E%E5%8F%82%E6%95%B0%E8%AE%BE%E7%BD%AE"><span class="toc-number">3.1.1.</span> <span class="toc-text">1. 初始化与参数设置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ddim%E9%87%87%E6%A0%B7%E7%AE%97%E6%B3%95"><span class="toc-number">3.1.2.</span> <span class="toc-text">2. DDIM采样算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E5%AE%9E%E7%8E%B0%E8%A6%81%E7%82%B9"><span class="toc-number">3.1.3.</span> <span class="toc-text">3. 关键实现要点</span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-10T15:08:30.000Z" title="发表于 2025-08-10 23:08:30">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器">笔记｜生成模型（四）：变分自编码器</a><time datetime="2025-08-08T17:37:31.000Z" title="发表于 2025-08-09 01:37:31">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-06T17:37:31.000Z" title="发表于 2025-08-07 01:37:31">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-03T17:37:31.000Z" title="发表于 2025-08-04 01:37:31">2025-08-04</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-30T17:37:31.000Z" title="发表于 2025-07-31 01:37:31">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-22T09:40:51.000Z" title="发表于 2025-08-22 17:40:51">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-22T08:27:55.000Z" title="发表于 2025-08-22 16:27:55">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-21T15:08:30.000Z" title="发表于 2025-08-21 23:08:30">2025-08-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论">笔记｜生成模型（七）：Score-Base理论</a><time datetime="2025-08-16T15:08:30.000Z" title="发表于 2025-08-16 23:08:30">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 By AAA高老庄旺铺招租</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/7-ddim/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/',
+      title: '笔记｜生成模型（六）：DDIM理论',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

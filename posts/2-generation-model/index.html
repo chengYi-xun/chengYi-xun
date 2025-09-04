@@ -1,0 +1,469 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（二）：生成模型的技术路线总览 | AAA高老庄旺铺招租的个人博客</title><meta name="author" content="AAA高老庄旺铺招租"><meta name="copyright" content="AAA高老庄旺铺招租"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="判别模型 vs 生成模型 在人工智能领域，如今深度学习模型大致可分为两类：判别式模型（Discriminative Models）和生成式模型（Generative Models）。 判别模型: 判别模型关注的是建模条件概率 \(P(y \mid x)\)，即在给定输入 \(x\) 的条件下预测标签 \(y\)。从信息学角度来看，人类所使用的语言、图像、音频等形式的信息，虽然本质上处于极高维空间中">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（二）：生成模型的技术路线总览">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/index.html">
+<meta property="og:site_name" content="AAA高老庄旺铺招租的个人博客">
+<meta property="og:description" content="判别模型 vs 生成模型 在人工智能领域，如今深度学习模型大致可分为两类：判别式模型（Discriminative Models）和生成式模型（Generative Models）。 判别模型: 判别模型关注的是建模条件概率 \(P(y \mid x)\)，即在给定输入 \(x\) 的条件下预测标签 \(y\)。从信息学角度来看，人类所使用的语言、图像、音频等形式的信息，虽然本质上处于极高维空间中">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-03T17:37:31.000Z">
+<meta property="article:modified_time" content="2025-09-04T15:05:45.977Z">
+<meta property="article:author" content="AAA高老庄旺铺招租">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（二）：生成模型的技术路线总览',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2025-09-04 23:05:45'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 5.4.2"><link rel="alternate" href="/chengYi-xun/atom.xml" title="AAA高老庄旺铺招租的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="AAA高老庄旺铺招租的个人博客"><span class="site-name">AAA高老庄旺铺招租的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（二）：生成模型的技术路线总览</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-03T17:37:31.000Z" title="发表于 2025-08-04 01:37:31">2025-08-04</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-09-04T15:05:45.977Z" title="更新于 2025-09-04 23:05:45">2025-09-04</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（二）：生成模型的技术路线总览"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h2 id="判别模型-vs-生成模型">判别模型 vs 生成模型</h2>
+<p>在人工智能领域，如今深度学习模型大致可分为两类：判别式模型（Discriminative
+Models）和生成式模型（Generative Models）。</p>
+<p><strong>判别模型</strong>:</p>
+<p>判别模型关注的是建模条件概率 <span class="math inline">\(P(y \mid
+x)\)</span>，即在给定输入 <span class="math inline">\(x\)</span>
+的条件下预测标签 <span
+class="math inline">\(y\)</span>。从信息学角度来看，人类所使用的语言、图像、音频等形式的信息，虽然本质上处于极高维空间中，但它们在该空间中的分布往往集中在结构性很强、低维的流形上。因此，它们在高维空间中呈现出几何稀疏性，换句话说，数据在高维空间中运动、变化，但只活动在某种低自由度的结构中。举个栗子：假设我们用
+<span class="math inline">\(64×64×3=12288\)</span>
+维来表示彩色人脸图像，但现实中，人脸受限于：姿态（2～3个自由度），表情（2～5个自由度），光照变化，年龄、性别等特征。尽管图像空间是
+1 万多维，人脸变化的真实自由度可能只有几十个维度，所以，所有可能的 RGB
+图像中，人脸图像只占据一个非常小的“面团”一样的区域，这个区域是一个低维流形。</p>
+<p>很多人对低维流形可能理解的还是不够形象，举一个更抽象的例子就是：想象一只虫子在一张纸上爬，纸是
+2D的，但纸卷成球、筒或任何弯曲形状时，虫子仍然只能沿着纸的表面爬。如果虫子位置用
+3D 坐标表示，它的“位置向量”是在 3D
+空间中表示的，但所有点都集中在那张弯曲的纸上，所以实际虫子的坐标可以用二维坐标方式表示就足够了。而这张纸就是一个二维流形嵌入在三维空间中。</p>
+<p>经过上述例子说明，我们可以发现真实世界的数据分布在一个高维空间但稠密且低维的流形上，而不同类别的数据通常分布在这个流形上的不同区域。因此，判别模型的目标就是：在这个复杂的高维空间中，学习一个最优的决策边界（可能是非线性的），从而将不同类别的流形区域尽可能清晰、稳定地区分开。这个边界可以是：一条直线（线性模型），一个超平面（SVM），一个高度复杂的非线性判别函数（如
+ResNet、Transformer）等。</p>
+<p>数学语言表达：</p>
+<p>假设样本 <span class="math inline">\(x \in R^d\)</span>，类别标签为
+<span class="math inline">\(y \in \{1, 2, \dots, K\}\)</span></p>
+<p>判别模型试图学习一个函数 <span
+class="math inline">\(f(x)\)</span>，使得：</p>
+<p><span class="math display">\[f(x) = \mathop {\arg \max }\limits_y
+\;P(y\mid x)\]</span></p>
+<p><strong>生成模型</strong>:</p>
+<p>生成模型则试图学习数据的联合概率分布 <span class="math inline">\(P(x,
+y)\)</span> 或边际概率分布 <span
+class="math inline">\(P(x)\)</span>。它们不仅可以完成判别任务（通过
+<span class="math inline">\(P(y \mid x) = \frac{P(x,
+y)}{P(x)}\)</span>），更重要的是能够生成与训练数据“相似”的新数据样本。换句话说：</p>
+<ul>
+<li>判别模型关注“这张图是猫吗？”</li>
+<li>生成模型尝试“生成一张像猫的图”。</li>
+</ul>
+<p>所以，<a
+target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/611466195">生成模型的一般定义是</a>：给定从真实分布
+<span class="math inline">\(P(x)\)</span> 中采样的观测数据 <span
+class="math inline">\(x\)</span>，训练得到一个由参数 <span
+class="math inline">\(\theta\)</span> 控制、能够逼近真实分布的模型 <span
+class="math inline">\(p_\theta(x)\)</span>，我们将 <span
+class="math inline">\(p_\theta(x)\)</span> 称为生成模型。通常，<span
+class="math inline">\(x\)</span>
+可以被视为来自某一分布的样本，例如一组图像数据，其中每一张图片可以看作是一个多维向量。<span
+class="math inline">\(P(x)\)</span>
+表示这些数据在真实世界中的分布；而我们能够观测到的数据，只是从该真实分布中采样而来。</p>
+<p>需要注意的是，真实分布 <span class="math inline">\(P(x)\)</span>
+通常是无法直接获取的。即使在一个看似简单的问题中，比如抛硬币，表面上我们可能观察到正反面概率为
+50%，但实际上决定这个概率的因素非常复杂，例如空气阻力、抛掷的力度与角度，甚至太阳风和地磁等微妙因素都可能影响最终的落地结果。</p>
+<p>因此，真实分布往往是高度复杂、不可观测的。生成模型 <span
+class="math inline">\(p_\theta(x)\)</span> 的任务就是用某种近似方法对
+<span class="math inline">\(P(x)\)</span>
+进行建模。例如，在抛硬币的例子中，我们可以简化建模为一个由参数 <span
+class="math inline">\(\theta\)</span>
+控制的伯努利分布，通过参数估计的方法求出 <span
+class="math inline">\(\theta\)</span>；也可以引入更多特征（如力度、角度等）构建一个更精细的模型。</p>
+<p>在得到生成模型 $ P_(x) $
+后，就能采样（生成）出各式各样的，包括观测集没有的数据了，这就是最终的目的。</p>
+<p>但我们无法直接用神经网络拟合 <span
+class="math inline">\(P_\theta(x)\)</span>，一方面是因为真值难以构造，我们无法穷尽每类图像在图像空间中的概率函数是什么，因此就无法计算每类图像的真值。另一方面，概率密度函数
+<span class="math inline">\(P_\theta(x)\)</span>
+通常定义在高维空间中，在这种空间中直接建模密度函数的形式极为复杂且不稳定（还稀疏和不连续）。尤其对于图像这样的高维数据，直接在这样上万维度的空间上建模一个可归一化的概率密度函数既计算复杂，又缺乏明确的分布形态。</p>
+<p>有些<strong>大聪明</strong>不服，马上跳出来了：“你说的不对，直接用文本输入，然后用图片做监督，比如我给我网络输入一个‘草地上有一只猫’，然后我用草地上的猫来监督他的训练。只要我的图片数量够多，不就可以让网络学会‘草地上有只猫’图像的概率分布函数了吗”。很好，你有点小聪明，但是不多。首先是不管你穷尽多少图像，都无法穷举该类型的照片，自然就无法学习到他的概率。真实情况也确实是如果我们能够捏造某种类型的数据便已足够。但第二个问题是，这种做法会导致<strong>均值灾难</strong>。</p>
+<p>什么是均值灾难？以上面的例子为例，你训练集里确实有10万张猫在草地上的照片，但这些猫位置不同、大小不同、颜色不同。用像素级的均方误差来监督网络训练——也就是说，你在惩罚网络生成图像和真实图像之间的逐像素差异。</p>
+<p>于是，发生悲剧了：网络为了在所有训练图像上都“少犯错”，它学会了一个所有可能图像的平均值。也就是说，猫的位置模糊了、轮廓糊了、颜色灰了——整个图像看起来就像是一只幽灵猫，像被拍糊了一样，完全丧失了真实感。这就是均值灾难（mean
+collapse）或模糊灾难（blurry image problem）。</p>
+<p>它的本质是什么？本质是你让神经网络输出一个“确定的图像”，去逼近一个多峰分布的真值。这时候，神经网络做的事情就是——输出这个多峰分布的均值图像。但问题是，多峰分布的均值，根本不是任何一个真实样本，它只是各个样本的“中间态”，而这个“中间态”在图像空间里看起来就是一张糊图。</p>
+<h2 id="那如何训练生成模型呢">那如何训练生成模型呢</h2>
+<p>看过之前笔记的同学应该还记的变分推断这一好用的工具（<a
+href="../0-generation-basic-theory">(=`ω´=)我是链接猪</a>）。没错，既然无法直接求出真实数据的分布
+<span
+class="math inline">\(P(x)\)</span>，那我们就尝试近似它。生成模型大体上做的事情就是：</p>
+<p>从一个简单的已知分布（如标准高斯分布）出发，通过某种方式或手段，将其近似为真实数据的概率分布
+<span class="math inline">\(P(x)\)</span>
+。更抽象地说，这个变换相当于把原始的低维流形通过一个映射函数 <span
+class="math inline">\(f(z)\)</span>
+映射到高维的数据空间。这样做的好处是：我们可以在简单的分布 <span
+class="math inline">\(P(z)\)</span>
+中轻松地进行随机采样，然后通过学习得到的生成函数 <span
+class="math inline">\(f(z)\)</span>，生成看起来像来自真实数据分布 <span
+class="math inline">\(P(x)\)</span> 的样本。</p>
+<p>所以，根据上述手段和方式的不同，生成模型划分为多个流派和类别。</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>大类</strong></th>
+<th style="text-align: left;"><strong>流派 (派系)</strong></th>
+<th style="text-align: left;"><strong>核心思想</strong></th>
+<th style="text-align: left;"><strong>代表性模型 / 算法</strong></th>
+<th style="text-align: left;"><strong>开创性/代表性论文</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>隐式建模 (Implicit
+Modeling)</strong></td>
+<td style="text-align: left;"><strong>对抗生成
+(Adversarial)</strong></td>
+<td
+style="text-align: left;">通过生成器和判别器之间的零和博弈来学习数据分布，最终生成器产生无法被判别器区分的逼真样本。</td>
+<td style="text-align: left;">GAN, WGAN</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1406.2661">Generative Adversarial Nets
+(2014)</a></strong> - <em>Ian Goodfellow, et al.</em> <br> <strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1701.07875">Wasserstein GAN
+(2017)</a></strong> - <em>Martin Arjovsky, et al.</em></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>显式建模 (Explicit
+Modeling)</strong></td>
+<td style="text-align: left;"><strong>扩散模型 (Diffusion
+Models)</strong></td>
+<td
+style="text-align: left;"><strong>前向过程</strong>：对真实数据逐步添加噪声。<strong>反向过程</strong>：学习一个神经网络，从纯噪声开始，逐步去除噪声，最终“还原”出清晰的样本。</td>
+<td style="text-align: left;">DDPM, Score-based Generative Models</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2006.11239">Denoising Diffusion
+Probabilistic Models (2020)</a></strong> - <em>Jonathan Ho, et
+al.</em></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>流模型 (Flow-based)</strong></td>
+<td
+style="text-align: left;">利用一系列<strong>可逆变换</strong>将简单分布直接映射到复杂的数据分布，从而可以精确计算出样本的概率密度（Likelihood）。</td>
+<td style="text-align: left;">NICE, RealNVP, Glow</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1410.8516">NICE: Non-linear Independent
+Components Estimation (2014)</a></strong> - <em>Laurent Dinh, et
+al.</em> <br> <strong><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1807.03039">Glow:
+Generative Flow with Invertible 1x1 Convolutions (2018)</a></strong> -
+<em>Diederik P. Kingma, et al.</em></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>流匹配 (Flow
+Matching)</strong></td>
+<td
+style="text-align: left;"><strong>直接学习</strong>从简单分布（如噪声）到数据分布的连续变换<strong>向量场</strong>（Vector
+Field）。它无需像流模型那样强制变换可逆，也无需像扩散模型那样遵循固定的前向过程，实现了更高效和灵活的训练。</td>
+<td style="text-align: left;">Flow Matching, Conditional Flow
+Matching</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2210.02747">Flow Matching for Generative
+Modeling (2022)</a></strong> - <em>Yaron Lipman, et al.</em></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>分数匹配 (Score
+Matching)</strong></td>
+<td style="text-align: left;">不直接对概率密度 <span
+class="math inline">\(p(x)\)</span>
+建模，而是对其<strong>对数概率的梯度</strong> <span
+class="math inline">\(\nabla_x \log
+p(x)\)</span>（分数函数）进行建模，并指导生成过程。</td>
+<td style="text-align: left;">NCSN (Noise Conditional Score
+Network)</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1907.05600">Generative Modeling by
+Estimating Gradients of the Data Distribution (2019)</a></strong> -
+<em>Yang Song, et al.</em></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>自回归模型
+(Autoregressive)</strong></td>
+<td
+style="text-align: left;">将数据的联合概率分布分解为一系列<strong>条件概率的乘积</strong>，并逐个维度地生成数据。</td>
+<td style="text-align: left;">PixelRNN, PixelCNN, VQ-VAE, WaveNet</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1601.06759">Pixel Recurrent Neural Networks
+(2016)</a></strong> - <em>Aaron van den Oord, et al.</em></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>变分自编码器 (Variational
+Autoencoder)</strong></td>
+<td
+style="text-align: left;">同时学习一个编码器和解码器。通过最大化“证据下界”（ELBO）来近似计算数据的边际似然，并学习一个规整的隐空间。</td>
+<td style="text-align: left;">VAE (Variational Autoencoder)</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1312.6114">Auto-Encoding Variational Bayes
+(2013)</a></strong> - <em>Diederik P. Kingma, et al.</em></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>能量模型
+(Energy-based)</strong></td>
+<td style="text-align: left;">为每个数据点 <span
+class="math inline">\(x\)</span>
+分配一个非归一化的标量<strong>能量值</strong> <span
+class="math inline">\(E(x)\)</span>，能量越低表示该数据点越可能真实。</td>
+<td style="text-align: left;">EBM (Energy-Based Model)</td>
+<td style="text-align: left;"><strong><a
+target="_blank" rel="noopener" href="http://yann.lecun.com/exdb/publis/pdf/lecun-06.pdf">A Tutorial on
+Energy-Based Learning (2006)</a></strong> - <em>Yann LeCun, et
+al.</em></td>
+</tr>
+</tbody>
+</table>
+<p>好像还有一个薛定谔的桥理论，但是非主流方法，我对此了解也不深，所以没有写上去。后续会陆续讲解他们的原理，感兴趣的同学请follow
+me。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">AAA高老庄旺铺招租</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/">https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">AAA高老庄旺铺招租的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（三）：生成对抗理论</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（一）：一些概率论的基础概念和理论</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-21</div><div class="title">笔记｜生成模型（八）：SDE统一DDPM和SMLD</div></div></a></div><div><a href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-16</div><div class="title">笔记｜生成模型（七）：Score-Base理论</div></div></a></div><div><a href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-12</div><div class="title">笔记｜生成模型（六）：DDIM理论</div></div></a></div><div><a href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-10</div><div class="title">笔记｜生成模型（五）：DDPM理论</div></div></a></div><div><a href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-09</div><div class="title">笔记｜生成模型（四）：变分自编码器</div></div></a></div><div><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-07</div><div class="title">笔记｜生成模型（三）：生成对抗理论</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">AAA高老庄旺铺招租</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到AAA高老庄旺铺招租的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%A4%E5%88%AB%E6%A8%A1%E5%9E%8B-vs-%E7%94%9F%E6%88%90%E6%A8%A1%E5%9E%8B"><span class="toc-number">1.</span> <span class="toc-text">判别模型 vs 生成模型</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%82%A3%E5%A6%82%E4%BD%95%E8%AE%AD%E7%BB%83%E7%94%9F%E6%88%90%E6%A8%A1%E5%9E%8B%E5%91%A2"><span class="toc-number">2.</span> <span class="toc-text">那如何训练生成模型呢</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-10T15:08:30.000Z" title="发表于 2025-08-10 23:08:30">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器">笔记｜生成模型（四）：变分自编码器</a><time datetime="2025-08-08T17:37:31.000Z" title="发表于 2025-08-09 01:37:31">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-06T17:37:31.000Z" title="发表于 2025-08-07 01:37:31">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-03T17:37:31.000Z" title="发表于 2025-08-04 01:37:31">2025-08-04</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-30T17:37:31.000Z" title="发表于 2025-07-31 01:37:31">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-22T09:40:51.000Z" title="发表于 2025-08-22 17:40:51">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-22T08:27:55.000Z" title="发表于 2025-08-22 16:27:55">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-21T15:08:30.000Z" title="发表于 2025-08-21 23:08:30">2025-08-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论">笔记｜生成模型（七）：Score-Base理论</a><time datetime="2025-08-16T15:08:30.000Z" title="发表于 2025-08-16 23:08:30">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 By AAA高老庄旺铺招租</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/2-generation-model/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/',
+      title: '笔记｜生成模型（二）：生成模型的技术路线总览',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

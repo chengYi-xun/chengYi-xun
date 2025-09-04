@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>AAA高老庄旺铺招租的个人博客</title>
+  <icon>https://chengyi-xun.github.io/chengYi-xun/img/favicon64x64.png</icon>
+  <subtitle>分享编程与生活</subtitle>
+  <link href="https://chengyi-xun.github.io/chengYi-xun/atom.xml" rel="self"/>
+  
+  <link href="https://chengyi-xun.github.io/chengYi-xun/"/>
+  <updated>2025-09-04T15:05:45.977Z</updated>
+  <id>https://chengyi-xun.github.io/chengYi-xun/</id>
+  
+  <author>
+    <name>AAA高老庄旺铺招租</name>
+    
+  </author>
+  
+  <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>笔记｜生成模型（九）：Classifier Guidance 理论与实现</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/</id>
+    <published>2025-08-22T09:40:51.000Z</published>
+    <updated>2025-09-04T15:05:45.977Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Diffusion models" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Diffusion-models/"/>
+    
+    <category term="Generative models" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/</id>
+    <published>2025-08-22T08:27:55.000Z</published>
+    <updated>2025-09-04T15:05:45.977Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Diffusion models" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Diffusion-models/"/>
+    
+    <category term="Genetative models" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Genetative-models/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（八）：SDE统一DDPM和SMLD</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/9-SDE/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/9-SDE/</id>
+    <published>2025-08-21T15:08:30.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（七）：Score-Base理论</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/8-score-match/</id>
+    <published>2025-08-16T15:08:30.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（六）：DDIM理论</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/7-ddim/</id>
+    <published>2025-08-12T15:08:30.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（五）：DDPM理论</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/6-ddpm/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/6-ddpm/</id>
+    <published>2025-08-10T15:08:30.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>杂谈｜写作的目的</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/5-some_think/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/5-some_think/</id>
+    <published>2025-08-10T09:08:30.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="thinking" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/thinking/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（四）：变分自编码器</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/</id>
+    <published>2025-08-08T17:37:31.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（三）：生成对抗理论</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/3-GAN-theory/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/3-GAN-theory/</id>
+    <published>2025-08-06T17:37:31.000Z</published>
+    <updated>2025-09-04T15:05:45.977Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（二）：生成模型的技术路线总览</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/2-generation-model/</id>
+    <published>2025-08-03T17:37:31.000Z</published>
+    <updated>2025-09-04T15:05:45.977Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>笔记｜生成模型（一）：一些概率论的基础概念和理论</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/1-generation-basic-theory/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/1-generation-basic-theory/</id>
+    <published>2025-07-30T17:37:31.000Z</published>
+    <updated>2025-09-04T15:05:45.977Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Notes" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Notes/"/>
+    
+    
+    <category term="Deep learning" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Deep-learning/"/>
+    
+    <category term="Generative models theory" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/Generative-models-theory/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>置顶｜本站文章索引</title>
+    <link href="https://chengyi-xun.github.io/chengYi-xun/posts/top-1-article-index/"/>
+    <id>https://chengyi-xun.github.io/chengYi-xun/posts/top-1-article-index/</id>
+    <published>2025-07-14T08:08:11.000Z</published>
+    <updated>2025-09-04T15:05:45.978Z</updated>
+    
+    
+      
+      
+        
+        
+    <summary type="html">&lt;link rel=&quot;stylesheet&quot; class=&quot;aplayer-secondary-style-marker&quot; href=&quot;/chengYi-xun/css/APlayer.min.css&quot;&gt;&lt;script src=&quot;/chengYi-xun/js/APlayer.m</summary>
+        
+      
+    
+    
+    
+    <category term="Tutorials" scheme="https://chengyi-xun.github.io/chengYi-xun/categories/Tutorials/"/>
+    
+    
+    <category term="自我介绍" scheme="https://chengyi-xun.github.io/chengYi-xun/tags/%E8%87%AA%E6%88%91%E4%BB%8B%E7%BB%8D/"/>
+    
+  </entry>
+  
+</feed>

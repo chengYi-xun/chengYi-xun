@@ -1,0 +1,900 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（四）：变分自编码器 | AAA高老庄旺铺招租的个人博客</title><meta name="author" content="AAA高老庄旺铺招租"><meta name="copyright" content="AAA高老庄旺铺招租"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="自编码器（Autoencoder, AE） VS 变分自编码器（Variational Autoencoder，VAE） 自编码器 如下图所示，自编码器分为编码器和解码器组成。编码器通过映射将原始高维空间的数据映射成一个特征向量（之前说过某种数据一般都是高维空间低维流形的形式存在，那存储和运算其实仅需要在低维流形上即可。关键在于如何表示出低维流形），即寻找输入数据的低维特征来压缩数据。而解码器通过">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（四）：变分自编码器">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/index.html">
+<meta property="og:site_name" content="AAA高老庄旺铺招租的个人博客">
+<meta property="og:description" content="自编码器（Autoencoder, AE） VS 变分自编码器（Variational Autoencoder，VAE） 自编码器 如下图所示，自编码器分为编码器和解码器组成。编码器通过映射将原始高维空间的数据映射成一个特征向量（之前说过某种数据一般都是高维空间低维流形的形式存在，那存储和运算其实仅需要在低维流形上即可。关键在于如何表示出低维流形），即寻找输入数据的低维特征来压缩数据。而解码器通过">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-08T17:37:31.000Z">
+<meta property="article:modified_time" content="2025-09-04T15:05:45.978Z">
+<meta property="article:author" content="AAA高老庄旺铺招租">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（四）：变分自编码器',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2025-09-04 23:05:45'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 5.4.2"><link rel="alternate" href="/chengYi-xun/atom.xml" title="AAA高老庄旺铺招租的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="AAA高老庄旺铺招租的个人博客"><span class="site-name">AAA高老庄旺铺招租的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（四）：变分自编码器</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-08T17:37:31.000Z" title="发表于 2025-08-09 01:37:31">2025-08-09</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-09-04T15:05:45.978Z" title="更新于 2025-09-04 23:05:45">2025-09-04</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（四）：变分自编码器"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h2
+id="自编码器autoencoder-ae-vs-变分自编码器variational-autoencodervae">自编码器（Autoencoder,
+AE） VS 变分自编码器（Variational Autoencoder，VAE）</h2>
+<h2 id="自编码器"><strong>自编码器</strong></h2>
+<p>如下图所示，自编码器分为编码器和解码器组成。编码器通过映射将原始高维空间的数据映射成一个特征向量（之前说过某种数据一般都是高维空间低维流形的形式存在，那存储和运算其实仅需要在低维流形上即可。关键在于如何表示出低维流形），即寻找输入数据的低维特征来压缩数据。而解码器通过映射将低维特征解码回我们能够看得懂的高纬数据。</p>
+<p><img src="/chengYi-xun/img/ae.jpg" alt="AE 架构" /></p>
+<p>用数学的定义表示为：</p>
+<p>给定数据集 <span class="math inline">\(\mathcal{D} =
+\{x^{(i)}\}_{i=1}^N\)</span>，编码器 <span
+class="math inline">\(f_\theta: \mathcal{X} \to \mathcal{Z}\)</span>
+和解码器 <span class="math inline">\(g_\phi: \mathcal{Z} \to
+\mathcal{X}\)</span>。这两个函数学习一个确定性映射，使得重构结果 <span
+class="math inline">\(\hat{x}\)</span> 尽可能接近原始输入 <span
+class="math inline">\(x\)</span>：</p>
+<p><span class="math display">\[
+z = f_\theta(x), \quad \hat{x} = g_\phi(z)
+\]</span> 其中 <span class="math inline">\(x\)</span>
+是输入数据，z是低维特征（或中间变量），<span
+class="math inline">\(\hat{x}\)</span> 是解码特征。</p>
+<p>优化目标为最小化重构误差：</p>
+<p><span class="math display">\[
+\min_{\theta, \phi} \ \mathcal{L}_{AE}(\theta, \phi)
+= \frac{1}{N} \sum_{i=1}^N \ell\left( x^{(i)},
+g_\phi\left(f_\theta\left(x^{(i)}\right)\right) \right)
+\]</span></p>
+<p>其中常用均方误差（MSE）作为损失函数：</p>
+<p><span class="math display">\[
+\ell(x, \hat{x}) = \|x - \hat{x}\|_2^2
+\]</span></p>
+<p>缺点：</p>
+<ol type="1">
+<li><strong>潜在空间无规律性</strong>：自编码器训练时只关注重构误差，并不保证潜在空间
+<span class="math inline">\(z\)</span> 的连续性和规律性。这意味着：
+<ul>
+<li>相似的输入可能被映射到潜在空间中相距很远的位置</li>
+<li>潜在空间中相邻的点解码后可能产生完全不同的输出</li>
+<li>无法通过在潜在空间中插值来生成有意义的新样本</li>
+</ul></li>
+<li><strong>无法进行生成</strong>：虽然解码器 <span
+class="math inline">\(g_\phi\)</span>
+可以将潜在编码解码回数据，但我们无法知道如何采样合理的潜在编码 <span
+class="math inline">\(z\)</span>
+来生成新的数据。因为训练过程中没有约束潜在空间的分布。</li>
+<li><strong>过拟合风险</strong>：自编码器可能简单地学会记忆训练数据，而不是学习数据的内在表示。这导致模型在新数据上泛化能力差。</li>
+<li><strong>缺乏概率解释</strong>：传统自编码器是确定性的，没有概率框架，无法量化不确定性，也无法进行贝叶斯推断。</li>
+</ol>
+<h2 id="变分自编码器"><strong>变分自编码器</strong></h2>
+<p><strong>核心思想</strong></p>
+<p>为了解决上述问题，我们需要对传统自编码器进行根本性的改进。核心思想是<strong>引入概率框架</strong>，将确定性的编码-解码过程转换为概率生成模型。具体而言：</p>
+<ol type="1">
+<li><strong>概率化建模</strong>：
+<ul>
+<li>编码器：<span class="math inline">\(q_\phi(z|x)\)</span> -
+将输入数据映射为潜在变量的概率分布</li>
+<li>解码器：<span class="math inline">\(p_\theta(x|z)\)</span> -
+从潜在变量生成数据的概率分布<br />
+</li>
+<li>先验分布：<span class="math inline">\(p(z)\)</span> -
+对潜在空间结构的约束</li>
+</ul></li>
+<li><strong>理论基础</strong>：基于变分推断框架，通过最大化数据对数似然的下界来训练模型</li>
+</ol>
+<p><img src="/chengYi-xun/img/vae-gaussian.png" alt="VAE架构" /></p>
+<p>VAE架构如图所示，其网络流程可概述如下： <span
+class="math display">\[x \xrightarrow{\text{Encoder}} q_\phi(z|x)
+\xrightarrow{\text{Sample}} z \xrightarrow{\text{Decoder}}
+p_\theta(x|z)\]</span>
+编码器根据输入图像预测对应先验分布的均值和协方差，经过重采样得到隐变量<span
+class="math inline">\(z\)</span>，隐变量通过解码器得到原始的数据分布<span
+class="math inline">\(x\)</span>。</p>
+<p><strong>编码器（Encoder/Recognition Network）</strong>：</p>
+<ul>
+<li>输入：观测数据 <span class="math inline">\(x\)</span></li>
+<li>输出：隐变量后验分布的参数 <span
+class="math inline">\(\mu_\phi(x)\)</span> 和 <span
+class="math inline">\(\sigma_\phi(x)\)</span></li>
+<li>功能：学习近似后验分布 <span class="math inline">\(q_\phi(z|x) =
+\mathcal{N}(\mu_\phi(x), \sigma^2_\phi(x))\)</span></li>
+</ul>
+<p><strong>解码器（Decoder/Generative Network）</strong>：</p>
+<ul>
+<li>输入：隐变量 <span class="math inline">\(z\)</span></li>
+<li>输出：重构数据的条件分布 <span
+class="math inline">\(p_\theta(x|z)\)</span></li>
+<li>功能：学习从隐变量空间到数据空间的映射，生成与原始数据相似的样本</li>
+</ul>
+<p><strong>损失函数</strong>：</p>
+<h3 id="vae的损失函数推导">VAE的损失函数推导</h3>
+<p>VAE使用一个encoder将高维数据<span
+class="math inline">\(x\)</span>编码为低维隐变量<span
+class="math inline">\(z\)</span>，再用一个decoder将<span
+class="math inline">\(z\)</span>还原回<span
+class="math inline">\(p(x|z)\)</span>：</p>
+<p><span class="math display">\[Loss = \mathbb{E}_{z \sim q(z|x)}[-\log
+p_\theta(x|z)] + \text{KL}(q_\phi(z|x) \| p(z))\]</span></p>
+<ul>
+<li>第一项是基于encoder得到的<span
+class="math inline">\(z\)</span>经过decoder后的重建损失（类似于正则项）</li>
+<li>第二项是encoder预测分布与先验分布之间的KL散度</li>
+</ul>
+<h3 id="分布假设与公式详解">分布假设与公式详解</h3>
+<p>为了使VAE的损失函数具有解析形式，我们需要对各个分布做出合理假设：</p>
+<ol type="1">
+<li><p><strong>先验分布 <span
+class="math inline">\(p(z)\)</span></strong>：假设为标准正态分布 <span
+class="math inline">\(\mathcal{N}(0, I)\)</span></p></li>
+<li><p><strong>编码器输出 <span
+class="math inline">\(q(z|x)\)</span></strong>：输出为正态分布 <span
+class="math inline">\(\mathcal{N}(\mu_\phi(x),
+\Sigma_\phi(x))\)</span>，并简化假设各维度独立，即 <span
+class="math inline">\(\Sigma_\phi(x) =
+\text{diag}(\sigma^2_\phi(x))\)</span>，最终形式为 <span
+class="math inline">\(\mathcal{N}(\mu_\phi(x),
+\sigma_\phi(x))\)</span></p></li>
+<li><p><strong>解码器输出 <span
+class="math inline">\(p(x|z)\)</span></strong>：同样假设为正态分布 <span
+class="math inline">\(\mathcal{N}(\mu_\theta(z),
+\Sigma_\theta(z))\)</span>，并简化假设各维度独立且方差为常数，即 <span
+class="math inline">\(\Sigma_\theta(x) = \text{diag}(\sigma^2_\theta(x))
+= \sigma^2 I\)</span></p></li>
+</ol>
+<h3 id="损失函数的具体形式">损失函数的具体形式</h3>
+<p>基于上述假设，我们可以推导出损失函数的解析形式：</p>
+<ol type="1">
+<li><p><strong>KL散度项</strong>：</p>
+<p>两个高斯分布之间的KL散度有解析解。对于 <span
+class="math inline">\(q_\phi(z|x) = \mathcal{N}(\mu_\phi(x),
+\Sigma_\phi(x))\)</span> 和 <span class="math inline">\(p(z) =
+\mathcal{N}(0, I)\)</span>：</p>
+<p><span class="math display">\[\begin{align*}
+\text{KL}(q_\phi(z|x) \| p(z)) &amp;= \int q_\phi(z|x) \log
+\frac{q_\phi(z|x)}{p(z)} dz \\
+&amp;= \mathbb{E}_{z \sim q_\phi(z|x)}\left[\log q_\phi(z|x) - \log
+p(z)\right]
+\end{align*}\]</span></p>
+<p>对于两个多维高斯分布 <span class="math inline">\(\mathcal{N}(\mu_1,
+\Sigma_1)\)</span> 和 <span class="math inline">\(\mathcal{N}(\mu_2,
+\Sigma_2)\)</span>，KL散度的通用公式为：</p>
+<p><span class="math display">\[\text{KL}(\mathcal{N}(\mu_1, \Sigma_1)
+\| \mathcal{N}(\mu_2, \Sigma_2)) =
+\frac{1}{2}\left[\text{tr}(\Sigma_2^{-1}\Sigma_1) +
+(\mu_2-\mu_1)^T\Sigma_2^{-1}(\mu_2-\mu_1) - d +
+\log\frac{\det(\Sigma_2)}{\det(\Sigma_1)}\right]\]</span></p>
+<p>在我们的情况下，<span class="math inline">\(\mu_1 =
+\mu_\phi(x)\)</span>，<span class="math inline">\(\Sigma_1 =
+\Sigma_\phi(x)\)</span>，<span class="math inline">\(\mu_2 =
+0\)</span>，<span class="math inline">\(\Sigma_2 =
+I\)</span>，代入得：</p>
+<p><span class="math display">\[\begin{align*}
+\text{KL}(q_\phi(z|x) \| p(z)) &amp;=
+\frac{1}{2}\left[\text{tr}(I^{-1}\Sigma_\phi(x)) + (0-\mu_\phi(x))^T
+I^{-1}(0-\mu_\phi(x)) - d +
+\log\frac{\det(I)}{\det(\Sigma_\phi(x))}\right] \\
+&amp;= \frac{1}{2}\left[\text{tr}(\Sigma_\phi(x)) +
+\mu_\phi(x)^T\mu_\phi(x) - d + \log 1 - \log\det(\Sigma_\phi(x))\right]
+\\
+&amp;= \frac{1}{2}\left[\text{tr}(\Sigma_\phi(x)) +
+\mu_\phi(x)^T\mu_\phi(x) - d - \log\det(\Sigma_\phi(x))\right]
+\end{align*}\]</span></p>
+<p>当假设各维度独立时，<span class="math inline">\(\Sigma_\phi(x) =
+\text{diag}(\sigma^2_\phi(x)_1, ...,
+\sigma^2_\phi(x)_d)\)</span>，则：</p>
+<ul>
+<li><span class="math inline">\(\text{tr}(\Sigma_\phi(x)) =
+\sum_{i=1}^{d} \sigma^2_\phi(x)_i\)</span></li>
+<li><span class="math inline">\(\mu_\phi(x)^T\mu_\phi(x) =
+\sum_{i=1}^{d} \mu^2_\phi(x)_i\)</span></li>
+<li><span class="math inline">\(\log\det(\Sigma_\phi(x)) =
+\sum_{i=1}^{d} \log\sigma^2_\phi(x)_i\)</span></li>
+</ul>
+<p>因此最终得到： <span class="math display">\[\text{KL}(q_\phi(z|x) \|
+p(z)) = \frac{1}{2}\sum_{i=1}^{d}(\mu^2_\phi(x)_i + \sigma^2_\phi(x)_i -
+1 - \log\sigma^2_\phi(x)_i)\]</span></p>
+<p>为避免乘法麻烦，可让encoder直接预测 <span
+class="math inline">\(\log\sigma^2_\phi(x)\)</span> 而非 <span
+class="math inline">\(\sigma^2_\phi(x)\)</span>，避免加激活函数： <span
+class="math display">\[\sigma_\phi(x) = \exp(0.5 *
+(\log\sigma^2_\phi(x)))\]</span></p></li>
+<li><p><strong>重建损失项</strong>：</p>
+<p>由于我们假设解码器输出 <span class="math inline">\(p_\theta(x|z) =
+\mathcal{N}(\mu_\theta(z), \Sigma_\theta(z))\)</span>，即给定隐变量<span
+class="math inline">\(z\)</span>时，<span
+class="math inline">\(x\)</span>服从均值为<span
+class="math inline">\(\mu_\theta(z)\)</span>、协方差为<span
+class="math inline">\(\Sigma_\theta(z)\)</span>的高斯分布。</p>
+<p>对于D维高斯分布，其概率密度函数为： <span
+class="math display">\[p_\theta(x|z) =
+\frac{1}{(2\pi)^{D/2}|\Sigma_\theta(z)|^{1/2}}
+\exp\left(-\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\right)\]</span></p>
+<p>取负对数： <span class="math display">\[-\log p_\theta(x|z) =
+-\log\left[\frac{1}{(2\pi)^{D/2}|\Sigma_\theta(z)|^{1/2}}
+\exp\left(-\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\right)\right]\]</span></p>
+<p>利用对数性质 <span class="math inline">\(\log(ab) = \log a + \log
+b\)</span> 和 <span class="math inline">\(\log(1/a) = -\log a\)</span>：
+<span class="math display">\[= \log(2\pi)^{D/2} +
+\log|\Sigma_\theta(z)|^{1/2} +
+\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\]</span></p>
+<p>进一步化简： <span class="math display">\[= \frac{D}{2}\log(2\pi) +
+\frac{1}{2}\log|\Sigma_\theta(z)| +
+\frac{1}{2}(x-\mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x-\mu_\theta(z))\]</span></p>
+<p>因此得到： <span class="math display">\[-\log p_\theta(x|z) =
+\frac{D}{2}\log(2\pi) + \frac{1}{2}\log\det(\Sigma_\theta(z)) +
+\frac{1}{2}(x - \mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x -
+\mu_\theta(z))\]</span></p>
+<p>其中：</p>
+<ul>
+<li><strong>D</strong>
+是数据的维度（例如，对于28×28的MNIST图像，D=784）</li>
+<li>第一项 <span class="math inline">\(\frac{D}{2}\log(2\pi)\)</span>
+是归一化常数项</li>
+<li>第二项是协方差矩阵行列式的对数</li>
+<li>第三项是马氏距离（Mahalanobis distance）</li>
+</ul></li>
+</ol>
+<p>在简化假设下（各维度独立且方差为常数），这等价于： <span
+class="math display">\[= \frac{D}{2}\log(2\pi) + \frac{D}{2}\log\sigma^2
++ \frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2\]</span></p>
+<p>进一步简化，重建损失可以表示为： <span
+class="math display">\[\Rightarrow \frac{1}{2\sigma^2}\|x -
+\mu_\theta(z)\|^2 \quad \text{(MSE Loss!)}\]</span></p>
+<p><strong>注意事项</strong>： 1.
+nn.MSELoss在计算均方误差时默认是对所有维度上取平均的，返回值是针对一个像素维度的平均值。也就是对每个样本的所有元素的平方差进行求和，然后除以元素总数，这意味着在每个样本的所有预测值和目标值之间的所有元素上都会计算平均值。
+2. 但是二项KL散度的结果是在latent维度上的和，两loss在量级上容易失衡 3.
+方法一：MSELoss在batch维度算平均；方法二：KL项前加系数缩小</p>
+<p>最终，完整的损失函数为： <span class="math display">\[Loss =
+\frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2 +
+\frac{1}{2}\sum_{i=1}^{d}(\mu^2_\phi(x)_i + \sigma^2_\phi(x)_i - 1 -
+\log\sigma^2_\phi(x)_i), z \in \mathcal{N}(\mu_\phi(x),
+\text{diag}(\sigma_\phi(x)))\]</span></p>
+<p>其中一般 <span class="math inline">\(\sigma^2 = 1\)</span></p>
+<p><strong>为什么VAE的逐像素优化不会产生均值灾难？</strong></p>
+<p>虽然VAE在实践中也使用逐像素的MSE或BCE损失，但它巧妙地避免了<a
+href="../2-generation-model.md">均值灾难</a>问题。关键原因如下：</p>
+<ul>
+<li><strong>概率建模</strong>：VAE将解码器建模为条件概率分布 <span
+class="math inline">\(p_\theta(x|z)\)</span>，而不是确定性函数。每个隐变量
+<span class="math inline">\(z\)</span>
+对应一个输出分布，而非单一图像</li>
+<li><strong>隐变量采样</strong>：通过从 <span
+class="math inline">\(q_\phi(z|x)\)</span> 采样不同的 <span
+class="math inline">\(z\)</span>，同一输入可以产生多样化的重构结果，避免了输出单一"平均图像"</li>
+<li><strong>分布约束</strong>：KL散度项迫使编码器学习结构化的隐空间，使得相似的输入映射到相似的隐变量区域，但仍保持足够的变异性</li>
+<li><strong>变分框架</strong>：重构损失是对期望的优化：<span
+class="math inline">\(\mathbb{E}_{q_\phi(z|x)}[\log
+p_\theta(x|z)]\)</span>，这意味着模型在多个采样的 <span
+class="math inline">\(z\)</span> 上平均优化，而非对固定输出优化</li>
+<li>本质上，VAE通过概率建模和隐变量的随机性，将"一对一的确定性重构"转化为"一对多的概率性生成"，从而绕过了均值灾难的陷阱。</li>
+</ul>
+<p>聪明的同学可能会注意到，估计均值和方差再随机采样的方式是不可导的，梯度如何反传到编码器上？这就不得不提重参数化技巧的重要性了。</p>
+<p><strong>重参数化技巧（Reparameterization Trick）</strong></p>
+<p>VAE训练中的一个关键挑战是：<strong>如何通过采样操作进行反向传播？因为采样是一个随机过程，梯度无法直接通过。</strong></p>
+<p>重参数化技巧巧妙地解决了这个问题。对于高斯分布 <span
+class="math inline">\(q_\phi(z|x) = \mathcal{N}(\mu_\phi(x),
+\sigma^2_\phi(x))\)</span>，我们可以将采样过程重写为：</p>
+<p><span class="math display">\[z = \mu_\phi(x) + \sigma_\phi(x) \odot
+\epsilon\]</span></p>
+<p>其中 <span class="math inline">\(\epsilon \sim \mathcal{N}(0,
+I)\)</span> 是从标准高斯分布采样的噪声，<span
+class="math inline">\(\odot\)</span> 表示逐元素乘积。</p>
+<p>这样，随机性被转移到了与参数无关的 <span
+class="math inline">\(\epsilon\)</span> 上，而 <span
+class="math inline">\(z\)</span> 关于参数 <span
+class="math inline">\(\phi\)</span>
+是可微的，从而可以使用标准的反向传播算法。<strong>（先对标准正态分布采样再放大，而不是直接构造目标分布进行随机采样）</strong></p>
+<p>通过重参数化，将不可微的采样操作转化为可微的确定性变换，这种方法相比于其他梯度估计方法（如REINFORCE），提供了低方差的梯度估计，实现简单，计算效率高。</p>
+<p><strong>VAE和AE的异同对比：</strong></p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 33%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>对比维度</th>
+<th>自编码器 (AE)</th>
+<th>变分自编码器 (VAE)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>学习范式</strong></td>
+<td>无监督学习，编码器-解码器架构</td>
+<td>无监督学习，编码器-解码器架构</td>
+</tr>
+<tr class="even">
+<td><strong>网络结构</strong></td>
+<td>对称的编码器-解码器结构</td>
+<td>对称的编码器-解码器结构</td>
+</tr>
+<tr class="odd">
+<td><strong>隐空间性质</strong></td>
+<td>确定性映射，每个输入对应唯一隐编码</td>
+<td>概率分布，从学习到的分布中采样</td>
+</tr>
+<tr class="even">
+<td><strong>隐变量数学表示</strong></td>
+<td><span class="math inline">\(z = f_\theta(x)\)</span></td>
+<td><span class="math inline">\(z \sim q_\phi(z\|x)\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>生成能力</strong></td>
+<td>❌ 隐空间不连续，随机采样无意义</td>
+<td>✅ 隐空间连续，支持随机生成</td>
+</tr>
+<tr class="even">
+<td><strong>隐空间约束</strong></td>
+<td>❌ 无约束，可能不规整</td>
+<td>✅ KL散度约束到先验分布</td>
+</tr>
+<tr class="odd">
+<td><strong>优化目标</strong></td>
+<td>仅重构误差：<span class="math inline">\(\mathcal{L} = \|\|x -
+\hat{x}\|\|^2\)</span></td>
+<td>重构损失 + KL正则：<span class="math inline">\(\mathcal{L} =
+\mathcal{L}_{recon} + \mathcal{L}_{KL}\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>理论基础</strong></td>
+<td>信息压缩和特征学习</td>
+<td>变分推断和贝叶斯框架</td>
+</tr>
+<tr class="odd">
+<td><strong>训练稳定性</strong></td>
+<td>容易过拟合，记忆训练数据</td>
+<td>KL正则化防止过拟合</td>
+</tr>
+<tr class="even">
+<td><strong>插值性质</strong></td>
+<td>❌ 隐空间插值可能无意义</td>
+<td>✅ 支持语义插值和平滑变换</td>
+</tr>
+<tr class="odd">
+<td><strong>不确定性</strong></td>
+<td>❌ 确定性输出，无不确定性建模</td>
+<td>✅ 概率框架，可量化不确定性</td>
+</tr>
+<tr class="even">
+<td><strong>应用场景</strong></td>
+<td>特征提取、降维、异常检测</td>
+<td>数据生成、插值、潜在空间探索</td>
+</tr>
+</tbody>
+</table>
+<h2
+id="变分自编码器的一些数学证明和推导">变分自编码器的一些数学证明和推导：</h2>
+<p><a
+href="../2-generation-model.md">生成模型的技术路线总览</a>中有讨论到，生成模型所需要做的事就是：给定从真实分布
+<span class="math inline">\(P(x)\)</span> 中采样的观测数据 <span
+class="math inline">\(x\)</span>，训练得到一个由参数 <span
+class="math inline">\(\theta\)</span> 控制、能够逼近真实分布的模型 <span
+class="math inline">\(p_\theta(x)\)</span>。VAE的想法是借助AE的思想，引入隐变量
+<span class="math inline">\(z\)</span> 用来表示数据的低维流形，这个<span
+class="math inline">\(z\)</span>
+不是孤立的，而是服从某种分人为规定的先验分布，定义为 <span
+class="math inline">\(p(z)\)</span>。那么，数据的边际似然可以写为：</p>
+<p><span class="math display">\[p_\theta(x) = \int
+p_\theta(x|z)p(z)dz\]</span></p>
+<p>为了让分布可控和方便重采样，<span
+class="math inline">\(p(z)\)</span>通常选择已知的分布形态来表示，比如标准高斯分布
+<span class="math inline">\(p(z) = \mathcal{N}(0, I)\)</span>。</p>
+<p>然而，直接优化边际似然面临两个关键挑战：</p>
+<ol type="1">
+<li>积分 <span class="math inline">\(\int p_\theta(x|z)p(z)dz\)</span>
+通常无法解析计算</li>
+<li>后验分布 <span class="math inline">\(p_\theta(z|x)\)</span>
+难以直接获得</li>
+</ol>
+<p>这就是VAE要解决的核心问题：如何在无法直接计算边际似然和后验分布的情况下，有效地训练一个生成模型？</p>
+<p><strong>VAE的解决方案</strong></p>
+<p>VAE采用了变分推断来解决这个问题。</p>
+<ol type="1">
+<li><p><strong>引入变分分布</strong>：既然真实的后验分布 <span
+class="math inline">\(p_\theta(z|x)\)</span>
+难以计算，则引入一个参数化的变分分布 <span
+class="math inline">\(q_\phi(z|x)\)</span>
+来近似它。这个分布由编码器网络参数化。</p></li>
+<li><p><strong>优化证据下界（ELBO）</strong>：通过最大化证据下界来同时优化编码器和解码器。我们可以将对数边际似然重写为：</p></li>
+</ol>
+<p><strong>推导步骤详解：（这里采用Jensen不等式，用基础理论章节中的贝叶斯推断也是可以的）</strong></p>
+<p><span class="math display">\[
+\begin{aligned}
+\log p_\theta(x) &amp;= \log \int p_\theta(x|z)p(z)dz \quad
+\text{(边际似然的积分形式)} \\
+&amp;= \log \int \frac{p_\theta(x|z)p(z)}{q_\phi(z|x)} q_\phi(z|x) dz
+\quad \text{(乘除变分分布)} \\
+&amp;= \log
+\mathbb{E}_{q_\phi(z|x)}\left[\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}\right]
+\quad \text{(期望形式)} \\
+&amp;\ge \mathbb{E}_{q_\phi(z|x)}\left[\log
+\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}\right] \quad \text{(Jensen不等式)}
+\\
+&amp;= \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] +
+\mathbb{E}_{q_\phi(z|x)}\left[\log \frac{p(z)}{q_\phi(z|x)}\right] \\
+&amp;= \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] -
+\text{KL}(q_\phi(z|x) \| p(z)) \\
+&amp;= ELBO
+\end{aligned}
+\]</span></p>
+<ul>
+<li>Jensen不等式，因为<span
+class="math inline">\(\log\)</span>是凹函数，所以<span
+class="math inline">\(\log(\mathbb{E}[X]) \ge
+\mathbb{E}[\log(X)]\)</span></li>
+<li>KL散度定义：<span class="math inline">\(\text{KL}(q\|p) =
+\mathbb{E}_q[\log q - \log p]\)</span></li>
+</ul>
+<p><strong>所以VAE 优化目标可表述为：</strong></p>
+<p><span class="math display">\[
+\max_{\theta, \phi} \ \mathcal{L}_{VAE}(\theta, \phi)
+= \mathbb{E}_{q_\theta(z|x)} \left[ \log p_\phi(x|z) \right]
+- \mathrm{KL}\left( q_\theta(z|x) \,\|\, p(z) \right)
+\]</span></p>
+<p>由两部分组成：</p>
+<ol type="1">
+<li><p><strong>重构损失（Reconstruction Loss）</strong>：<span
+class="math inline">\(-\mathbb{E}_{q_\phi(z|x)}[\log
+p_\theta(x|z)]\)</span></p>
+<ul>
+<li>衡量解码器重构输入的能力</li>
+<li>对于伯努利分布，这等价于二元交叉熵</li>
+<li>对于高斯分布，这等价于均方误差</li>
+</ul></li>
+<li><p><strong>正则化项（Regularization Term）</strong>：<span
+class="math inline">\(\text{KL}(q_\phi(z|x) \| p(z))\)</span></p>
+<ul>
+<li>约束编码器输出的分布接近先验分布</li>
+<li>防止编码器简单地记忆训练数据</li>
+<li>确保隐空间的连续性和可插值性</li>
+</ul></li>
+</ol>
+<p><strong>VAE的直观理解</strong></p>
+<p>从信息论的角度，VAE可以理解为一个信息瓶颈（Information
+Bottleneck）：</p>
+<ul>
+<li><strong>编码器</strong>：压缩输入信息到隐变量，但要保留足够的信息用于重构</li>
+<li><strong>KL正则化</strong>：限制隐变量携带的信息量，防止过拟合</li>
+<li><strong>解码器</strong>：从压缩的表示中恢复原始信息</li>
+</ul>
+<p>从几何角度，VAE学习了一个从数据空间到隐空间的光滑映射：</p>
+<ul>
+<li><strong>连续性</strong>：相似的输入被映射到隐空间中相近的位置</li>
+<li><strong>可插值性</strong>：隐空间中两点之间的插值对应有意义的生成结果</li>
+<li><strong>解耦性</strong>：理想情况下，隐变量的不同维度对应数据的不同属性</li>
+</ul>
+<p><strong>VAE的优势与局限</strong></p>
+<p><strong>优势：</strong></p>
+<ol type="1">
+<li><strong>理论基础扎实</strong>：基于变分推断的严格数学框架</li>
+<li><strong>稳定训练</strong>：相比GAN，训练过程更稳定，不存在模式坍塌问题</li>
+<li><strong>可解释的隐空间</strong>：隐变量有明确的概率解释</li>
+<li><strong>支持推断</strong>：可以将新数据编码到隐空间</li>
+<li><strong>易于扩展</strong>：框架灵活，易于加入各种先验知识</li>
+</ol>
+<p><strong>局限：</strong></p>
+<ol type="1">
+<li><strong>生成质量</strong>：由于使用像素级重构损失，生成的图像往往比较模糊</li>
+<li><strong>后验坍塌</strong>：KL项可能导致编码器忽略输入，退化为先验分布</li>
+<li><strong>表达能力受限</strong>：简单的高斯假设可能无法捕捉复杂的数据分布</li>
+<li><strong>重构与生成的权衡</strong>：重构质量和生成多样性之间存在固有矛盾</li>
+</ol>
+<p><strong>VAE的重要变体</strong></p>
+<p>为了克服原始VAE的局限性，研究者们提出了许多改进版本：</p>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>变体名称</th>
+<th>核心思想</th>
+<th>数学表示</th>
+<th>主要特点</th>
+<th>应用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Conditional VAE (CVAE)</strong></td>
+<td>引入条件信息实现可控生成</td>
+<td><span class="math inline">\(q_\phi(z\|x,c),
+p_\theta(x\|z,c)\)</span></td>
+<td>• 支持条件生成<br>• 可控制生成内容<br>• 结合标签信息</td>
+<td>条件图像生成、半监督学习、多模态学习</td>
+</tr>
+<tr class="even">
+<td><strong>VQ-VAE</strong></td>
+<td>使用离散隐变量和向量量化技术</td>
+<td>离散编码本 <span class="math inline">\(e \in \mathbb{R}^{K \times
+D}\)</span></td>
+<td>• 解决后验坍塌<br>• 提高生成质量<br>• 支持自回归生成</td>
+<td>图像生成、语音合成、强化学习</td>
+</tr>
+<tr class="odd">
+<td><strong>Hierarchical VAE</strong></td>
+<td>使用多层隐变量捕捉层次结构</td>
+<td><span class="math inline">\(z = \{z_1, z_2, ..., z_L\}\)</span></td>
+<td>• 高层捕捉全局信息<br>• 低层捕捉局部细节<br>• 更强表达能力</td>
+<td>复杂数据建模、层次化表示学习</td>
+</tr>
+<tr class="even">
+<td><strong>Adversarial VAB (AVB)</strong></td>
+<td>结合GAN思想使用判别器定义变分分布</td>
+<td>隐式变分分布通过判别器学习</td>
+<td>• 避免高斯假设限制<br>• 提高后验表达能力<br>• 结合对抗训练</td>
+<td>复杂后验分布建模、高质量生成</td>
+</tr>
+</tbody>
+</table>
+<p><strong>VAE在实际应用中的技巧</strong></p>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>技巧类别</th>
+<th>具体技巧</th>
+<th>技术描述</th>
+<th>应用目的</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>防止后验坍塌</strong></td>
+<td>KL退火 (KL Annealing)</td>
+<td>训练初期减小KL项权重，逐渐增加</td>
+<td>避免编码器忽略输入信息</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>自由比特 (Free Bits)</td>
+<td>为每个隐变量维度设置最小信息量</td>
+<td>确保每个维度承载有效信息</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>跳跃连接</td>
+<td>在解码器中加入跳跃连接</td>
+<td>减少对隐变量的过度依赖</td>
+</tr>
+<tr class="even">
+<td><strong>提高生成质量</strong></td>
+<td>感知损失</td>
+<td>使用预训练网络的特征匹配损失代替像素损失</td>
+<td>生成更具语义合理性的图像</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>对抗训练</td>
+<td>加入判别器，提高生成样本的真实感</td>
+<td>增强生成图像的视觉质量</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>自回归解码器</td>
+<td>使用PixelCNN等自回归模型作为解码器</td>
+<td>改善像素级细节生成</td>
+</tr>
+<tr class="odd">
+<td><strong>改进隐空间</strong></td>
+<td>归一化流 (Normalizing Flows)</td>
+<td>增强后验分布的表达能力</td>
+<td>学习更复杂的后验分布</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>混合高斯先验</td>
+<td>使用更灵活的先验分布</td>
+<td>提供更丰富的隐空间结构</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>信息最大化</td>
+<td>鼓励隐变量之间的独立性</td>
+<td>实现更好的属性解耦</td>
+</tr>
+</tbody>
+</table>
+<p><strong>VAE与其他生成模型的比较</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>VAE</th>
+<th>GAN</th>
+<th>扩散模型</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>理论基础</td>
+<td>变分推断</td>
+<td>博弈论</td>
+<td>随机过程</td>
+</tr>
+<tr class="even">
+<td>训练稳定性</td>
+<td>高</td>
+<td>低</td>
+<td>高</td>
+</tr>
+<tr class="odd">
+<td>生成质量</td>
+<td>中等</td>
+<td>高</td>
+<td>最高</td>
+</tr>
+<tr class="even">
+<td>推断能力</td>
+<td>支持</td>
+<td>不支持</td>
+<td>部分支持</td>
+</tr>
+<tr class="odd">
+<td>训练速度</td>
+<td>快</td>
+<td>中等</td>
+<td>慢</td>
+</tr>
+<tr class="even">
+<td>可解释性</td>
+<td>高</td>
+<td>低</td>
+<td>中等</td>
+</tr>
+</tbody>
+</table>
+<p><strong>最后贴上VAE的代码</strong></p>
+<p><strong>模型代码：</strong> <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">import</span> torch.nn <span class="keyword">as</span> nn </span><br><span class="line"><span class="keyword">import</span> torch.nn.functional <span class="keyword">as</span> F</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">VAE</span>(nn.Module):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="built_in">super</span>().__init__()</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 编码器</span></span><br><span class="line">        <span class="variable language_">self</span>.encoder_layer = nn.Sequential(</span><br><span class="line">            nn.Linear(<span class="number">784</span>, <span class="number">256</span>),</span><br><span class="line">            nn.ReLU(),</span><br><span class="line">            nn.Linear(<span class="number">256</span>, <span class="number">128</span>),</span><br><span class="line">        )</span><br><span class="line">        <span class="variable language_">self</span>.fc_mu = nn.Linear(<span class="number">128</span>, <span class="number">10</span>)     <span class="comment"># 均值</span></span><br><span class="line">        <span class="variable language_">self</span>.fc_log_var = nn.Linear(<span class="number">128</span>, <span class="number">10</span>)  <span class="comment"># 对数方差</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 解码器</span></span><br><span class="line">        <span class="variable language_">self</span>.decoder = nn.Sequential(</span><br><span class="line">            nn.Linear(<span class="number">10</span>, <span class="number">128</span>),</span><br><span class="line">            nn.ReLU(),</span><br><span class="line">            nn.Linear(<span class="number">128</span>, <span class="number">256</span>),</span><br><span class="line">            nn.ReLU(),</span><br><span class="line">            nn.Linear(<span class="number">256</span>, <span class="number">784</span>),</span><br><span class="line">        )</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">encode</span>(<span class="params">self, x</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;编码器：输出均值和对数方差&quot;&quot;&quot;</span></span><br><span class="line">        h = <span class="variable language_">self</span>.encoder_layer(x)           <span class="comment"># [b,784] -&gt; [b,128]</span></span><br><span class="line">        mu = <span class="variable language_">self</span>.fc_mu(h)                  <span class="comment"># [b,128] -&gt; [b,10]</span></span><br><span class="line">        log_var = <span class="variable language_">self</span>.fc_log_var(h)        <span class="comment"># [b,128] -&gt; [b,10]</span></span><br><span class="line">        <span class="keyword">return</span> mu, log_var</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">reparameterize</span>(<span class="params">self, mu, log_var</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;重参数化技巧&quot;&quot;&quot;</span></span><br><span class="line">        eps = torch.randn_like(mu)          <span class="comment"># 标准正态分布采样</span></span><br><span class="line">        std = torch.exp(<span class="number">0.5</span> * log_var)     <span class="comment"># 标准差</span></span><br><span class="line">        z = mu + eps * std                  <span class="comment"># [b,10]</span></span><br><span class="line">        <span class="keyword">return</span> z</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">decode</span>(<span class="params">self, z</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;解码器&quot;&quot;&quot;</span></span><br><span class="line">        <span class="keyword">return</span> <span class="variable language_">self</span>.decoder(z)              <span class="comment"># [b,10] -&gt; [b,784]</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, x</span>):</span><br><span class="line">        x = x.view(-<span class="number">1</span>, <span class="number">28</span>*<span class="number">28</span>)               <span class="comment"># [b,1,28,28] -&gt; [b,784]</span></span><br><span class="line">        mu, log_var = <span class="variable language_">self</span>.encode(x)        <span class="comment"># 编码</span></span><br><span class="line">        z = <span class="variable language_">self</span>.reparameterize(mu, log_var) <span class="comment"># 重参数化</span></span><br><span class="line">        recon_x = <span class="variable language_">self</span>.decode(z)            <span class="comment"># 解码重构</span></span><br><span class="line">        <span class="keyword">return</span> recon_x, mu, log_var</span><br></pre></td></tr></table></figure></p>
+<p><strong>训练代码：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 训练设置</span></span><br><span class="line">device = torch.device(<span class="string">&#x27;cuda&#x27;</span> <span class="keyword">if</span> torch.cuda.is_available() <span class="keyword">else</span> <span class="string">&#x27;cpu&#x27;</span>)</span><br><span class="line">model = VAE().to(device)</span><br><span class="line">optimizer = torch.optim.Adam(model.parameters(), lr=<span class="number">1e-3</span>)</span><br><span class="line"><span class="keyword">def</span> <span class="title function_">vae_loss</span>(<span class="params">recon_x, x, mu, log_var</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;VAE损失函数：重构损失 + KL散度&quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 重构损失（BCE或MSE）</span></span><br><span class="line">    recon_loss = F.mse_loss(recon_x, x.view(-<span class="number">1</span>, <span class="number">784</span>), reduction=<span class="string">&#x27;sum&#x27;</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># KL散度损失</span></span><br><span class="line">    kl_loss = -<span class="number">0.5</span> * torch.<span class="built_in">sum</span>(<span class="number">1</span> + log_var - mu.<span class="built_in">pow</span>(<span class="number">2</span>) - log_var.exp())</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> recon_loss + kl_loss</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> batch_idx, data <span class="keyword">in</span> <span class="built_in">enumerate</span>(train_loader):</span><br><span class="line">    data = data.to(device)</span><br><span class="line">    optimizer.zero_grad()</span><br><span class="line">    <span class="comment"># 前向传播</span></span><br><span class="line">    recon_batch, mu, log_var = model(data)</span><br><span class="line">    <span class="comment"># 计算损失</span></span><br><span class="line">    loss = vae_loss(recon_batch, data, mu, log_var)</span><br><span class="line">    <span class="comment"># 反向传播</span></span><br><span class="line">    loss.backward()</span><br><span class="line">    optimizer.step()</span><br></pre></td></tr></table></figure>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">AAA高老庄旺铺招租</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/">https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">AAA高老庄旺铺招租的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/5-some_think/" title="杂谈｜写作的目的"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">杂谈｜写作的目的</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（三）：生成对抗理论</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-21</div><div class="title">笔记｜生成模型（八）：SDE统一DDPM和SMLD</div></div></a></div><div><a href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-16</div><div class="title">笔记｜生成模型（七）：Score-Base理论</div></div></a></div><div><a href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-12</div><div class="title">笔记｜生成模型（六）：DDIM理论</div></div></a></div><div><a href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-10</div><div class="title">笔记｜生成模型（五）：DDPM理论</div></div></a></div><div><a href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-07</div><div class="title">笔记｜生成模型（三）：生成对抗理论</div></div></a></div><div><a href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-04</div><div class="title">笔记｜生成模型（二）：生成模型的技术路线总览</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">AAA高老庄旺铺招租</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">7</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到AAA高老庄旺铺招租的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8autoencoder-ae-vs-%E5%8F%98%E5%88%86%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8variational-autoencodervae"><span class="toc-number">1.</span> <span class="toc-text">自编码器（Autoencoder,
+AE） VS 变分自编码器（Variational Autoencoder，VAE）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8"><span class="toc-number">2.</span> <span class="toc-text">自编码器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%98%E5%88%86%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8"><span class="toc-number">3.</span> <span class="toc-text">变分自编码器</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#vae%E7%9A%84%E6%8D%9F%E5%A4%B1%E5%87%BD%E6%95%B0%E6%8E%A8%E5%AF%BC"><span class="toc-number">3.1.</span> <span class="toc-text">VAE的损失函数推导</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%86%E5%B8%83%E5%81%87%E8%AE%BE%E4%B8%8E%E5%85%AC%E5%BC%8F%E8%AF%A6%E8%A7%A3"><span class="toc-number">3.2.</span> <span class="toc-text">分布假设与公式详解</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8D%9F%E5%A4%B1%E5%87%BD%E6%95%B0%E7%9A%84%E5%85%B7%E4%BD%93%E5%BD%A2%E5%BC%8F"><span class="toc-number">3.3.</span> <span class="toc-text">损失函数的具体形式</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%98%E5%88%86%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8%E7%9A%84%E4%B8%80%E4%BA%9B%E6%95%B0%E5%AD%A6%E8%AF%81%E6%98%8E%E5%92%8C%E6%8E%A8%E5%AF%BC"><span class="toc-number">4.</span> <span class="toc-text">变分自编码器的一些数学证明和推导：</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-10T15:08:30.000Z" title="发表于 2025-08-10 23:08:30">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器">笔记｜生成模型（四）：变分自编码器</a><time datetime="2025-08-08T17:37:31.000Z" title="发表于 2025-08-09 01:37:31">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-06T17:37:31.000Z" title="发表于 2025-08-07 01:37:31">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-03T17:37:31.000Z" title="发表于 2025-08-04 01:37:31">2025-08-04</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-30T17:37:31.000Z" title="发表于 2025-07-31 01:37:31">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-22T09:40:51.000Z" title="发表于 2025-08-22 17:40:51">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-22T08:27:55.000Z" title="发表于 2025-08-22 16:27:55">2025-08-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-21T15:08:30.000Z" title="发表于 2025-08-21 23:08:30">2025-08-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-score-match/" title="笔记｜生成模型（七）：Score-Base理论">笔记｜生成模型（七）：Score-Base理论</a><time datetime="2025-08-16T15:08:30.000Z" title="发表于 2025-08-16 23:08:30">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-12T15:08:30.000Z" title="发表于 2025-08-12 23:08:30">2025-08-12</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 By AAA高老庄旺铺招租</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/4-VAE-theory/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/4-VAE-theory/',
+      title: '笔记｜生成模型（四）：变分自编码器',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
