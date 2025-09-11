@@ -168,6 +168,92 @@ $$
 
 注：关于反向过程为什么要这样做，Lilian Weng 基于变分推断给出了[一个复杂的证明](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)，因为过于难以理解，这里暂且把它跳过。
 
+# Loss的来源
+
+DDPM的训练目标来源于最大化数据的对数似然 $\log p_\theta(x_0)$。由于直接优化这个目标很困难，所以使用变分推断来构造证据下界。
+
+根据变分推断理论，我们有：
+$$
+\log p_\theta(x_0) \geq \mathbb{E}_{x_{1:T} \sim q(x_{1:T}|x_0)}[\log p_\theta(x_0|x_{1:T}) - KL(q(x_{1:T}|x_0)||p_\theta(x_{1:T}))]
+$$
+
+这个不等式的右边被称为**变分下界**（ELBO，Evidence Lower BOund）。
+
+将变分下界展开，我们可以得到：
+$$
+\log p_\theta(x_0) \geq \underbrace{\mathbb{E}_{x_{1:T} \sim q(x_{1:T}|x_0)}[\log p_\theta(x_0|x_1)]}_{\text{reconstruction}} - \underbrace{KL(q(x_{1:T}|x_0)||p_\theta(x_{1:T}))}_{\text{regularization}} - \sum_{t=2}^T \underbrace{\mathbb{E}_{x_{1:T} \sim q(x_{1:T}|x_0)}[KL(q(x_{t-1}|x_t, x_0)||p_\theta(x_{t-1}|x_t))]}_{\text{matching}}
+$$
+
+现在我们逐项分析这个表达式,对于第三个matching项：
+$$
+KL(q(x_{t-1}|x_t, x_0)||p_\theta(x_{t-1}|x_t)) = KL(\mathcal{N}(x_{t-1}; \mu(x_t, x_0), \sigma_t^2\mathbf{I})||\mathcal{N}(x_{t-1}; \mu_\theta(x_t, t), \sigma_t^2\mathbf{I}))
+$$
+对于两个具有相同协方差矩阵的多元高斯分布，KL散度简化为：
+$$
+KL(\mathcal{N}(\mu_1, \Sigma)||\mathcal{N}(\mu_2, \Sigma)) = \frac{1}{2\sigma_t^2}||\mu(x_t, x_0) - \mu_\theta(x_t, t)||^2
+$$
+
+$$
+||\mu(x_t, x_0) - \mu_\theta(x_t, t)||^2 = \left|\left|\frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}x_t + \frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1-\bar{\alpha}_t}x_0 - \mu_\theta(x_t, t)\right|\right|^2
+$$
+
+将 $x_t = \sqrt{\bar{\alpha}_t}x_0 + \sqrt{1-\bar{\alpha}_t}\epsilon$ 代入上式：
+$$
+= \left|\left|\frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon\right) - \mu_\theta(x_t, t)\right|\right|^2
+$$
+
+
+$\mu(x_t, x_0)$ 或者说 $\mu(x_t, \epsilon)$ 里，其实只有 $\epsilon$ 是逆向过程中未知的，所以我们可以用 $\mu_\theta(x_t, t)$ 和 $\mu(x_t, x_0)$ 的格式对齐：
+
+$$
+||\mu(x_t, x_0) - \mu_\theta(x_t, t)||^2 = \left|\left|\frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon\right) - \mu_\theta(x_t, t)\right|\right|^2
+$$
+
+
+$$
+= \left|\left|\frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon\right) - \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon_\theta(x_t, t)\right)\right|\right|^2
+$$
+
+$$
+= \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}} \cdot \frac{1}{\alpha_t} ||\epsilon - \epsilon_\theta(x_t, t)||^2
+$$
+
+
+因此：
+$$
+KL(q(x_{t-1}|x_t, x_0)||p_\theta(x_{t-1}|x_t)) = KL(\mathcal{N}(x_{t-1}; \mu(x_t, x_0), \sigma_t^2\mathbf{I})||\mathcal{N}(x_{t-1}; \mu_\theta(x_t, t), \sigma_t^2\mathbf{I}))
+$$
+
+$$
+= \frac{1}{2\sigma_t^2}||\mu(x_t, x_0) - \mu_\theta(x_t, t)||^2
+$$
+
+$$
+= \frac{1}{2\sigma_t^2} \cdot \frac{(1-\alpha_t)^2}{(1-\bar{\alpha}_t)\alpha_t}||\epsilon - \epsilon_\theta(x_t, t)||^2
+$$
+
+设 $\alpha_0 = \bar{\alpha}_0 = 1$，所以当 $t=1$ 时，重构项和matching项可以合并。
+
+最终loss表达式
+
+$$
+\text{LOSS} = -\text{ELBO} = \sum_{t=1}^T \frac{1}{2\sigma_t^2} \cdot \frac{(1-\alpha_t)^2}{(1-\bar{\alpha}_t)\alpha_t} \mathbb{E}_{x_t \sim q(x_t|x_0)}[||\epsilon - \epsilon_\theta(x_t, t)||^2]
+$$
+
+简化loss,DDPM作者发现直接不要前面的系数模型学习的效果更好
+
+$$
+L_{\text{simple}}(\theta) = \mathbb{E}_{x_0, t, \epsilon}[||\epsilon - \epsilon_\theta(\sqrt{\bar{\alpha}_t}x_0 + \sqrt{1-\bar{\alpha}_t}\epsilon, t)||^2]
+$$
+
+这个简化版本的损失函数具有以下优点：
+
+- 去除了复杂的权重系数，使训练更加稳定
+- 所有时间步的损失贡献相等，避免了某些时间步主导训练过程
+- 实验表明这种简化版本在实际应用中效果更好
+
+这就是DDPM训练中使用的最终损失函数，它直接优化噪声预测的准确性。
+
 # 具体的训练过程
 
 我们已经知道了去噪网络的参数和预测目标，下一个问题就是如何去训练这个去噪网络。原始论文中给出了如下的训练过程：
