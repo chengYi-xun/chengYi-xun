@@ -36,7 +36,8 @@ tags:
 8. [笔记｜生成模型（八）：SDE统一DDPM和SMLD](../9-SDE)
 9. [笔记｜生成模型（九）：Classifier Guidance 理论与实现](../10-classifier-guidance-for-diffusion-models)
 10. [笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](../11-classifier-free-guidance-for-diffusion-models)
-
+11. [笔记｜生成模型（十一）：UIT和DiT架构详解](../12-UIT-VS-DIT)
+12. [笔记｜生成模型（十二）：Flow Matching理论与实现](../13-flow-matching)
 
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)
