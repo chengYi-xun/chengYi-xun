@@ -32,12 +32,13 @@ tags:
 4. [笔记｜生成模型（四）：变分自编码器理论](../4-VAE-theory)
 5. [笔记｜生成模型（五）：DDPM理论](../6-ddpm)
 6. [笔记｜生成模型（六）：DDIM理论](../7-ddim)
-7. [笔记｜生成模型（七）：Score-Base理论](../8-score-match)
+7. [笔记｜生成模型（七）：Score-Based理论](../8-score-match)
 8. [笔记｜生成模型（八）：SDE统一DDPM和SMLD](../9-SDE)
 9. [笔记｜生成模型（九）：Classifier Guidance 理论与实现](../10-classifier-guidance-for-diffusion-models)
 10. [笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](../11-classifier-free-guidance-for-diffusion-models)
 11. [笔记｜生成模型（十一）：UIT和DiT架构详解](../12-UIT-VS-DIT)
-12. [笔记｜生成模型（十二）：Flow Matching理论与实现](../13-flow-matching)
+12. [笔记｜生成模型（十二）：Normalizing Flow理论与实现](../13-Normalizing-flow)
+13. [笔记｜生成模型（十三）：Flow Matching理论与实现](../14-flow_matching)
 
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)
