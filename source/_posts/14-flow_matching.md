@@ -83,8 +83,7 @@ $$
 
 在实际上进行训练时，神经网络建模的是向量场 $v_t$，通过设定不同的 $\phi_t$ 和 $p_t$ 可以得到不同的 $v_t$。
 
-![ODE 与 SDE 的示意图](https://littlenyima-1319014516.cos.ap-beijing.myqcloud.com/blog/2024/07/05/differential-equations.jpg)
-
+![ODE 与 SDE 的示意图](/chengYi-xun/img/ode.jpeg)
 ## 概述
 
 Flow Matching 的训练目标和 Score Matching 是比较类似的，学习的目标就是通过学习拟合一个向量场 $u_t$，使得能够得到对分布进行变换的概率路径 $p_t$，也就是下边这个公式：
