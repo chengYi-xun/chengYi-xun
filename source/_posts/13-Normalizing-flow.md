@@ -13,7 +13,7 @@ series: Diffusion Models theory
 
 Normalizing flow（标准化流）是一类对概率分布进行建模的工具，它能完成简单的概率分布（例如高斯分布）和任意复杂分布之间的相互转换，经常被用于 data generation、density estimation、inpainting 等任务中，例如 Stability AI 提出的 [Stable Diffusion 3](https://arxiv.org/abs/2403.03206) 中用到的 rectified flow 就是 normalizing flow 的变体之一。
 
-![Normalizing flow 示意图](/chengYi-xun/img/normalizing-flow.jpg)
+![Normalizing flow 示意图](/chengYi-xun/img/normalizing-flow.png)
 
 为了便于理解，在正式开始介绍之前先简要说明一下 normalizing flow 的做法。如上图所示，为了将一个高斯分布 $z_0$ 转换为一个复杂的分布 $z_K$，normalizing flow 会对初始的分布 $z_0$ 进行多次可逆的变换，将其逐渐转换为 $z_K$。由于每一次变换都是可逆的，从 $z_K$ 出发也能得到高斯分布 $z_0$​。这样，我们就实现了复杂分布与高斯分布之间的互相转换，从而能从简单的高斯分布建立任意复杂分布。
 
