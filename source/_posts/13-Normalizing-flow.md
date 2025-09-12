@@ -150,6 +150,7 @@ def train_normalizing_flow(model, data_loader, optimizer, epochs):
             log_prob_z = -0.5 * torch.sum(z**2, dim=1) - 0.5 * z.shape[1] * torch.log(2 * torch.pi)
             
             # 计算总的对数似然
+            
             log_prob_x = log_prob_z + log_det_jacobian
             
             # 负对数似然作为损失
@@ -160,6 +161,49 @@ def train_normalizing_flow(model, data_loader, optimizer, epochs):
             loss.backward()
             optimizer.step()
 ```
+
+代码这里假设基础分布log_prob_z是 **标准正态分布 $\mathcal{N}(0, I)$**：
+
+$$
+p(z) = \frac{1}{(2\pi)^{d/2}} \exp\left(-\frac{1}{2}\|z\|^2\right)
+$$
+
+取对数得到：
+$$
+\log p(z) = -\frac{1}{2} \|z\|^2 - \frac{d}{2}\log(2\pi)
+$$
+
+其中 $d$ 是数据维度，对应代码中的 `z.shape[1]`。
+
+**代码实现：**
+```python
+log_prob_z = -0.5 * torch.sum(z**2, dim=1) - 0.5 * z.shape[1] * torch.log(2 * torch.pi)
+```
+
+代码与公式的对应关系：
+- `torch.sum(z**2, dim=1)` ↔ $\|z\|^2$ （向量的平方和）
+- `-0.5 * z.shape[1] * torch.log(2 * torch.pi)` ↔ $-\frac{d}{2}\log(2\pi)$ （归一化常数）
+
+```python
+# 计算总的对数似然
+log_prob_x = log_prob_z + log_det_jacobian
+```
+
+这行代码实现了**变量替换公式**（Change of Variables Formula）：
+
+$$
+\log p(x) = \log p(z) + \log \left| \det \frac{\partial f}{\partial x} \right|
+$$
+
+**公式解释：**
+- $\log p(x)$：目标分布 $x$ 的对数概率密度
+- $\log p(z)$：基础分布 $z$ 的对数概率密度（`log_prob_z`）
+- $\log \left| \det \frac{\partial f}{\partial x} \right|$：雅可比行列式的对数（`log_det_jacobian`）
+
+**物理意义：**
+- `log_prob_z`：衡量变换后的 $z$ 在基础分布中的"合理性"
+- `log_det_jacobian`：补偿变换过程中的"体积变化"，确保概率密度的正确性
+
 
 # 采样过程
 
@@ -178,6 +222,234 @@ def sample_from_flow(model, num_samples):
     
     return x
 ```
+这里不同的流模型对应不同的inverse方法：
+### 1. Affine Coupling Layer (RealNVP/MAF 常用)
+
+**公式**
+给定输入 $\mathbf{x} = (x_a, x_b)$，用神经网络预测变换参数：
+
+$$
+y_a = x_a, \quad y_b = x_b \cdot \exp(s(x_a)) + t(x_a)
+$$
+
+其中：
+
+* $s(\cdot)$：scale 网络
+* $t(\cdot)$：translation 网络
+
+**逆变换**：
+
+$$
+x_a = y_a, \quad x_b = (y_b - t(y_a)) \cdot \exp(-s(y_a))
+$$
+
+```python
+class AffineCoupling(Flow):
+    """仿射耦合层 - 用于实现可逆神经网络的核心组件"""
+
+    def __init__(self, in_features, mask_type="channel_wise",
+                 scale_net=None, translate_net=None, scale_translate_net=None,
+                 inverse_mask=False):
+        super().__init__(in_features)  # 调用父类构造函数
+
+        # 验证并设置掩码类型（棋盘格或通道维度）
+        if mask_type not in ["checkerboard", "channel_wise"]:
+            raise ValueError("mask_type must be 'checkerboard' or 'channel_wise'")
+        self.mask_type = mask_type
+        self.inverse_mask = inverse_mask  # 是否反转掩码
+
+        # 初始化网络：要么提供独立的缩放和平移网络，要么提供联合网络
+        if scale_net and translate_net:
+            self.scale_net = scale_net      # 独立的缩放网络
+            self.translate_net = translate_net  # 独立的平移网络
+            self.scale_translate_net = None
+        elif scale_translate_net:
+            self.scale_translate_net = scale_translate_net  # 联合网络
+            self.scale_net = None
+            self.translate_net = None
+        else:
+            raise ValueError("Must provide either (scale_net, translate_net) or scale_translate_net")
+
+    def build_mask(self, x):
+        """根据输入张量构建二进制掩码"""
+        if x.dim() == 4:  # 4D张量 (batch, channels, height, width)
+            _, channels, height, width = x.shape
+            if self.mask_type == "checkerboard":
+                # 创建棋盘格掩码用于图像数据
+                mask = checkerboard_mask(height, width, self.inverse_mask)
+                return torch.from_numpy(mask).view(1, 1, height, width).to(x.device)
+            else:  # channel_wise
+                # 创建通道级掩码
+                mask = channel_wise_mask(channels, self.inverse_mask)
+                return torch.from_numpy(mask).view(1, channels, 1, 1).to(x.device)
+        
+        elif x.dim() == 2:  # 2D张量 (batch, features)
+            _, n_features = x.shape
+            # 对于2D输入只支持通道级掩码
+            mask = channel_wise_mask(n_features, self.inverse_mask)
+            return torch.from_numpy(mask).view(1, n_features).to(x.device)
+        
+        raise ValueError("Input must be 2D or 4D tensor")
+
+    def get_parameters(self, x, y=None):
+        """通过神经网络计算缩放和平移参数"""
+        if self.scale_translate_net:
+            # 使用联合网络同时输出log_scale和translation
+            log_s, t = self.scale_translate_net(x) if y is None else self.scale_translate_net(x, y)
+        else:
+            # 使用独立网络分别计算
+            log_s = self.scale_net(x) if y is None else self.scale_net(x, y)
+            t = self.translate_net(x) if y is None else self.translate_net(x, y)
+        
+        return log_s, t
+
+    def forward(self, x, y=None, compute_jacobian=True):
+        """前向变换：x -> z"""
+        mask = self.build_mask(x)           # 构建掩码
+        x_masked = mask * x                 # 被掩码的部分（保持不变）
+        x_inv_masked = (1 - mask) * x       # 未被掩码的部分（将被变换）
+
+        # 使用被掩码的部分计算变换参数
+        log_s, t = self.get_parameters(x_masked, y)
+        
+        # 只对未被掩码的部分应用参数
+        log_s = log_s * (1 - mask)
+        t = t * (1 - mask)
+
+        # 仿射变换：z = x_masked + (x_inv_masked * exp(log_s) + t)
+        z = x_masked + x_inv_masked * torch.exp(log_s) + t
+
+        # 计算雅可比行列式的对数（用于概率密度变换）
+        if compute_jacobian:
+            self._logdet_jacobian = log_s.view(log_s.size(0), -1).sum(-1)
+
+        return z
+
+    def inverse(self, z, y=None):
+        """逆向变换：z -> x"""
+        mask = self.build_mask(z)           # 构建掩码
+        z_masked = mask * z                 # 被掩码的部分（保持不变）
+        z_inv_masked = (1 - mask) * z       # 未被掩码的部分（将被逆变换）
+
+        # 使用被掩码的部分计算变换参数
+        log_s, t = self.get_parameters(z_masked, y)
+        
+        # 只对未被掩码的部分应用参数
+        log_s = log_s * (1 - mask)
+        t = t * (1 - mask)
+
+        # 逆仿射变换：x = z_masked + (z_inv_masked - t) * exp(-log_s)
+        x = z_masked + (z_inv_masked - t) * torch.exp(-log_s)
+
+        return x
+```
+
+
+### 2. Planar Flow
+
+**公式**
+
+$$
+f(z) = z + u \cdot h(w^\top z + b)
+$$
+
+* $h$：激活函数（如 $\tanh$）
+
+**逆变换**：
+Planar Flow 通常 **不是解析可逆**，只能通过数值方法（比如 Newton-Raphson）求解 $x$。
+因此这种 flow 采样效率差。
+
+
+### 3. Invertible Linear Layer (Glow)
+
+**公式**
+
+$$
+y = Wx
+$$
+
+其中 $W$ 是可逆矩阵（通常用 LU 分解保证可逆）。
+
+**逆变换**：
+
+$$
+x = W^{-1} y
+$$
+
+**代码**：
+
+```python
+class InvertibleLinear(nn.Module):
+    """可逆线性变换层 - 使用可逆矩阵实现线性变换"""
+
+    def __init__(self, dim):
+        super(InvertibleLinear, self).__init__()
+        self.dim = dim  # 输入/输出维度
+        
+        # 生成随机正交矩阵作为初始权重（保证可逆性）
+        w_init = np.random.randn(dim, dim)  # 生成随机矩阵
+        w_init = np.linalg.qr(w_init)[0]    # QR分解获取正交矩阵Q
+        w_init = w_init.astype(np.float32)  # 转换为float32类型
+        
+        # 将权重矩阵设置为可训练参数
+        self.W = nn.Parameter(torch.from_numpy(w_init), requires_grad=True)
+
+    def forward(self, x, logpx=None):
+        """前向传播：y = Wx"""
+        y = F.linear(x, self.W)  # 执行线性变换 y = xW^T
+        
+        # 如果不需要计算对数概率密度，直接返回结果
+        if logpx is None:
+            return y
+        else:
+            # 返回变换结果和更新后的对数概率密度
+            # logpx + log|det(W)| = logpx + _logdetgrad
+            return y, logpx + self._logdetgrad
+
+    def inverse(self, y, logpy=None):
+        """逆向传播：x = W^(-1)y"""
+        # 使用权重矩阵的逆矩阵进行逆变换
+        x = F.linear(y, self.W.inverse())
+        
+        # 检查数值稳定性（调试用）
+        if torch.isnan(x).any():
+            print('InvertibleLinear_inverse: nan detected')
+            
+        # 如果不需要计算对数概率密度，直接返回结果
+        if logpy is None:
+            return x
+        else:
+            # 返回逆变换结果和更新后的对数概率密度
+            # logpy - log|det(W)| = logpy - _logdetgrad
+            return x, logpy - self._logdetgrad
+
+    @property
+    def _logdetgrad(self):
+        """计算权重矩阵行列式的对数"""
+        return torch.logdet(self.W)
+```
+
+
+你可以多个flow组合使用，如果你有多个 flow block 组成的模型（比如 RealNVP/Glow）
+
+训练时：
+
+```python
+z, log_det = x, 0
+for flow in flows:
+    z, ldj = flow.forward(z)
+    log_det += ldj
+```
+
+采样时：
+
+```python
+x = z
+for flow in reversed(flows):
+    x = flow.inverse(x)
+```
+
+---
 
 # 与扩散模型的关系
 
