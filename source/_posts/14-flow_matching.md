@@ -61,7 +61,7 @@ $$
 ![Flow Matching通过建模时间相关速度场学习从噪声到数据的平滑路径。](/chengYi-xun/img/flow_matching.png)
 
 下图展示了 Flow Matching 中关键变量的定义：$x_0$ 表示初始噪声，$x_1$ 表示目标数据，$x_t$ 表示时间 $t$ 处的中间状态。
-$x_t = (1-t)x_0 + tx_1 = x_0 + t(x_1-x_0)$，其中t一般定义为采样时间步的方差，在代码中一般用sigma表示，sigma的范围是从0到1。（一般用倒数表示，随机采样正整数时间步，则sigma = 1/time，这里的sigma就是公式里面的t）。$x_0 + t(x_1-x_0)$可以理解成从$x_0$的起点开始，朝着$x_{0->1}$的方向步进了t的长度。
+$x_t = (1-t)x_0 + tx_1 = x_0 + t(x_1-x_0)$，其中t一般定义为采样时间步的方差，在代码中一般用sigma表示，sigma的范围是从0到1。（一般用倒数表示，随机采样正整数时间步，则sigmas = timesteps / num_train_timesteps，这里的sigma就是公式里面的t）。$x_0 + t(x_1-x_0)$可以理解成从$x_0$的起点开始，朝着$x_{0->1}$的方向步进了t的长度。
 
 ![Flow Matching 变量定义示意图](/chengYi-xun/img/flow.jpeg)
 
