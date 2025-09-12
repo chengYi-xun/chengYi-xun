@@ -141,29 +141,86 @@ DiT 的 block 大部分结构都可以直接沿用 ViT 的结构，不过和 ViT
 
 ```python
 def modulate(x, shift, scale):
+    """
+    自适应调制函数：对输入进行缩放和平移变换
+    Args:
+        x: 输入特征 [batch, seq_len, dim]
+        shift: 平移参数 [batch, dim]
+        scale: 缩放参数 [batch, dim]
+    Returns:
+        调制后的特征
+    """
+    # 先进行缩放变换 (1 + scale)，再进行平移变换 + shift
+    # unsqueeze(1) 将 [batch, dim] 扩展为 [batch, 1, dim] 以匹配x的维度
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
 
 class DiTBlock(nn.Module):
     """
-    A DiT block with adaptive layer norm zero (adaLN-Zero) conditioning.
+    DiT (Diffusion Transformer) 块，使用自适应层归一化零初始化 (adaLN-Zero) 条件化
+    这是Transformer架构的一个变体，专门为扩散模型设计
     """
+    
     def __init__(self, hidden_size, num_heads, mlp_ratio=4.0, **block_kwargs):
         super().__init__()
+        
+        # 第一个层归一化：用于多头自注意力之前，不使用可学习的仿射参数
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        
+        # 多头自注意力模块
         self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
+        
+        # 第二个层归一化：用于MLP之前，不使用可学习的仿射参数
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        
+        # 计算MLP的隐藏层维度（通常是输入维度的4倍）
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
+        
+        # 定义近似GELU激活函数（使用tanh近似以提高计算效率）
         approx_gelu = lambda: nn.GELU(approximate="tanh")
-        self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
+        
+        # MLP模块：两层全连接网络，中间使用GELU激活，无dropout
+        self.mlp = Mlp(in_features=hidden_size, 
+                      hidden_features=mlp_hidden_dim, 
+                      act_layer=approx_gelu, 
+                      drop=0)
+        
+        # 自适应层归一化调制网络
+        # 输出6个参数：注意力的shift/scale/gate + MLP的shift/scale/gate
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(hidden_size, 6 * hidden_size, bias=True)
+            nn.SiLU(),  # Swish激活函数 (x * sigmoid(x))
+            nn.Linear(hidden_size, 6 * hidden_size, bias=True)  # 线性层输出6组参数
         )
 
     def forward(self, x, c):
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
+        """
+        前向传播
+        Args:
+            x: 输入特征 [batch, seq_len, hidden_size]
+            c: 条件信息 [batch, hidden_size]（如时间嵌入、类别嵌入等）
+        """
+        
+        # 通过调制网络生成6组参数，每组大小为 [batch, hidden_size]
+        # chunk(6, dim=1) 将 [batch, 6*hidden_size] 分割为6个 [batch, hidden_size] 的张量
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = \
+            self.adaLN_modulation(c).chunk(6, dim=1)
+        
+        # 第一个残差连接：多头自注意力分支
+        # 1. 对x进行层归一化
+        # 2. 使用shift_msa和scale_msa进行自适应调制
+        # 3. 通过自注意力模块
+        # 4. 使用gate_msa进行门控（控制信息流量）
+        # 5. 添加残差连接
         x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
+        
+        # 第二个残差连接：MLP分支
+        # 1. 对x进行层归一化
+        # 2. 使用shift_mlp和scale_mlp进行自适应调制
+        # 3. 通过MLP模块
+        # 4. 使用gate_mlp进行门控
+        # 5. 添加残差连接
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        
         return x
 ```
 
@@ -174,37 +231,88 @@ Decoder 则是由 AdaLN + Linear 组成：
 ```python
 class FinalLayer(nn.Module):
     """
-    The final layer of DiT.
+    DiT (Diffusion Transformer) 的最终输出层
+    将隐藏特征转换为最终的输出patch，通常用于重建图像或预测噪声
     """
+    
     def __init__(self, hidden_size, patch_size, out_channels):
         super().__init__()
+        
+        # 最终层归一化：不使用可学习的仿射参数，与DiTBlock保持一致
         self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        
+        # 线性投影层：将隐藏特征映射到输出patch
+        # 输出维度 = patch_size² × out_channels (每个patch的像素数 × 通道数)
         self.linear = nn.Linear(hidden_size, patch_size * patch_size * out_channels, bias=True)
+        
+        # 自适应层归一化调制网络（简化版，只有shift和scale参数）
+        # 输出2组参数：shift 和 scale，用于条件化最终的层归一化
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(hidden_size, 2 * hidden_size, bias=True)
+            nn.SiLU(),  # Swish激活函数 (x * sigmoid(x))
+            nn.Linear(hidden_size, 2 * hidden_size, bias=True)  # 输出2倍hidden_size的特征
         )
 
     def forward(self, x, c):
+        """
+        前向传播
+        Args:
+            x: 输入特征 [batch, num_patches, hidden_size] - 来自DiT块的输出
+            c: 条件信息 [batch, hidden_size] - 时间嵌入、类别嵌入等条件
+        Returns:
+            x: 输出特征 [batch, num_patches, patch_size² × out_channels]
+        """
+        
+        # 通过调制网络生成shift和scale参数
+        # chunk(2, dim=1) 将 [batch, 2*hidden_size] 分割为2个 [batch, hidden_size] 的张量
         shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
+        
+        # 对输入进行层归一化，然后使用条件信息进行自适应调制
+        # modulate函数：x * (1 + scale) + shift
         x = modulate(self.norm_final(x), shift, scale)
+        
+        # 通过线性层将特征映射到最终输出维度
+        # [batch, num_patches, hidden_size] -> [batch, num_patches, patch_size² × out_channels]
         x = self.linear(x)
+        
         return x
 ```
 
 这些 `adaLN_modulation` 层在创建时被零初始化：
 
 ```python
-# Zero-out adaLN modulation layers in DiT blocks:
+# 零初始化 DiT 块中的 adaLN 调制层：
 for block in self.blocks:
+    # 将每个 DiT 块的 adaLN 调制网络的最后一层（线性层）权重初始化为 0
+    # adaLN_modulation[-1] 是 Sequential 中的最后一个模块（nn.Linear）
     nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
+    
+    # 将每个 DiT 块的 adaLN 调制网络的最后一层偏置初始化为 0
     nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
 
-# Zero-out output layers:
+# 零初始化输出层：
+# 将最终层的 adaLN 调制网络的线性层权重初始化为 0
 nn.init.constant_(self.final_layer.adaLN_modulation[-1].weight, 0)
+
+# 将最终层的 adaLN 调制网络的线性层偏置初始化为 0
 nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
+
+# 将最终层的输出线性层权重初始化为 0
 nn.init.constant_(self.final_layer.linear.weight, 0)
+
+# 将最终层的输出线性层偏置初始化为 0
 nn.init.constant_(self.final_layer.linear.bias, 0)
+```
+
+adaLN 调制层零初始化的作用：
+
+```python
+# 当权重和偏置都为0时：
+# adaLN_modulation 输出 = SiLU(0) + Linear(input, weight=0, bias=0) = 0
+# 这意味着：
+shift_msa = scale_msa = gate_msa = 0  # 对于DiT块
+shift_mlp = scale_mlp = gate_mlp = 0  # 对于DiT块
+shift = scale = 0                     # 对于最终层
+
 ```
 
 # 总结
