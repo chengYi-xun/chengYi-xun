@@ -162,7 +162,7 @@ $$
 $$
 代入上一章最后的 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$，得到：
 $$
-\mu=\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\tilde{\epsilon}\right)
+\mu=\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\tilde{\epsilon}\right)
 $$
 注意在反向过程中我们并不知道在前向过程中加入的噪声 $\epsilon$ 是 $\mathcal{N}(0,1)$ 中的具体哪一个噪声，而噪声也没有办法继续转换成其他的形式。因此我们使用神经网络在反向过程中估计的目标就是 $\tilde{\epsilon}$。在这个网络中，输入除了 $\mathbf{x}_t$ 之外还需要 $t$，可以简单理解为：加噪过程中 $\mathbf{x}_t$ 的噪声含量是由 $t$ 决定的，因此在预测噪声时也需要知道时间步 $t$​ 作为参考，以降低预测噪声的难度。
 
@@ -327,132 +327,45 @@ $$
 首先我们需要先定义 $\beta$、$\alpha$，以及 $\bar\alpha$ 等最基本的常量，这里我们保持 DDPM 原论文的配置，也就是 $\beta$ 初始为 $1\times10^{-4}$，最终为 $0.02$，且共有 $1000$ 个时间步：
 
 ```python
-import torch
+import torch  # 导入PyTorch库
 
 class DDPM:
     def __init__(
         self,
-        num_train_timesteps:int = 1000,
-        beta_start: float = 0.0001,
-        beta_end: float = 0.02,
+        num_train_timesteps: int = 1000,  # 训练时的总时间步数T，默认1000步
+        beta_start: float = 0.0001,  # 噪声调度的起始值β_1，控制初始加噪强度
+        beta_end: float = 0.02,  # 噪声调度的结束值β_T，控制最终加噪强度
     ):
+        # 生成线性噪声调度序列 β_t，从β_start线性增长到β_end
+        # 形状: [num_train_timesteps]，即 [1000]
+        # β_t 控制每一步添加噪声的比例，越大则加噪越强
         self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
+        
+        # 计算 α_t = 1 - β_t
+        # α_t 表示每一步保留原信号的比例
+        # 形状: [num_train_timesteps]
         self.alphas = 1.0 - self.betas
+        
+        # 计算累积乘积 ᾱ_t = ∏(i=1 to t) α_i
+        # torch.cumprod 沿着维度0进行累积乘法
+        # ᾱ_t 表示从x_0到x_t总共保留了多少原始信号
+        # 例如: ᾱ_3 = α_1 * α_2 * α_3
+        # 形状: [num_train_timesteps]
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+        
+        # 生成逆序的时间步序列，用于采样时从T-1到0的逆向扩散过程
+        # torch.arange(999, -1, -1) 生成 [999, 998, 997, ..., 2, 1, 0]
+        # 采样时按此顺序逐步去噪：x_T -> x_{T-1} -> ... -> x_1 -> x_0
+        # 形状: [num_train_timesteps]
         self.timesteps = torch.arange(num_train_timesteps - 1, -1, -1)
 ```
 
-然后是比较简单的前向过程，只需要实现加噪即可，按照 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$ 这个公式实现即可。注意需要将系数的维度数量都与输入样本对齐：
+### 参数详细说明：
 
-```python
-class DDPM:
-    ...
+1. **噪声调度 (Noise Schedule)**：
+   - `beta_start = 0.0001`：起始时加噪很轻微（保留99.99%的信号）
+   - `beta_end = 0.02`：结束时加噪较强（保留98%的信号）
+   - 线性增长确保噪声逐渐增强
 
-    def add_noise(
-        self,
-        original_samples: torch.Tensor,
-        noise: torch.Tensor,
-        timesteps: torch.Tensor,
-    ):
-        alphas_cumprod = self.alphas_cumprod.to(device=original_samples.device ,dtype=original_samples.dtype)
-        noise = noise.to(original_samples.device)
-        timesteps = timesteps.to(original_samples.device)
-
-        # \sqrt{\bar\alpha_t}
-        sqrt_alpha_prod = alphas_cumprod[timesteps].flatten() ** 0.5
-        while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
-            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
-
-        # \sqrt{1 - \bar\alpha_t}
-        sqrt_one_minus_alpha_prod = (1.0 - alphas_cumprod[timesteps]).flatten() ** 0.5
-        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
-            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
-
-        return sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
-```
-
-反向过程相对来说比较复杂，不过因为我们已经完成了公式的推导，只需要按照公式实现即可。我们也再把公式贴到这里，对着公式实现具体的代码：
-$$
-\begin{aligned}
-\sigma&=\left(\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar\alpha_{t-1}}\right)^{-1/2}\\
-\mu&=\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\tilde{\epsilon}_t\right)
-\end{aligned}
-$$
-
-```python
-class DDPM:
-    ...
-
-    @torch.no_grad()
-    def sample(
-        self,
-        unet: UNet2DModel,
-        batch_size: int,
-        in_channels: int,
-        sample_size: int,
-    ):
-        betas = self.betas.to(unet.device)
-        alphas = self.alphas.to(unet.device)
-        alphas_cumprod = self.alphas_cumprod.to(unet.device)
-        timesteps = self.timesteps.to(unet.device)
-        images = torch.randn((batch_size, in_channels, sample_size, sample_size), device=unet.device)
-        for timestep in tqdm(timesteps, desc='Sampling'):
-            pred_noise: torch.Tensor = unet(images, timestep).sample
-
-            # mean of q(x_{t-1}|x_t)
-            alpha_t = alphas[timestep]
-            alpha_cumprod_t = alphas_cumprod[timestep]
-            sqrt_alpha_t = alpha_t ** 0.5
-            one_minus_alpha_t = 1.0 - alpha_t
-            sqrt_one_minus_alpha_cumprod_t = (1 - alpha_cumprod_t) ** 0.5
-            mean = (images - one_minus_alpha_t / sqrt_one_minus_alpha_cumprod_t * pred_noise) / sqrt_alpha_t
-
-            # variance of q(x_{t-1}|x_t)
-            if timestep > 0:
-                beta_t = betas[timestep]
-                one_minus_alpha_cumprod_t_minus_one = 1.0 - alphas_cumprod[timestep - 1]
-                one_divided_by_sigma_square = alpha_t / beta_t + 1.0 / one_minus_alpha_cumprod_t_minus_one
-                variance = (1.0 / one_divided_by_sigma_square) ** 0.5
-            else:
-                variance = torch.zeros_like(timestep)
-
-            epsilon = torch.randn_like(images)
-            images = mean + variance * epsilon
-        images = (images / 2.0 + 0.5).clamp(0, 1).cpu().permute(0, 2, 3, 1).numpy()
-        return images
-```
-
-
-# 总结
-
-本文总结了 DDPM 的理论和实现方式，在代码部分我们是完全根据推导出的公式实现的采样过程。实际上在很多代码库中，采样过程并没有严格按照论文中的公式实现，而是先从 $\mathbf{x}_t$、$t$ 和预测的噪声反向计算出 $\mathbf{x}_0$，再基于 $\mu=\frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}\mathbf{x}_t+\frac{\sqrt{\bar\alpha_{t-1}}\beta_t}{1-\bar\alpha_t}\mathbf{x}_0$ 计算均值，这样的好处在于可以对 $\mathbf{x}_0$ 进一步规范化，控制输出的范围。
-
-可以看出 DDPM 虽然理论比较复杂，但实现起来还是比较简单直接的。
-
-最后提一下Open AI的Improved DDPM。虽然 DDPM 在生成任务上取得了不错的效果，但如果使用一些 metric 对 DDPM 进行评价，就会发现其虽然能在 FID 和 Inception Score 上获得不错的效果，但在负对数似然（Negative Log-likelihood，NLL）这个指标上表现不够好。根据 VQ-VAE2 文章中的观点，NLL 上的表现体现的是模型捕捉数据整体分布的能力。而且有工作表明即使在 NLL 指标上仅有微小的提升，就会在生成效果和特征表征能力上有很大的提升。
-
-Improved DDPM 主要是针对 DDPM 的训练过程进行改进，主要从两个方面进行改进：
-
-1. 不使用 DDPM 原有的固定方差，而是使用可学习的方差；
-2. 改进了加噪过程，使用余弦形式的 Scheduler，而不是线性 Scheduler。
-
-作者发现线性的 $\beta_t$ 对于高分辨率图像效果不错，但对于低分辨率的图像表现不佳。在之前的文章中我们提到过，在 DDPM 加噪的时候 $\beta_t$ 是从一个比较小的数值逐渐增加到比较大的数值的，因为如果最开始的时候加入很大的噪声，会严重破坏图像信息，不利于图像的学习。在这里应该也是相同的道理，因为低分辨率图像包含的信息本身就不多，虽然一开始使用了比较小的 $\beta_t$，但线性的 schedule 对于这些低分辨率图像来说还是加噪比较快。
-
-作者把方差用一种 cosine 的形式定义，不过并不是直接定义 $\beta_t$，而是定义 $\bar{\alpha}_t$：
-$$
-\bar{\alpha}_t=\frac{f(t)}{f(0)},\quad f(t)=\cos\left(\frac{t/T+s}{1+s}\cdot\frac{\pi}{2}\right)^2
-$$
-这个 schedule 和线性 schedule 的比较如下图所示：
-
-![iddpm](/chengYi-xun/img/iddpm.png)
-
-这个 schedule 在 $t=0$ 和 $t=T$ 附近都变化比较小，而在中间有一个接近于线性的下降过程，同时可以发现 cosine schedule 比 linear schedule 对信息的破坏更慢。这也印证了我们在前边提到的理论：在扩散开始的时候更加缓慢地加噪，可以得到更好的训练效果。除此之外设计这个 schedule 的时候作者也有一些比较细节的考虑，比如选取一个比较小的偏移量 $s=8\times10^{-3}$，防止 $\beta_t$ 在 $t=0$ 附近过小，并且将 $\beta_t$ 裁剪到 $0.999$ 来防止 $t=T$ 附近出现奇异点。
-
-
-> 参考资料：
->
-> 1. [DDPM 理论与实现](https://littlenyima.github.io/posts/13-denoising-diffusion-probabilistic-models/)
-> 2. [简单基础入门理解Denoising Diffusion Probabilistic Model，DDPM扩散模型](https://blog.csdn.net/qq_40714949/article/details/126643111)
-> 3. [扩散模型之DDPM](https://zhuanlan.zhihu.com/p/563661713)
-> 4. [Denoising Diffusion-based Generative Modeling: Foundations and Applications](https://drive.google.com/file/d/1DYHDbt1tSl9oqm3O333biRYzSCOtdtmn/view)
-> 5. [Train a diffusion model](https://huggingface.co/docs/diffusers/tutorials/basic_training)
+2. **关键变量的数学含义**：
+   - **betas (β_t)**：每
