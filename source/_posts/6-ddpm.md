@@ -162,7 +162,7 @@ $$
 $$
 代入上一章最后的 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$，得到：
 $$
-\mu=\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\tilde{\epsilon}\right)
+\mu=\frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t-\frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\tilde{\epsilon}\right)
 $$
 注意在反向过程中我们并不知道在前向过程中加入的噪声 $\epsilon$ 是 $\mathcal{N}(0,1)$ 中的具体哪一个噪声，而噪声也没有办法继续转换成其他的形式。因此我们使用神经网络在反向过程中估计的目标就是 $\tilde{\epsilon}$。在这个网络中，输入除了 $\mathbf{x}_t$ 之外还需要 $t$，可以简单理解为：加噪过程中 $\mathbf{x}_t$ 的噪声含量是由 $t$ 决定的，因此在预测噪声时也需要知道时间步 $t$​ 作为参考，以降低预测噪声的难度。
 
@@ -327,18 +327,36 @@ $$
 首先我们需要先定义 $\beta$、$\alpha$，以及 $\bar\alpha$ 等最基本的常量，这里我们保持 DDPM 原论文的配置，也就是 $\beta$ 初始为 $1\times10^{-4}$，最终为 $0.02$，且共有 $1000$ 个时间步：
 
 ```python
-import torch
+import torch  # 导入PyTorch库
 
 class DDPM:
     def __init__(
         self,
-        num_train_timesteps:int = 1000,
-        beta_start: float = 0.0001,
-        beta_end: float = 0.02,
+        num_train_timesteps: int = 1000,  # 训练时的总时间步数T，默认1000步
+        beta_start: float = 0.0001,  # 噪声调度的起始值β_1，控制初始加噪强度
+        beta_end: float = 0.02,  # 噪声调度的结束值β_T，控制最终加噪强度
     ):
+        # 生成线性噪声调度序列 β_t，从β_start线性增长到β_end
+        # 形状: [num_train_timesteps]，即 [1000]
+        # β_t 控制每一步添加噪声的比例，越大则加噪越强
         self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
+        
+        # 计算 α_t = 1 - β_t
+        # α_t 表示每一步保留原信号的比例
+        # 形状: [num_train_timesteps]
         self.alphas = 1.0 - self.betas
+        
+        # 计算累积乘积 ᾱ_t = ∏(i=1 to t) α_i
+        # torch.cumprod 沿着维度0进行累积乘法
+        # ᾱ_t 表示从x_0到x_t总共保留了多少原始信号
+        # 例如: ᾱ_3 = α_1 * α_2 * α_3
+        # 形状: [num_train_timesteps]
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+        
+        # 生成逆序的时间步序列，用于采样时从T-1到0的逆向扩散过程
+        # torch.arange(999, -1, -1) 生成 [999, 998, 997, ..., 2, 1, 0]
+        # 采样时按此顺序逐步去噪：x_T -> x_{T-1} -> ... -> x_1 -> x_0
+        # 形状: [num_train_timesteps]
         self.timesteps = torch.arange(num_train_timesteps - 1, -1, -1)
 ```
 

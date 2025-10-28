@@ -352,3 +352,89 @@ $$\min_G C(G) \Leftrightarrow \min_G JS(p_{data} \| p_g)$$
 ### 总结
 
 GAN开创了生成模型的新时代，通过对抗学习的思想，巧妙地避开了直接建模概率分布的困难。虽然训练过程存在诸多挑战，但其强大的生成能力使其在图像生成、风格迁移、超分辨率等多个领域取得了巨大成功。随着各种改进技术的出现，GAN已经成为深度学习中最重要的生成模型之一。
+
+
+### GAN的PyTorch实现
+```python
+def train_gan(generator, discriminator, dataloader, num_epochs, 
+              noise_dim, device, k=1, lr=0.0002):
+    """
+    GAN训练函数
+    
+    Args:
+        generator: 生成器模型
+        discriminator: 判别器模型
+        dataloader: 数据加载器
+        num_epochs: 训练轮数
+        noise_dim: 噪声向量维度
+        device: 训练设备 (cpu/cuda)
+        k: 判别器更新次数（论文中使用k=1）
+        lr: 学习率
+    """
+    # 优化器 - 使用动量优化
+    optimizer_G = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optimizer_D = optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
+    
+    # 损失函数
+    criterion = nn.BCELoss()
+    
+    generator.to(device)
+    discriminator.to(device)
+    
+    for epoch in range(num_epochs):
+        for batch_idx, real_data in enumerate(dataloader):
+            batch_size = real_data.size(0)
+            real_data = real_data.to(device)
+            
+            # ========== 训练判别器 k 步 ==========
+            for _ in range(k):
+                # 1. 从噪声先验采样
+                z = torch.randn(batch_size, noise_dim).to(device)
+                
+                # 2. 从数据分布采样（已通过dataloader获得）
+                
+                # 3. 更新判别器（梯度上升）
+                optimizer_D.zero_grad()
+                
+                # 真实数据的判别器输出
+                real_output = discriminator(real_data)
+                real_labels = torch.ones(batch_size, 1).to(device)
+                loss_real = criterion(real_output, real_labels)
+                
+                # 生成数据的判别器输出
+                fake_data = generator(z).detach()
+                fake_output = discriminator(fake_data)
+                fake_labels = torch.zeros(batch_size, 1).to(device)
+                loss_fake = criterion(fake_output, fake_labels)
+                
+                # 判别器总损失：最大化 log D(x) + log(1 - D(G(z)))
+                d_loss = loss_real + loss_fake
+                d_loss.backward()
+                optimizer_D.step()
+            
+            # ========== 训练生成器 1 步 ==========
+            # 从噪声先验采样
+            z = torch.randn(batch_size, noise_dim).to(device)
+            
+            # 更新生成器（梯度下降）
+            optimizer_G.zero_grad()
+            
+            # 生成假数据
+            fake_data = generator(z)
+            fake_output = discriminator(fake_data)
+            
+            # 生成器损失：最小化 log(1 - D(G(z)))
+            # 等价于最大化 log D(G(z))
+            g_labels = torch.ones(batch_size, 1).to(device)
+            g_loss = criterion(fake_output, g_labels)
+            
+            g_loss.backward()
+            optimizer_G.step()
+            
+            # 打印训练信息
+            if batch_idx % 100 == 0:
+                print(f'Epoch [{epoch}/{num_epochs}] Batch {batch_idx}/{len(dataloader)} '
+                      f'Loss_D: {d_loss.item():.4f} Loss_G: {g_loss.item():.4f}')
+    
+    return generator, discriminator
+```

@@ -190,7 +190,7 @@ class DDIM:
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
         
         # 定义采样时间步序列（线性采样策略）
-        # 从T-1到0，均匀选择sample_steps个时间步
+        # 从T-1到0，均匀选择sample_steps个时间步 
         self.timesteps = torch.linspace(num_train_timesteps - 1, 0, sample_steps).long()
 ```
 
@@ -250,7 +250,7 @@ $$\sigma_t = \eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alp
                     (one_minus_alpha_prod_tau * one_minus_alpha_t) / one_minus_alpha_prod_t
                 )
             else:
-                # η = 0 时，σ_t = 0，实现确定性采样
+                # η = 0 时，σ_t = 0，实现确定性采样 通过η参数控制随机性，η=0实现确定性采样
                 sigma_t = torch.zeros_like(alphas[0])
             
             # 步骤3：计算预测的原始图像 x̂_0

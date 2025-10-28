@@ -203,6 +203,67 @@ for step, batch in enumerate(train_dataloader):
     # 计算损失
     target = noise - model_input
     loss = torch.mean((model_pred - target) ** 2)
+    
+def get_sigmas(timesteps, n_dim=4, dtype=torch.float32):
+    # 从 noise_scheduler 中取出所有预定义的 sigma 序列，
+    # 并将其移动到与当前加速器（如 GPU）一致的 device 和 dtype。
+    # 这些 sigma 通常是噪声调度表，用来控制不同时间步的噪声强度。
+    sigmas = noise_scheduler.sigmas.to(device=accelerator.device, dtype=dtype)
+
+    # 同样，从调度器中取出完整的时间步表（通常是从大到小的整数序列，如 [999, 998, ..., 0]）。
+    schedule_timesteps = noise_scheduler.timesteps.to(accelerator.device)
+
+    # 将传入的 timesteps 也放到相同的 device 上，以保证比较时不会出错。
+    timesteps = timesteps.to(accelerator.device)
+
+    # 遍历传入的每一个时间步 t，在 schedule_timesteps 中找到它对应的索引位置。
+    # (schedule_timesteps == t) 会返回一个布尔张量，nonzero() 找到为 True 的索引位置。
+    # .item() 提取成 Python 标量。
+    # 最终 step_indices 是一个 Python 列表，表示每个输入 timestep 在调度表中的索引。
+    step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
+
+    # 根据这些索引，从 sigmas 表中取出对应的 sigma 值。
+    # flatten() 保证 sigma 是一维的，例如形状为 [batch_size]。
+    sigma = sigmas[step_indices].flatten()
+
+    # 为了让 sigma 可以和 model_input (如 [B, C, H, W]) 正确广播，
+    # 需要不断扩展维度直到它与输入的维度数 n_dim 相同。
+    # 例如原来 [B] → [B, 1] → [B, 1, 1] → [B, 1, 1, 1]
+    while len(sigma.shape) < n_dim:
+        sigma = sigma.unsqueeze(-1)
+
+    # 返回最终形状的 sigma 张量，例如 [B, 1, 1, 1]
+    return sigma
+
+class FlowMatchEulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
+    _compatibles = []
+    order = 1
+
+    @register_to_config
+    def __init__(
+        self,
+        num_train_timesteps: int = 1000,
+        shift: float = 1.0,
+        use_dynamic_shifting=False,
+        base_shift: Optional[float] = 0.5,
+        max_shift: Optional[float] = 1.15,
+        base_image_seq_len: Optional[int] = 256,
+        max_image_seq_len: Optional[int] = 4096,
+        invert_sigmas: bool = False,
+    ):
+
+        timesteps = np.linspace(1, num_train_timesteps, num_train_timesteps, dtype=np.float32)[::-1].copy()
+        timesteps = torch.from_numpy(timesteps).to(dtype=torch.float32)
+
+        sigmas = timesteps / num_train_timesteps
+        if not use_dynamic_shifting:
+            # when use_dynamic_shifting is True, we apply the timestep shifting on the fly based on the image resolution
+            sigmas = shift * sigmas / (1 + (shift - 1) * sigmas)
+
+        self.timesteps = sigmas * num_train_timesteps
+        ....
+
+
 ```
 
 速度场的真实值为 $v_t = x_0 - x_1 = \text{noise} - \text{data}$，模型通过最小化预测速度场与真实速度场的MSE损失来学习。
