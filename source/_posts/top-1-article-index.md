@@ -39,6 +39,13 @@ tags:
 11. [笔记｜生成模型（十一）：UIT和DiT架构详解](../12-UIT-VS-DIT)
 12. [笔记｜生成模型（十二）：Normalizing Flow理论与实现](../13-Normalizing-flow)
 13. [笔记｜生成模型（十三）：Flow Matching理论与实现](../14-flow_matching)
+14. [笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](../15-sd3)
+15. [笔记｜生成模型（十五）：Flux 架构解析](../16-flux)
+16. [笔记｜生成模型（十六）：强化学习基础与策略梯度](../17-rl-basics)
+17. [笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](../18-trpo-ppo)
+18. [笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](../19-dpo)
+19. [笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解](../20-grpo)
+20. [笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](../21-flow-grpo)
 
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)

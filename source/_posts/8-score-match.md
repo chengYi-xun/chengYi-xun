@@ -15,7 +15,14 @@ series: Score Base Models theory
 
 生成模型通常从某个已有的概率分布中进行采样以生成样本。Score-based 模型的关键在于对概率分布的对数梯度，即 **Score Function** 的建模。为了学习这个对象，我们需要使用一种称为 **score matching** 的技术，这是 Score-based 模型名称的由来。
 
-## Score Function 和 Score-based Models
+## Score Function 和 Score-based Models：什么是 Score？
+
+**核心思考出发点**：在生成模型中，我们的目标是让模型学会真实数据的概率分布 $p(x)$。如果知道了这个分布，我们就能在概率高的地方采样，生成出逼真的图片。但真实分布极其复杂，直接建模 $p(x)$ 非常困难（比如需要计算极其复杂的归一化常数 $Z$）。
+
+**能不能换个思路？** 我们不直接求概率的具体数值 $p(x)$，而是求**概率增加的方向**！
+就像你在爬山，你不需要知道整座山的海拔地图（绝对概率），你只需要知道站在当前位置，往哪个方向走最陡峭（梯度），顺着走就能爬到山顶（高概率区域，即真实的图片）。
+
+这个“概率增加的方向”，在数学上就是对数概率的梯度，我们称之为 **Score Function（得分函数）**。
 
 考虑一个数据集 $\{x_1, x_2, \ldots, x_N\}$ 的概率分布 $p(x)$，我们可以使用一种通用的方式——能量模型（Energy-based model）的形式表示这个概率分布：
 
@@ -79,6 +86,28 @@ $$
 $$
 
 使得模型预测的 Score Function 与真实分布的 Score Function 之间的均方误差最小。然而真实分布的log梯度 $\nabla_x \log p(x)$ 是未知的，我们需要利用 **Score Matching** 方法，Score Matching可以让我们在不知道真实分布的 $p(x)$ 的情况下最小化这个Loss。
+
+**开源代码参考：**
+在实际的代码实现中（例如 Yang Song 的 `score_sde` 官方库），计算 Score Matching Loss 的核心 PyTorch 伪代码如下：
+
+```python
+# x: 真实数据样本
+# score_model: 预测 Score 的神经网络 s_theta(x)
+# sigma: 当前的噪声扰动级别
+
+# 1. 给真实数据加噪声
+noise = torch.randn_like(x)
+perturbed_x = x + noise * sigma
+
+# 2. 计算目标 Score (对于高斯扰动，真实 Score 就是 -noise / sigma)
+target_score = -noise / sigma
+
+# 3. 模型预测 Score
+predicted_score = score_model(perturbed_x, sigma)
+
+# 4. 计算 Score Matching Loss (L2 距离)
+loss = torch.mean(torch.sum((predicted_score - target_score) ** 2, dim=(1,2,3)))
+```
 
 ## Score Matching
 
@@ -239,12 +268,19 @@ $$
 采样的过程依然是进行一系列迭代，不过因为有多个分布，所以需要依次对每个分布迭代一遍，相当于一共迭代 $L\times T$ 轮，得到最终的结果。这种采样方法叫做 Annealed Langevin Dynamics，具体的采样算法可以参考[这个链接](https://uvadl2c.github.io/lectures/Advanced%20Generative%20&%20Energy-based%20Models/modern-based-models/lecture%204.2.pdf)的内容。
 
 
-# 总结
+# 总结与算法对比
 
-作为生成模型的一种，score-based model 也遵循学习+采样的范式，其学习过程使用 score matching 来间接学习分布，采样过程使用 Langevin dynamics 通过迭代过程进行采样（和 diffusion models 的采样过程有点类似）。在训练时由于低概率密度区域会有比较低的权重，所以这部分区域无法准确学习，为了解决这个问题，又使用 multiple noise pertubation 和 annealed Langevin dynamics 进行了改进。
+作为生成模型的一种，Score-based model 也遵循学习+采样的范式，其学习过程使用 Score Matching 来间接学习分布，采样过程使用 Langevin dynamics 通过迭代过程进行采样。
+
+**算法对比：Score-based Models vs DDPM vs Flow Matching**
+- **与 DDPM 的关系**：Yang Song 在后续的论文（SDE）中证明了，**Score-based Models 和 DDPM 在本质上是等价的！** DDPM 预测的噪声 $\epsilon_\theta$，实际上就是 Score Function 的一种缩放形式。DDPM 是从离散时间步出发的，而 Score-based Models 是从连续概率分布和向量场出发的。
+- **与 Flow Matching 的关系**：Flow Matching 是 Score-based Models 的进一步进化。Score-based Models 必须依赖于高斯噪声（Langevin 动力学），路径是弯曲且随机的。而 Flow Matching 允许我们定义**任意的、笔直的**概率流路径（比如从纯噪声直线走向真实图片），这使得 Flow Matching 的采样速度更快、训练更稳定（SD3 和 Flux 均采用了 Flow Matching）。
+
+**意义**：Score-based Models 的提出，彻底打破了传统生成模型（如 GAN、VAE）必须计算复杂似然函数或对抗训练的束缚，用极其优雅的“梯度场”概念，为现代扩散模型奠定了坚实的数学基础。
 
 > 参考资料：
 >
 > 1. [Score-based Generative Models](https://littlenyima.github.io/posts/16-score-based-generative-models/)
 > 2. [Score-based Generative Models总结](https://www.zhihu.com/search?type=content&q=score%20matching)
+> 3. [Yang Song's Blog: Generative Modeling by Estimating Gradients of the Data Distribution](https://yang-song.net/blog/2021/score/)
 

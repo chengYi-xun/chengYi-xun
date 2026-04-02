@@ -83,6 +83,28 @@ $$\mathcal{L} = \mathbb{E}_{x_0,x_1,t}\left[\left\|f_\theta(x(t),t) - \frac{d}{d
 
 • $\mathbb{E}_{x_0,x_1,t}$: 随机噪声/数据对和插值时间的期望
 
+**开源代码参考：**
+在实际的 PyTorch 实现中（例如 Stable Diffusion 3 或 Flux 的训练代码），Flow Matching 的 Loss 计算极其简单直观：
+
+```python
+# x_1: 真实图片 (目标)
+# x_0: 纯高斯噪声 (起点)
+# t: 随机采样的时间步 [0, 1]
+
+# 1. 线性插值得到当前时刻的 x_t
+x_t = (1 - t) * x_0 + t * x_1
+
+# 2. 计算真实的速度场 (目标速度)
+target_velocity = x_1 - x_0
+
+# 3. 神经网络预测速度场
+predicted_velocity = model(x_t, t)
+
+# 4. 计算 MSE Loss
+loss = F.mse_loss(predicted_velocity, target_velocity)
+```
+
+
 
 
 # Flow Matching采样过程
@@ -346,3 +368,15 @@ def step(self, model_output, timestep, sample, return_dict=True):
 > 2. [【AI知识分享】你一定能听懂的扩散模型Flow Matching基本原理深度解析](https://www.bilibili.com/video/BV1Wv3xeNEds/)
 > 3. [flow_matching](https://littlenyima.github.io/posts/51-flow-matching-for-diffusion-models/)
 > 4. [Normalizing Flow](https://littlenyima.github.io/posts/12-basic-concepts-of-normalizing-flow/)
+
+# 总结与算法对比
+
+**算法对比：Flow Matching vs DDPM**
+- **路径**：DDPM 的加噪路径是弯曲且充满随机性的（马尔可夫链），而 Flow Matching（特别是 Rectified Flow）的路径是两点之间的直线。
+- **速度**：因为直线路径更平滑，ODE 求解器可以用更大的步长（更少的步数）进行采样，这使得 Flow Matching 的生成速度远快于传统的 DDPM。
+- **实现**：Flow Matching 的 Loss 计算极其简单（预测速度与真实速度的 MSE），不需要像 DDPM 那样推导复杂的变分下界（ELBO）和各时间步的权重。
+
+**开源代码参考**：
+目前最前沿的开源图像大模型，如 **Stable Diffusion 3** 和 **Flux**，都已经全面抛弃了 DDPM，转而采用 Flow Matching（Rectified Flow）作为其核心的生成机制。你可以在 `diffusers` 库的 `FlowMatchEulerDiscreteScheduler` 中看到其采样过程的实现。
+
+> 下一篇：[笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](/chengYi-xun/2026/04/03/15-sd3/)
