@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十一）：UIT和DiT架构详解
-date: 2025-09-08 21:35:56
+date: 2025-08-11 10:00:00
 cover: false
 mathjax: true
 categories:

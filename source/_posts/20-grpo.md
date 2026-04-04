@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解
-date: 2026-04-03 10:15:00
+date: 2025-08-19 10:00:00
 cover: false
 mathjax: true
 categories:

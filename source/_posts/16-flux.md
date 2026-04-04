@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十五）：Flux 架构解析
-date: 2026-04-03 09:55:00
+date: 2025-08-15 10:00:00
 cover: false
 mathjax: true
 categories:

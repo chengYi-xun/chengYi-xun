@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）
-date: 2026-04-03 10:20:00
+date: 2025-08-20 10:00:00
 cover: false
 mathjax: true
 categories:

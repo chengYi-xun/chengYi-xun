@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)
-date: 2026-04-03 10:10:00
+date: 2025-08-18 10:00:00
 cover: false
 mathjax: true
 categories:

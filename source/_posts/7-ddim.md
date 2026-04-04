@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（六）：DDIM理论
-date: 2025-08-12 23:08:30
+date: 2025-08-06 10:00:00
 cover: false
 mathjax: true
 categories:

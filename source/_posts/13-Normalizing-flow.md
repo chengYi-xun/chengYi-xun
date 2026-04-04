@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十二）：Normalizing Flow理论与实现
-date: 2025-09-09 21:35:56
+date: 2025-08-12 10:00:00
 cover: false
 mathjax: true
 categories:

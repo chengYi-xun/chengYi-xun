@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（九）：Classifier Guidance 理论与实现
-date: 2025-08-22 17:40:51
+date: 2025-08-09 10:00:00
 cover: false
 mathjax: true
 categories:

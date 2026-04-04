@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（三）：生成对抗理论
-date: 2025-08-07 01:37:31
+date: 2025-08-02 10:00:00
 cover: false
 mathjax: true
 categories:

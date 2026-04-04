@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（二）：生成模型的技术路线总览
-date: 2025-08-04 01:37:31
+date: 2025-08-01 10:00:00
 cover: false
 mathjax: true
 categories:

@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十三）：Flow Matching理论与实现
-date: 2025-09-12 11:16:52
+date: 2025-08-13 10:00:00
 cover: false
 mathjax: true
 categories:

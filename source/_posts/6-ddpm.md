@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（五）：DDPM理论
-date: 2025-08-10 23:08:30
+date: 2025-08-05 10:00:00
 cover: false
 mathjax: true
 categories:

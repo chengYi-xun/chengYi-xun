@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（四）：变分自编码器理论
-date: 2025-08-09 01:37:31
+date: 2025-08-03 10:00:00
 cover: false
 mathjax: true
 categories:

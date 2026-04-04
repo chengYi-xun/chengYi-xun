@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)
-date: 2026-04-03 10:05:00
+date: 2025-08-17 10:00:00
 cover: false
 mathjax: true
 categories:

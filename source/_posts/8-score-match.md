@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（七）：Score-Based理论
-date: 2025-08-16 23:08:30
+date: 2025-08-07 10:00:00
 cover: false
 mathjax: true
 categories:

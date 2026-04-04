@@ -1,6 +1,6 @@
 ---
 title: 笔记｜生成模型（八）：SDE统一DDPM和SMLD
-date: 2025-08-21 23:08:30
+date: 2025-08-08 10:00:00
 cover: false
 mathjax: true
 categories:
