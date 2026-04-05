@@ -177,4 +177,4 @@ PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 
 
 接下来的两篇文章，我们将分别探讨这两条激动人心的前沿路线。
 
-> 下一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/2026/04/03/19-dpo/)
+> 下一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/19-dpo/)

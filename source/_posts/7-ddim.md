@@ -30,7 +30,7 @@ q(\mathbf{x}_{t-1}|\mathbf{x}_t)=\mathcal{N}(\mathbf{x}_{t-1};\mu_\theta(\mathbf
 $$
 我们可以看到之所以 DDPM 很慢，就是因为在推导 $q(\mathbf{x}_t|\mathbf{x}_{t-1},\mathbf{x}_0)$ 的时候引入了马尔可夫假设，使得去噪只能在相邻时间步之间进行。如果我们可以在不依赖马尔可夫假设的情况下推导出 $q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)$，就可以将上面式子里的 $t-1$ 替换为任意的中间时间步 $\tau$，从而实现采样加速。总结来说，DDIM 主要有两个出发点：
 
-1. 保持前向过程的分布 $q(\mathbf{x}_t|\mathbf{x}_{t-1})=\mathcal{N}\left(\mathbf{x}_t;\sqrt{\bar{\alpha}_t}\mathbf{x}_0,(1-\bar{\alpha}_t)\mathbf{I}\right)$ 不变；
+1. 保持边际分布 $q(\mathbf{x}_t|\mathbf{x}_0)=\mathcal{N}\left(\mathbf{x}_t;\sqrt{\bar{\alpha}_t}\mathbf{x}_0,(1-\bar{\alpha}_t)\mathbf{I}\right)$ 不变；
 2. 构建一个不依赖于马尔可夫假设的 $q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)$ 分布。
 
 ## $q(\mathbf{x}_\tau|\mathbf{x}_t,\mathbf{x}_0)$ 的推导

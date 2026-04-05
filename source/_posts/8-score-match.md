@@ -8,7 +8,7 @@ categories:
 tags:
  - Deep learning
  - Generative models theory
-series: Score Base Models theory
+series: Diffusion Models theory
 ---
 
 # Score-based 模型理论基础
@@ -212,7 +212,7 @@ $$
 
 
 
-## 从分布采样：郎之万动力学采样（Langevin Dynamics）
+## 从分布采样：朗之万动力学采样（Langevin Dynamics）
 
 现在我们已经通过神经网络学习到了数据分布的Score Function，那么如何用Score Function从这个数据分布中得到样本呢？答案就是朗之万动力学采样：
 
@@ -230,7 +230,7 @@ $$
 
 ## Pitfall陷阱
 
-现在我们得到了SMLD生成模型，但实际上这个模型由很大的问题。
+现在我们得到了SMLD生成模型，但实际上这个模型有很大的问题。
 $$
 \begin{aligned}
 \mathcal{L} = \int p(x) \left\| \nabla_x \log p(x) - s_\theta(x) \right\|^2 \mathrm{d}x

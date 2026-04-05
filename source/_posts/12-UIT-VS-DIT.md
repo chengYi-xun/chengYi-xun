@@ -8,8 +8,8 @@ categories:
 tags:
  - Deep learning
  - Diffusion models
- - Generavie models
-series: Diffusion Models
+ - Generative models
+series: Diffusion Models theory
 ---
 # UIT
 

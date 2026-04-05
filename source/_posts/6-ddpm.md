@@ -376,7 +376,9 @@ class DDPM:
    - 线性增长确保噪声逐渐增强
 
 2. **关键变量的数学含义**：
-   - **betas (β_t)**：每
+   - **betas (β_t)**：每一步的噪声强度，从 `beta_start` 到 `beta_end` 线性递增
+   - **alphas (α_t = 1 - β_t)**：每步保留原始信号的比例
+   - **alphas_cumprod (ᾱ_t = ∏α_i)**：从 $x_0$ 到 $x_t$ 累积保留的信号比例。这是前向加噪公式 $q(x_t|x_0) = \mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,\,(1-\bar\alpha_t)\,\mathbf{I})$ 的核心参数
 
 
 # 总结与算法对比
@@ -386,7 +388,7 @@ class DDPM:
 - **与 VAE 对比**：VAE 也是通过变分推断（ELBO）来学习分布，但 VAE 的隐变量空间是低维的，导致生成的图片往往比较模糊。而 DDPM 保持了与原图相同维度的隐变量，且通过几百步的细微去噪，生成的细节极其逼真。
 
 **开源代码参考**：
-目前最权威的 DDPM 开源实现是 Hugging Face 的 diffusers 库。你可以查看 DDPMScheduler 类的 dd_noise（前向加噪）和 step（反向去噪）方法，其核心逻辑与我们上面推导的公式完全一致。
+目前最权威的 DDPM 开源实现是 Hugging Face 的 diffusers 库。你可以查看 DDPMScheduler 类的 add_noise（前向加噪）和 step（反向去噪）方法，其核心逻辑与我们上面推导的公式完全一致。
 
 > 参考资料：
 > 

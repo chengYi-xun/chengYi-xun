@@ -366,4 +366,4 @@ loss.backward()
 optimizer.step()
 ```
 
-> 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/2026/04/03/18-trpo-ppo/)
+> 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/18-trpo-ppo/)

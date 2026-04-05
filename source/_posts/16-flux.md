@@ -101,4 +101,4 @@ Flux 通过 Double Stream 和 Single Stream 的混合架构，结合 2D RoPE 和
 
 随着 SD3 和 Flux 的解析完成，我们补齐了现代大模型架构的拼图。接下来，我们将正式进入本系列的最高潮：**大模型对齐与强化学习（RLHF）**。
 
-> 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/2026/04/03/17-rl-basics/)
+> 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/17-rl-basics/)

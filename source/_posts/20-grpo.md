@@ -157,4 +157,4 @@ loss = (policy_loss + beta * kl).mean()
 
 GRPO 优雅地去除了 Critic 网络，用组内相对优势实现了高效的对比学习。它证明了在生成式大模型时代，简单的经验统计往往比复杂的神经网络预测更加鲁棒和高效。
 
-> 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/2026/04/03/21-flow-grpo/)
+> 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/21-flow-grpo/)

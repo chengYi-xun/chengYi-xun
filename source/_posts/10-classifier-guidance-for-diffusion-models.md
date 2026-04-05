@@ -9,7 +9,7 @@ tags:
  - Deep learning
  - Diffusion models
  - Generative models
-series: Diffusion Models
+series: Diffusion Models theory
 ---
 
 > 转载自：*[Classifier-Free Guidance 理论与实现](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)

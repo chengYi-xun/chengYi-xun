@@ -143,4 +143,4 @@ loss = -F.logsigmoid(beta * logits).mean()
 
 那么，如何解决在线 RL（PPO）的显存危机呢？这就引出了我们下一篇的主角：GRPO。
 
-> 下一篇：[笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解](/chengYi-xun/2026/04/03/20-grpo/)
+> 下一篇：[笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解](/chengYi-xun/posts/20-grpo/)

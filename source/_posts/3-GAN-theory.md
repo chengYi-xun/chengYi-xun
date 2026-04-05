@@ -86,7 +86,7 @@ $$
 
 这里首先给出作者画的图来解释为什么对抗训练能够收敛。图中绿色线代表生成器的概率分布，蓝色虚线代表判别器的分布，黑色虚线代表真实数据分布。字母 $z$ 代表采样的高斯噪声，$x$ 代表真实数据，我们从 $z$ 中采样，通过生成器将 $z$ 的样本映射成符合 $x$ 分布的样本。在图$(a)$ 中，判别器和生成器的概率分布都是随机设定，大部分样本的映射都不正确。首先训练判别器，既让判别器能够识别出哪些是映射过来的数据，哪些是真实样本数据。训练完成之后就是图$(b)$ 所展示的分布。真实数据判别接近1，生成数据判别接近0。然后再训练生成器，让生成器朝着让判别器无法判别的方向移动，即为图$(c)$ ，最后经过循环拉扯，达到了图$(d)$ 的平衡。即生成器的分布和真实数据的分布相同。
 
-![GAN theroy](/chengYi-xun/img/gan_theroy.png)
+![GAN theory](/chengYi-xun/img/gan_theory.png)
 
 
 **背后的数学原理**
@@ -291,12 +291,12 @@ $$
 **步骤3：变换为JS散度**
 
 注意到：
-$$\log\frac{p_{data}(x)}{p_{data}(x) + p_g(x)} = \log\frac{p_{data}(x)}{2 \cdot \frac{p_{data}(x) + p_g(x)}{2}} = \log\frac{p_{data}(x)}{2M(x)} = \log 2 + \log\frac{p_{data}(x)}{M(x)}$$
+$$\log\frac{p_{data}(x)}{p_{data}(x) + p_g(x)} = \log\frac{p_{data}(x)}{2 \cdot \frac{p_{data}(x) + p_g(x)}{2}} = \log\frac{p_{data}(x)}{2M(x)} = -\log 2 + \log\frac{p_{data}(x)}{M(x)}$$
 
 其中 $M(x) = \frac{p_{data}(x) + p_g(x)}{2}$ 是两个分布的平均。
 
 因此：
-$$C(G) = \log 4 + KL(p_{data} \| M) + KL(p_g \| M)$$
+$$C(G) = -\log 4 + KL(p_{data} \| M) + KL(p_g \| M)$$
 
 根据JS散度的定义：
 
@@ -304,7 +304,7 @@ $$JS(p_{data} \| p_g) = \frac{1}{2}KL(p_{data} \| M) + \frac{1}{2}KL(p_g \| M)$$
 
 我们得到
 
-$$C(G) = \log 4 + 2 \cdot JS(p_{data} \| p_g)$$
+$$C(G) = -\log 4 + 2 \cdot JS(p_{data} \| p_g)$$
 
 由于生成器G要最小化 $C(G)$，而 $\log 4$ 是常数，因此：
 $$\min_G C(G) \Leftrightarrow \min_G JS(p_{data} \| p_g)$$

@@ -8,7 +8,7 @@ categories:
 tags:
  - Deep learning
  - Generative models theory
-series: Score Base Models theory
+series: Diffusion Models theory
 ---
 
 
@@ -83,7 +83,7 @@ $$
 在上一章节中，我们推导了Score Matching 的离散过程（离散形式的SDE），可用朗之万动力学采样进行生成新样本。然而当正向过程改为连续形态的 SDE 描述后，逆向过程也需相应变化。对于给定 SDE，其逆向过程同样是一个 SDE，表示为（推导过程见[这个链接](https://kexue.fm/archives/9209)）：
 
 $$
-\mathrm{d}x=\left[f(x,t)-g^2(t)\textcolor{green}{\nabla_x\log p_t(x)}\right]\mathrm{d}t+g(t)\mathrm{d}w
+\mathrm{d}x=\left[f(x,t)-g^2(t){\color{green}\nabla_x\log p_t(x)}\right]\mathrm{d}t+g(t)\mathrm{d}w
 $$
 
 此处 $\mathrm{d}t$ 表示反向时间梯度，即从 $t=T$ 到 $t=0$ 的方向。上式中绿色部分正是我们在上一篇文章中介绍的 score function $s_\theta(x,t)$。这表明，虽从离散形式变为连续形式，但学习目标仍然一致的——即用网络学习分布的 score function。

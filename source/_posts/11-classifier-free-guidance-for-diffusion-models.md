@@ -8,8 +8,8 @@ categories:
 tags:
  - Deep learning
  - Diffusion models
- - Genetative models
-series: Diffusion Models
+ - Generative models
+series: Diffusion Models theory
 ---
 
 > 论文链接：*[Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598)*
