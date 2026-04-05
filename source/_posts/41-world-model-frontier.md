@@ -10,6 +10,7 @@ tags:
  - Embodied AI
  - Frontier
 series: "世界模型"
+mathjax: true
 ---
 
 > **前置知识**：本文是世界模型系列的终篇。建议先阅读前六篇。
@@ -155,7 +156,7 @@ $$
 4. 执行提取的动作
 
 $$
-\text{Image}_0 + \text{Goal} \xrightarrow{\text{Video Gen}} \hat{V}_{0:T} \xrightarrow{\text{Inverse Dynamics}} a_{0:T-1} \xrightarrow{\text{Execute}} \text{Robot}
+\text{Image}_0 + \text{Goal} \overset{\text{Video Gen}}{\longrightarrow} \hat{V}_{0:T} \overset{\text{Inverse Dynamics}}{\longrightarrow} a_{0:T-1} \overset{\text{Execute}}{\longrightarrow} \text{Robot}
 $$
 
 ---
@@ -216,7 +217,7 @@ $$
 Sora 和 Cosmos 表明，**规模**是涌现物理理解的关键因素。但多大才"够"？
 
 $$
-\text{能力} \stackrel{?}{=} f(\text{参数量}, \text{数据量}, \text{计算量})
+\text{能力} \overset{?}{=} f(\text{参数量}, \text{数据量}, \text{计算量})
 $$
 
 是否存在类似 LLM 的 **Scaling Law** for World Models？目前没有定论。
@@ -252,6 +253,8 @@ $$
 WorldScore 是第一次尝试统一评估，但仍然不完善。
 
 ---
+
+![World Model Evolution Timeline](/img/wm_timeline.png)
 
 ## 6. 技术演进全景图
 

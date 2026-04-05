@@ -11,6 +11,7 @@ tags:
  - Autonomous Driving
  - World Model
 series: "世界模型"
+mathjax: true
 ---
 
 > **核心论文**：
@@ -174,13 +175,13 @@ Vista 最大的贡献：**直接在世界模型生成的视频中训练自动驾
 传统流程：
 
 $$
-\text{真实数据} \xrightarrow{\text{训练}} \pi_\theta \xrightarrow{\text{部署}} \text{真实车辆}
+\text{真实数据} \overset{\text{训练}}{\longrightarrow} \pi_\theta \overset{\text{部署}}{\longrightarrow} \text{真实车辆}
 $$
 
 Vista 流程：
 
 $$
-\text{真实数据} \xrightarrow{\text{训练 WM}} \text{Vista} \xrightarrow{\text{生成训练数据}} \pi_\theta \xrightarrow{\text{部署}} \text{真实车辆}
+\text{真实数据} \overset{\text{训练 WM}}{\longrightarrow} \text{Vista} \overset{\text{生成训练数据}}{\longrightarrow} \pi_\theta \overset{\text{部署}}{\longrightarrow} \text{真实车辆}
 $$
 
 用 Vista 生成的数据训练的规划器，在 nuScenes 上的 L2 误差降低了 **15-20%**。
@@ -229,6 +230,8 @@ $$
 $$
 \hat{\mathcal{O}}_{t+1} = \text{VQ-Decoder}(\hat{\mathbf{T}}_{t+1})
 $$
+
+![Pixel vs Occupancy Prediction](/img/pixel_vs_occupancy.png)
 
 ### 4.4 占用预测 vs 像素预测
 

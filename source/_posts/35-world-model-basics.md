@@ -9,6 +9,7 @@ tags:
  - Latent Space
  - Generative Model
 series: "世界模型"
+mathjax: true
 ---
 
 > **系列说明**：本文是世界模型系列的第一篇。世界模型领域目前技术路线**尚未收敛**，存在五大并行分支。本系列将从基础概念出发，按分支逐一展开。
@@ -96,6 +97,8 @@ $$
 ---
 
 ## 2. Ha & Schmidhuber (2018): 经典世界模型
+
+![World Models V-M-C Architecture](/img/world_model_arch.png)
 
 2018 年 Ha 和 Schmidhuber 的论文 *"World Models"* 首次将"世界模型"这个概念在深度学习中系统化。它的架构简洁而深刻，由三个模块组成：
 
@@ -304,6 +307,8 @@ $$
 Ha & Schmidhuber 2018 开创了"世界模型"的现代研究，之后领域迅速分化为五大技术路线：
 
 ### 路线图
+
+![世界模型五大技术路线](/img/wm_five_routes.png)
 
 ```
 Ha & Schmidhuber (2018)

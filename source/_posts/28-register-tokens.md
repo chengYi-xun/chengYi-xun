@@ -10,6 +10,7 @@ tags:
  - Self-Supervised Learning
  - Computer Vision
 series: "杂谈"
+mathjax: true
 ---
 
 > **论文**：*Vision Transformers Need Registers*（Darcet et al., ICLR 2024 Outstanding Paper）

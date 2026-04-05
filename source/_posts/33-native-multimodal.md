@@ -10,6 +10,7 @@ tags:
  - VQ-VAE
  - Native Multimodal
 series: "多模态融合"
+mathjax: true
 ---
 
 > **论文**：

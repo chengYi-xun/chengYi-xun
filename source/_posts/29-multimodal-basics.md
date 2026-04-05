@@ -10,6 +10,7 @@ tags:
  - Computer Vision
  - NLP
 series: "多模态融合"
+mathjax: true
 ---
 
 > **系列说明**：本文是多模态融合系列的第一篇，从最基本的概念出发，建立三级融合的数学框架，为后续 CLIP、BLIP-2、LLaVA 等模型打下理论基础。

@@ -9,6 +9,7 @@ tags:
  - Model-based RL
  - World Model
 series: "世界模型"
+mathjax: true
 ---
 
 > **核心论文**：
@@ -42,6 +43,8 @@ DreamerV3 是第一个**从零开始、不依赖人类先验**完成这个任务
 $$
 \text{完整状态} = (\underbrace{h_t}_{\text{确定性}}, \underbrace{z_t}_{\text{随机性}})
 $$
+
+![RSSM Architecture](/img/rssm_architecture.png)
 
 ### 1.2 RSSM 的四个方程
 

@@ -10,6 +10,7 @@ tags:
  - State Space Model
  - Multimodal Frontier
 series: "多模态融合"
+mathjax: true
 ---
 
 > **核心论文**：

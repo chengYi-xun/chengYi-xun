@@ -10,6 +10,7 @@ tags:
  - Video Generation
  - World Model
 series: "世界模型"
+mathjax: true
 ---
 
 > **核心论文**：
@@ -71,6 +72,8 @@ Sora 的架构未完全公开，但从技术说明和第三方分析可推断：
 ---
 
 ## 2. Genie：可交互的世界模型
+
+![Genie Architecture](/img/genie_architecture.png)
 
 ### 2.1 核心创新：从视频中学习潜动作
 

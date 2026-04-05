@@ -10,6 +10,7 @@ tags:
  - SigLIP
  - Vision-Language Model
 series: "多模态融合"
+mathjax: true
 ---
 
 > **论文**：*Learning Transferable Visual Models From Natural Language Supervision*（Radford et al., 2021, OpenAI）

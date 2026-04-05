@@ -10,6 +10,7 @@ tags:
  - Vision-Language Model
  - Multimodal Learning
 series: "多模态融合"
+mathjax: true
 ---
 
 > **论文**：*BLIP-2: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models*（Li et al., 2023, Salesforce）

@@ -9,6 +9,7 @@ tags:
  - Multimodal LLM
  - Vision-Language Model
 series: "多模态融合"
+mathjax: true
 ---
 
 > **论文**：*Visual Instruction Tuning*（Liu et al., 2023, UW-Madison / Microsoft）
