@@ -46,9 +46,26 @@ tags:
 18. [笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](../19-dpo)
 19. [笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解](../20-grpo)
 20. [笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](../21-flow-grpo)
+21. [笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](../22-dapo)
+22. [笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](../23-grpo-variants)
+23. [笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](../24-superflow)
+24. [笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](../25-video-grpo)
+
+## LLM 记忆与对齐
+25. [笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](../26-memory-bank)
+
+# 多模态融合
+1. [笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](../29-multimodal-basics)
+2. [笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](../30-clip)
+3. [笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](../31-blip2-qformer)
+4. [笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片](../32-llava)
+5. [笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](../33-native-multimodal)
+6. [笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](../34-multimodal-frontier)
 
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)
+2. [笔记｜VGGT——用一个 Transformer 完成所有 3D 视觉任务](../27-vggt)
+3. [笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](../28-register-tokens)
 
 <!-- # 
 ## 基础理论
