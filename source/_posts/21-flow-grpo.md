@@ -15,63 +15,76 @@ series: Diffusion Models theory
 
 > 本文为系列最终篇。在完整梳理了从 REINFORCE 到 PPO、DPO，再到最新 GRPO 的演进路线后，我们将目光转向图像生成领域。本文将结合 `flow_grpo` 开源代码库，深入解析如何将 GRPO 算法应用于基于 Flow Matching 的图像生成模型（如 Flux）的微调中。
 
-# 图像生成中的强化学习（为什么不用监督学习？）
+# 图像生成中的强化学习
 
-在传统的文本到图像（Text-to-Image, T2I）模型训练中，我们通常使用极大似然估计（MLE）或其变体（如 DDPM 的去噪得分匹配，Flow Matching 的向量场匹配）来拟合数据分布。
+**先用一个例子理解为什么需要 RL。**
 
-然而，这种基于数据的训练方式存在一个致命缺陷：**模型只是在机械地模仿训练集，而不知道人类真正喜欢什么样的图像。** 比如，训练集里可能有很多模糊、构图杂乱、甚至带有水印的图片。模型学会了生成这些图片，但这并不是我们想要的。
+假设你用一个 Flux 模型生成图像，给定 Prompt："一只橘猫坐在蓝色沙发上"。模型可能生成以下几种结果：
 
-为了让模型“懂审美”、“对齐人类偏好”，研究者们引入了 **RLHF（基于人类反馈的强化学习）**。其基本流程如下：
-1. **定义奖励模型（Reward Model）**：训练一个“美术老师”（判别模型，如 ImageReward, PickScore, Aesthetic Score），输入 Prompt 和生成的图像，输出一个标量分数，分数越高代表图像越符合人类偏好。
-2. **强化学习微调**：将 T2I 模型视为策略网络（Actor，即画画的学生），Prompt 视为状态（State，即考题），生成的图像（或去噪轨迹）视为动作（Action，即答卷）。利用 RL 算法最大化“美术老师”给出的分数。
+| 生成结果 | 问题 |
+|:---|:---|
+| 一只白色猫坐在蓝色沙发上 | 颜色不对（应该是橘猫） |
+| 一只橘猫站在蓝色沙发旁边 | 动作不对（应该是"坐在"） |
+| 一只橘猫坐在蓝色沙发上，画面清晰 | 完美 |
+| 一只橘猫坐在蓝色沙发上，但画面模糊 | 质量差 |
+
+传统的训练方式（Flow Matching 损失）只是让模型学会"生成看起来像训练集的图像"。但训练集里可能有模糊的、构图差的、与 Prompt 不一致的图像——模型无法区分好坏。
+
+**RL 的价值**：我们训练一个"美术老师"（奖励模型，如 PickScore 或 ImageReward）来给图像打分。模型自己生成图像 → 美术老师打分 → 模型根据分数调整自己。这就是 RLHF 在图像生成中的应用。
 
 ---
 
-# Flow-GRPO 框架解析：图像版“矮子里拔高个”
+# Flow-GRPO 框架解析：图像版"矮子里拔高个"
 
-**Flow-GRPO** 是一种专门为基于 Flow Matching 的生成模型（如 Flux, Stable Diffusion 3）设计的在线强化学习微调框架。
+**先看例子**：对于 Prompt "一只橘猫坐在蓝色沙发上"，我们让 Flux 模型生成 $G = 4$ 张图像，美术老师分别打分：
 
-**核心思考出发点**：由于图像生成模型（特别是像 Flux 这样百亿参数级别的模型）极其庞大，传统的 PPO 算法由于需要额外的 Critic 网络，显存开销根本无法承受。因此，Flow-GRPO 采用了我们在上一篇文章中推导的 **GRPO** 算法——彻底抛弃 Critic，用“组内相对评分”（矮子里拔高个）来实现高效的在线强化学习。
+| 图像 | 描述 | 奖励 $r_i$ | 相对优势 $\hat{A}_i$ |
+|:---:|:---|:---:|:---:|
+| 图 1 | 橘猫坐沙发，画面清晰 | $r_1 = 0.9$ | $+1.26$ |
+| 图 2 | 橘猫坐沙发，稍微模糊 | $r_2 = 0.6$ | $-0.06$ |
+| 图 3 | 白猫坐沙发（颜色错） | $r_3 = 0.3$ | $-1.38$ |
+| 图 4 | 橘猫坐沙发，普通水平 | $r_4 = 0.7$ | $+0.38$ |
+
+（均值 $\mu_R = 0.625$，标准差 $\sigma_R \approx 0.22$）
+
+跟上一篇 GRPO 的做法完全一样：图 1 和图 4 高于平均（正优势），模型学习生成更像它们的图；图 3 远低于平均（负优势），模型学习远离这种生成方式。**不需要 Critic 网络，只需要多生成几张图做对比。**
+
+**核心思考出发点**：由于像 Flux 这样的图像生成模型参数量达到百亿级别，传统的 PPO 算法由于需要额外的 Critic 网络，显存根本无法承受。因此，Flow-GRPO 采用了 GRPO 算法——彻底抛弃 Critic，用"组内相对评分"来实现高效的在线强化学习。
 
 ## 核心挑战：连续时间步的动作空间
 
-在 LLM 中，动作（Action）是离散的词表（Token）。而在扩散模型/Flow Matching 中，生成过程是一个连续的常微分方程（ODE）或随机微分方程（SDE）求解过程。
+在 LLM 中，动作（Action）是离散的词表（Token），计算 $\log \pi_\theta(a|s)$ 很直接。而在 Flow Matching 中，生成过程是一个连续的常微分方程（ODE）求解过程。
+
+**用例子理解**：LLM 生成文本就像逐字写作——每个字是一个离散的"动作"。而 Flux 生成图像像是画画——每个时间步的"动作"是在画布上做一次连续的涂抹（从噪声图向清晰图的一步变换）。
 
 **如何定义图像生成中的 Action？**
-Flow-GRPO 将**整个去噪轨迹（或向量场积分轨迹）**视为一个宏观的 Action。但在计算对数概率 $\log \pi_\theta(a|s)$ 时，我们需要将其分解为每个时间步 $t$ 的转移概率。
-
-对于 Flow Matching，模型预测的是速度场 $v_\theta(x_t, t)$。在添加了 SDE 噪声扰动后，我们可以通过 Girsanov 定理或直接计算高斯转移概率，得到模型在每一步的 $\log p_\theta(x_{t-\Delta t} | x_t)$。
+Flow-GRPO 将**整个去噪轨迹**视为一个宏观的 Action。在计算对数概率 $\log \pi_\theta(a|s)$ 时，将其分解为每个时间步 $t$ 的转移概率 $\log p_\theta(x_{t-\Delta t} | x_t)$ 的累加。
 
 ---
 
 # Flux 模型的 GRPO 训练流程
 
-结合 `flow_grpo` 仓库中的代码（特别是 `scripts/train_flux.py`），Flux 模型的 GRPO 训练流程可以分为以下几个关键步骤：
+结合 `flow_grpo` 仓库中的代码，Flux 模型的 GRPO 训练流程可以用橘猫的例子串起来：
 
 ## 1. 奖励模型设计 (Reward Composition)
 
 在 `flow_grpo/rewards.py` 中，框架支持组合多种奖励函数：
-- **Aesthetic Score**：美学评分，鼓励模型生成更好看的图像。
-- **ImageReward / PickScore**：基于人类偏好数据集训练的综合评分模型。
-- **CLIP Score / OCR Score**：用于衡量图像与文本 Prompt 的对齐程度（如是否正确拼写了文字）。
+- **Aesthetic Score**：美学评分（画面构图、色彩是否和谐）
+- **ImageReward / PickScore**：综合评分（是否符合人类偏好）
+- **CLIP Score**：图文匹配度（图像是否忠实于 Prompt "一只橘猫坐在蓝色沙发上"）
 
-对于一个 Prompt，模型生成 $G$ 张图像，奖励函数对这 $G$ 张图像分别打分，得到 $\{r_1, r_2, \dots, r_G\}$。
+在我们的例子中，图 3（白猫）的 CLIP Score 会很低（颜色不匹配），所以总奖励最低。
 
 ## 2. 组内采样与优势计算 (Group Sampling & Advantage)
 
-在训练循环中，对于每个 Prompt：
-1. 模型并行生成 $G$ 张图像（通常 $G=4$ 或 $8$）。
-2. 计算这组图像的奖励均值 $\mu_R$ 和标准差 $\sigma_R$。
-3. 计算每张图像的相对优势：$\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$。
+对于每个 Prompt，模型并行生成 $G$ 张图像（通常 $G=4$ 或 $8$），然后用我们在上一篇推导的公式计算相对优势 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$。
 
 ## 3. 损失计算与梯度反传 (Loss Computation)
 
-这是最核心的部分。为了计算 GRPO 损失，我们需要知道当前策略 $\pi_\theta$ 和旧策略 $\pi_{\theta_{\text{old}}}$ 生成这 $G$ 张图像的概率。
-
-在代码实现中（参考 `flow_grpo/diffusers_patch/` 中的 pipeline 修改）：
+这是最核心的部分。在代码实现中（参考 `flow_grpo/diffusers_patch/`）：
 - 模型不仅输出生成的图像，还会记录生成轨迹中每一步的隐变量 $x_t$ 和模型预测的速度场 $v_\theta$。
-- 通过计算 $\log \pi_\theta(x_{t-\Delta t} | x_t)$，累加得到整条轨迹的对数概率 $\log P_\theta$。
-- 参考模型（Reference Model，通常是冻结的预训练模型）同样计算这条轨迹的对数概率 $\log P_{\text{ref}}$。
+- 通过计算 $\log p_\theta(x_{t-\Delta t} | x_t)$，累加得到整条轨迹的对数概率 $\log P_\theta$。
+- 参考模型（冻结的预训练模型）同样计算这条轨迹的对数概率 $\log P_{\text{ref}}$。
 
 **GRPO 损失函数代码级映射**：
 $$
@@ -79,11 +92,11 @@ $$
 $$
 *(注：实际代码中会包含 PPO 的 Clip 操作，此处为简化表达)*
 
+在我们的橘猫例子中：图 1（清晰橘猫，$\hat{A} = +1.26$）的正向梯度会推动模型在类似 Prompt 下生成更清晰、颜色更准确的图像；图 3（白猫，$\hat{A} = -1.38$）的负向梯度会抑制模型产生颜色错误的输出。
+
 ---
 
 # 代码级解析：深入 `train_flux.py`
-
-让我们看看 `train_flux.py` 中的关键逻辑（伪代码抽象）：
 
 ```python
 # 1. 初始化模型
@@ -95,20 +108,19 @@ for batch in dataloader:
     prompts = batch["prompts"] # [Batch_size]
     
     # 2. 组内采样 (Group Sampling)
-    # 将 prompts 复制 G 份：[Batch_size * G]
     duplicated_prompts = duplicate(prompts, G)
     
     with torch.no_grad():
         # actor_model 生成图像，并返回轨迹的 log_probs
         images, old_log_probs, trajectories = actor_model.generate_with_logprob(duplicated_prompts)
         
-        # 计算奖励
+        # 计算奖励（美术老师给每张图打分）
         rewards = reward_model(images, duplicated_prompts)
         
         # 计算参考模型的 log_probs
         ref_log_probs = ref_model.compute_logprob(trajectories, duplicated_prompts)
     
-    # 3. 计算相对优势 (Advantage)
+    # 3. 计算相对优势 (Advantage) —— GRPO 的核心
     # rewards 形状为 [Batch_size, G]
     mean_rewards = rewards.mean(dim=1, keepdim=True)
     std_rewards = rewards.std(dim=1, keepdim=True)
@@ -116,13 +128,12 @@ for batch in dataloader:
     
     # 4. 策略更新 (Policy Update)
     for _ in range(ppo_epochs):
-        # 重新计算当前模型的 log_probs (因为模型参数在更新)
         current_log_probs = actor_model.compute_logprob(trajectories, duplicated_prompts)
         
         # 重要性采样比率
         ratio = torch.exp(current_log_probs - old_log_probs)
         
-        # 裁剪目标
+        # 裁剪目标（同 PPO）
         surr1 = ratio * advantages.view(-1)
         surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * advantages.view(-1)
         policy_loss = -torch.min(surr1, surr2).mean()
@@ -133,7 +144,6 @@ for batch in dataloader:
         # 总损失
         loss = policy_loss + beta * kl_loss
         
-        # 反向传播与优化
         loss.backward()
         optimizer.step()
 ```
@@ -141,14 +151,14 @@ for batch in dataloader:
 ## Flow-GRPO-Fast 的优化
 
 由于生成 $G$ 张图像需要进行几十步的 ODE 求解，采样过程极其耗时。`flow_grpo` 提出了 **Flow-GRPO-Fast** 变体。
-其核心思想是：**不从纯噪声 $t=1$ 开始采样，而是从中间时间步 $t_{start}$ 开始，或者减少采样步数。**
-通过截断轨迹或使用一致性模型（Consistency Models）的思路，极大加速了组内采样的速度，使得 GRPO 在图像生成上的训练成本大幅降低。
+
+**用例子理解**：生成一张 1024x1024 的图像，Flux 默认需要 50 步去噪。生成 4 张就是 200 步。Flow-GRPO-Fast 的做法是：不从纯噪声 $t=1$ 开始，而是从中间时间步 $t_{\text{start}}$ 开始（比如 $t=0.5$），或者减少每张图的采样步数。这极大加速了组内采样的速度。
 
 **开源代码参考与算法对比：**
 在图像生成的 RLHF 领域，之前主要使用 DPO（如 `Diffusion-DPO`）或 PPO（如 `DDPO`）。
 - **Diffusion-DPO** 只能进行离线学习，无法在训练中探索新的图像空间。
 - **DDPO** 使用了 PPO，但需要维护 Critic 网络，对于 Flux 这种 12B 的模型几乎不可能单卡运行。
-- **Flow-GRPO** (`flow_grpo` 仓库，如 `scripts/train_flux.py` 和 `scripts/train_flux_fast.py`) 完美结合了 Flow Matching 和 GRPO，彻底抛弃了 Critic，使得百亿参数图像大模型的在线 RL 成为可能。
+- **Flow-GRPO** 完美结合了 Flow Matching 和 GRPO，彻底抛弃了 Critic，使得百亿参数图像大模型的在线 RL 成为可能。
 
 ---
 
