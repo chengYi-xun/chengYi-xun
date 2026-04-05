@@ -62,6 +62,15 @@ tags:
 5. [笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](../33-native-multimodal)
 6. [笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](../34-multimodal-frontier)
 
+# 世界模型
+1. [笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](../35-world-model-basics)
+2. [笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](../36-dreamer)
+3. [笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](../37-jepa)
+4. [笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](../38-video-world-model)
+5. [笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](../39-physics-world-model)
+6. [笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](../40-driving-world-model)
+7. [笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](../41-world-model-frontier)
+
 # 杂谈
 1. [杂谈｜写作的目的](../5-some_think)
 2. [笔记｜VGGT——用一个 Transformer 完成所有 3D 视觉任务](../27-vggt)
