@@ -17,6 +17,7 @@ series: Diffusion Models theory
 # 强化学习基础概念：从"训狗"说起
 
 对于纯小白读者来说，理解强化学习（Reinforcement Learning, RL）最直观的例子就是**"训狗"**。
+
 - **智能体（Agent）**：就是那只狗（在 AI 中就是我们的模型）。
 - **环境（Environment）**：狗所处的现实世界。
 - **状态（State）**：狗当前看到的画面、听到的口令（比如你喊"坐下"）。

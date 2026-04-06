@@ -372,6 +372,7 @@ def step(self, model_output, timestep, sample, return_dict=True):
 # 总结与算法对比
 
 **算法对比：Flow Matching vs DDPM**
+
 - **路径**：DDPM 的加噪路径是弯曲且充满随机性的（马尔可夫链），而 Flow Matching（特别是 Rectified Flow）的路径是两点之间的直线。
 - **速度**：因为直线路径更平滑，ODE 求解器可以用更大的步长（更少的步数）进行采样，这使得 Flow Matching 的生成速度远快于传统的 DDPM。
 - **实现**：Flow Matching 的 Loss 计算极其简单（预测速度与真实速度的 MSE），不需要像 DDPM 那样推导复杂的变分下界（ELBO）和各时间步的权重。

@@ -274,6 +274,7 @@ $$
 作为生成模型的一种，Score-based model 也遵循学习+采样的范式，其学习过程使用 Score Matching 来间接学习分布，采样过程使用 Langevin dynamics 通过迭代过程进行采样。
 
 **算法对比：Score-based Models vs DDPM vs Flow Matching**
+
 - **与 DDPM 的关系**：Yang Song 在后续的论文（SDE）中证明了，**Score-based Models 和 DDPM 在本质上是等价的！** DDPM 预测的噪声 $\epsilon_\theta$，实际上就是 Score Function 的一种缩放形式。DDPM 是从离散时间步出发的，而 Score-based Models 是从连续概率分布和向量场出发的。
 - **与 Flow Matching 的关系**：Flow Matching 是 Score-based Models 的进一步进化。Score-based Models 必须依赖于高斯噪声（Langevin 动力学），路径是弯曲且随机的。而 Flow Matching 允许我们定义**任意的、笔直的**概率流路径（比如从纯噪声直线走向真实图片），这使得 Flow Matching 的采样速度更快、训练更稳定（SD3 和 Flux 均采用了 Flow Matching）。
 

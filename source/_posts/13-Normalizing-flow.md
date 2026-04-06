@@ -197,11 +197,13 @@ $$
 $$
 
 **公式解释：**
+
 - $\log p(x)$：目标分布 $x$ 的对数概率密度
 - $\log p(z)$：基础分布 $z$ 的对数概率密度（`log_prob_z`）
 - $\log \left| \det \frac{\partial f}{\partial x} \right|$：雅可比行列式的对数（`log_det_jacobian`）
 
 **物理意义：**
+
 - `log_prob_z`：衡量变换后的 $z$ 在基础分布中的"合理性"
 - `log_det_jacobian`：补偿变换过程中的"体积变化"，确保概率密度的正确性
 

@@ -26,6 +26,7 @@ tags:
 
 # 生成式人工智能
 ## 通用理论
+
 1. [笔记｜生成模型（一）：一些概率论的基础概念和理论](../1-generation-basic-theory)
 2. [笔记｜生成模型（二）：生成模型的技术路线总览](../2-generation-model)
 3. [笔记｜生成模型（三）：生成对抗理论](../3-GAN-theory)
@@ -52,9 +53,11 @@ tags:
 24. [笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](../25-video-grpo)
 
 ## LLM 记忆与对齐
+
 25. [笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](../26-memory-bank)
 
 # 多模态融合
+
 1. [笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](../29-multimodal-basics)
 2. [笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](../30-clip)
 3. [笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](../31-blip2-qformer)
@@ -63,6 +66,7 @@ tags:
 6. [笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](../34-multimodal-frontier)
 
 # 世界模型
+
 1. [笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](../35-world-model-basics)
 2. [笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](../36-dreamer)
 3. [笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](../37-jepa)
@@ -72,6 +76,7 @@ tags:
 7. [笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](../41-world-model-frontier)
 
 # 杂谈
+
 1. [杂谈｜写作的目的](../5-some_think)
 2. [笔记｜VGGT——用一个 Transformer 完成所有 3D 视觉任务](../27-vggt)
 3. [笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](../28-register-tokens)

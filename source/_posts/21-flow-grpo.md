@@ -160,6 +160,7 @@ for batch in dataloader:
 
 **开源代码参考与算法对比：**
 在图像生成的 RLHF 领域，之前主要使用 DPO（如 `Diffusion-DPO`）或 PPO（如 `DDPO`）。
+
 - **Diffusion-DPO** 只能进行离线学习，无法在训练中探索新的图像空间。
 - **DDPO** 使用了 PPO，但需要维护 Critic 网络，对于 Flux 这种 12B 的模型几乎不可能单卡运行。
 - **Flow-GRPO** 完美结合了 Flow Matching 和 GRPO，彻底抛弃了 Critic，使得百亿参数图像大模型的在线 RL 成为可能。

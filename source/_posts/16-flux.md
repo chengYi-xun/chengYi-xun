@@ -41,6 +41,7 @@ Flux 的核心骨干网络由两部分组成：
 ## Single Stream Blocks
 
 在模型的后半部分（共 38 层），Flux 切换到了 Single Stream Blocks。
+
 - 在进入 Single Stream 之前，文本和图像特征被完全拼接成一个长序列。
 - 在这些 Block 中，不再区分文本和图像，它们共享同一个 LayerNorm、QKV 投影矩阵和 MLP。
 
@@ -79,6 +80,7 @@ for block in self.single_transformer_blocks:
 在传统的 DiT 或 SD3 中，通常使用绝对位置编码（如 2D Sinusoidal Positional Encoding）来表示图像 Patch 的空间位置。
 
 Flux 创新性地在图像生成中引入了自然语言处理中广泛使用的 **RoPE (旋转位置编码)**。
+
 - 对于一维的文本序列，使用标准的 1D RoPE。
 - 对于二维的图像 Patch 序列，Flux 采用了 **2D RoPE**。它将每个 Patch 的行坐标和列坐标分别进行旋转编码，然后组合在一起。
 

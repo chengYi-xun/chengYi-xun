@@ -141,6 +141,7 @@ $$
 $$
 \mathcal{L}^{\text{PPO}}(\theta) = \mathcal{L}^{\text{CLIP}}(\theta) - c_1 \mathcal{L}^{\text{VF}}(\theta) + c_2 S[\pi_\theta](s_t)
 $$
+
 1. **策略损失 $\mathcal{L}^{\text{CLIP}}$**：即上述的裁剪目标函数。
 2. **价值损失 $\mathcal{L}^{\text{VF}}$**：Critic 网络预测的价值 $V_\theta(s_t)$ 与实际回报 $V_t^{\text{target}}$ 的均方误差，用于训练 Critic。
 3. **熵奖励（Entropy Bonus）$S[\pi_\theta]$**：鼓励策略保持一定的随机性，防止过早收敛到局部最优（探索与利用的权衡）。
