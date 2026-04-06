@@ -3,10 +3,10 @@ title: 笔记｜生成模型（六）：DDIM理论
 date: 2025-08-06 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---

@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习
 date: 2026-04-06 00:30:00
-categories:
- - Tutorials
-tags:
- - World Model
+categories\n
+Tutorials
+tags\n
+World Model
  - Model-based RL
  - Latent Space
  - Generative Model

@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon
 date: 2026-04-06 00:15:00
-categories:
- - Tutorials
-tags:
- - Flamingo
+categories\n
+Tutorials
+tags\n
+Flamingo
  - Chameleon
  - Perceiver Resampler
  - VQ-VAE

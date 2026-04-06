@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片
 date: 2026-04-06 00:10:00
-categories:
- - Tutorials
-tags:
- - LLaVA
+categories\n
+Tutorials
+tags\n
+LLaVA
  - Visual Instruction Tuning
  - Multimodal LLM
  - Vision-Language Model
@@ -105,13 +105,13 @@ LLaVA 的另一个核心贡献是**视觉指令数据**的构造方法。
 利用 GPT-4（纯文本版）自动生成视觉对话数据：
 
 ```
-输入给 GPT-4:
-  - 图像的 Caption（如 COCO caption）
+输入给 GPT-4\n
+图像的 Caption（如 COCO caption）
   - 图像中物体的 Bounding Box 坐标
   - 任务类型提示（对话/详细描述/复杂推理）
 
-GPT-4 输出:
-  - 多轮对话（如 Q: "图片里的人在做什么？" A: "..."）
+GPT-4 输出\n
+多轮对话（如 Q: "图片里的人在做什么？" A: "..."）
   - 详细描述（一段关于图片内容的长文本）
   - 推理问题（需要常识或逻辑推理的问答）
 ```

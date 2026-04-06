@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言
 date: 2026-04-06 00:00:00
-categories:
- - Tutorials
-tags:
- - CLIP
+categories\n
+Tutorials
+tags\n
+CLIP
  - Contrastive Learning
  - InfoNCE
  - SigLIP

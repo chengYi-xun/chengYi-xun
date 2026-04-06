@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律
 date: 2026-04-06 00:50:00
-categories:
- - Tutorials
-tags:
- - PhysDreamer
+categories\n
+Tutorials
+tags\n
+PhysDreamer
  - PhysGen
  - NewtonGen
  - Physics-Grounded

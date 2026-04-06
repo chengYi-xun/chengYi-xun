@@ -3,10 +3,10 @@ title: 笔记｜生成模型（七）：Score-Based理论
 date: 2025-08-07 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---
@@ -38,8 +38,8 @@ $$
 
 $$p_\theta(x) = \frac{\exp(-E_\theta(x))}{Z_\theta}$$
 
-其中：
-- $E_\theta(x)$ 为能量函数，由参数 $\theta$ 参数化
+其中\n
+$E_\theta(x)$ 为能量函数，由参数 $\theta$ 参数化
 - $Z_\theta = \int \exp(-E_\theta(x)) \mathrm{d}x$ 为配分函数，确保归一化条件 $\int p_\theta(x) \mathrm{d}x = 1$ 成立
 
 **性质：**

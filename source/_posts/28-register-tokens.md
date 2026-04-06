@@ -1,10 +1,10 @@
 ---
 title: 笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"
 date: 2026-04-05 23:50:00
-categories:
- - Tutorials
-tags:
- - Vision Transformer
+categories\n
+Tutorials
+tags\n
+Vision Transformer
  - Register Tokens
  - DINOv2
  - Self-Supervised Learning
@@ -332,8 +332,8 @@ Register Token 自提出以来（2023 年 9 月）影响深远，被多项重要
 
 ### 5.3 质疑与反思
 
-*Do All Vision Transformers Need Registers?*（2025）对原论文的结论进行了跨架构验证，发现：
-- 原论文的核心发现在 DINOv2 上高度可复现
+*Do All Vision Transformers Need Registers?*（2025）对原论文的结论进行了跨架构验证，发现\n
+原论文的核心发现在 DINOv2 上高度可复现
 - 但某些结论（如 outlier 始终出现在低信息区域）并不能普遍推广到所有架构
 - 对于某些文本监督模型（如 OpenCLIP），register 的收益并不稳定
 

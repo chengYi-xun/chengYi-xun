@@ -3,10 +3,10 @@ title: 笔记｜生成模型（十二）：Normalizing Flow理论与实现
 date: 2025-08-12 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---
@@ -180,8 +180,8 @@ $$
 log_prob_z = -0.5 * torch.sum(z**2, dim=1) - 0.5 * z.shape[1] * torch.log(2 * torch.pi)
 ```
 
-代码与公式的对应关系：
-- `torch.sum(z**2, dim=1)` ↔ $\|z\|^2$ （向量的平方和）
+代码与公式的对应关系\n
+`torch.sum(z**2, dim=1)` ↔ $\|z\|^2$ （向量的平方和）
 - `-0.5 * z.shape[1] * torch.log(2 * torch.pi)` ↔ $-\frac{d}{2}\log(2\pi)$ （归一化常数）
 
 ```python

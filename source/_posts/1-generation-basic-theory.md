@@ -3,10 +3,10 @@ title: 笔记｜生成模型（一）：一些概率论的基础概念和理论
 date: 2025-07-31 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---

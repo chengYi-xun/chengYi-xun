@@ -3,10 +3,10 @@ title: 笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现
 date: 2025-08-10 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Diffusion models
  - Generative models
 series: Diffusion Models theory

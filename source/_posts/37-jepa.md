@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（三）：JEPA——在嵌入空间预测世界
 date: 2026-04-06 00:40:00
-categories:
- - Tutorials
-tags:
- - JEPA
+categories\n
+Tutorials
+tags\n
+JEPA
  - V-JEPA
  - Self-Supervised Learning
  - World Model

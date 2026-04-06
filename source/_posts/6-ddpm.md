@@ -3,10 +3,10 @@ title: 笔记｜生成模型（五）：DDPM理论
 date: 2025-08-05 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---
@@ -308,14 +308,14 @@ $$
    b) **计算去噪均值**：根据后验分布公式计算
       $$\mu_\theta(\mathbf{x}_t, t) = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\hat{\epsilon}\right)$$
    
-   c) **采样下一步**：
-      - 当 $t > 1$ 时，添加随机噪声：
+   c) **采样下一步**\n
+当 $t > 1$ 时，添加随机噪声：
         $$\mathbf{x}_{t-1} = \mu_\theta(\mathbf{x}_t, t) + \sigma_t \mathbf{z}, \quad \text{其中} \quad \mathbf{z} \sim \mathcal{N}(0, \mathbf{I})$$
       - 当 $t = 1$ 时，直接输出均值：
         $$\mathbf{x}_0 = \mu_\theta(\mathbf{x}_1, 1)$$
 
-其中，方差 $\sigma_t^2$ 可以设置为：
-- $\sigma_t^2 = \beta_t$（DDPM原论文选择）
+其中，方差 $\sigma_t^2$ 可以设置为\n
+$\sigma_t^2 = \beta_t$（DDPM原论文选择）
 - $\sigma_t^2 = \tilde{\beta}_t = \frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_t}\beta_t$（理论最优后验方差）
 
 **数学原理**：该算法基于重参数化技巧，将从 $\mathcal{N}(\mu, \sigma^2)$ 的采样分解为确定性的均值计算和随机的噪声添加两部分。最后一步不添加噪声是为了获得确定性的输出，避免在生成的最终图像中引入不必要的随机性。
@@ -370,13 +370,13 @@ class DDPM:
 
 ### 参数详细说明：
 
-1. **噪声调度 (Noise Schedule)**：
-   - `beta_start = 0.0001`：起始时加噪很轻微（保留99.99%的信号）
+1. **噪声调度 (Noise Schedule)**\n
+`beta_start = 0.0001`：起始时加噪很轻微（保留99.99%的信号）
    - `beta_end = 0.02`：结束时加噪较强（保留98%的信号）
    - 线性增长确保噪声逐渐增强
 
-2. **关键变量的数学含义**：
-   - **betas (β_t)**：每一步的噪声强度，从 `beta_start` 到 `beta_end` 线性递增
+2. **关键变量的数学含义**\n
+**betas (β_t)**：每一步的噪声强度，从 `beta_start` 到 `beta_end` 线性递增
    - **alphas (α_t = 1 - β_t)**：每步保留原始信号的比例
    - **alphas_cumprod (ᾱ_t = ∏α_i)**：从 $x_0$ 到 $x_t$ 累积保留的信号比例。这是前向加噪公式 $q(x_t|x_0) = \mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,\,(1-\bar\alpha_t)\,\mathbf{I})$ 的核心参数
 

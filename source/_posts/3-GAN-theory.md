@@ -3,10 +3,10 @@ title: 笔记｜生成模型（三）：生成对抗理论
 date: 2025-08-02 10:00:00
 cover: false
 mathjax: true
-categories:
- - Notes
-tags:
- - Deep learning
+categories\n
+Notes
+tags\n
+Deep learning
  - Generative models theory
 series: Diffusion Models theory
 ---
@@ -309,8 +309,8 @@ $$C(G) = -\log 4 + 2 \cdot JS(p_{data} \| p_g)$$
 由于生成器G要最小化 $C(G)$，而 $\log 4$ 是常数，因此：
 $$\min_G C(G) \Leftrightarrow \min_G JS(p_{data} \| p_g)$$
 
-根据JS散度的性质和公式，有：
-1. 当且仅当 $p_g=p_{data}$ 时，JS散度为0，达到全局最小值
+根据JS散度的性质和公式，有\n
+当且仅当 $p_g=p_{data}$ 时，JS散度为0，达到全局最小值
 2. 此时最优判别器 $D^*_G(x) = \frac{1}{2}$，无法区分真假样本
 3. 这证明了GAN在理论上能够学习到真实数据分布
 
