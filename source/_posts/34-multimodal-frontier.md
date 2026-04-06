@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来
 date: 2026-04-06 00:20:00
-categories\n
-Tutorials
-tags\n
-InternVL
+categories:
+ - Tutorials
+tags:
+ - InternVL
  - Qwen-VL
  - Mamba
  - State Space Model

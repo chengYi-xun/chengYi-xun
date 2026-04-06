@@ -3,10 +3,10 @@ title: 杂谈｜写作的目的
 date: 2025-08-04 10:00:00
 cover: false
 mathjax: true
-categories\n
-Notes
-tags\n
-thinking
+categories:
+ - Notes
+tags:
+ - thinking
 series: other talk
 ---
 

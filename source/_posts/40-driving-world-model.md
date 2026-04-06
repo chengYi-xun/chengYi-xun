@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测
 date: 2026-04-06 00:55:00
-categories\n
-Tutorials
-tags\n
-GAIA-1
+categories:
+ - Tutorials
+tags:
+ - GAIA-1
  - DriveDreamer
  - OccWorld
  - Vista
@@ -279,8 +279,8 @@ $$
 \hat{o}_{t+1:t+H} = \mathcal{W}_\theta(o_{1:t}, a_{t:t+H-1}, c)
 $$
 
-其中\n
-$o_t$ 是观测（像素 / 点云 / 占用网格 / BEV）
+其中：
+- $o_t$ 是观测（像素 / 点云 / 占用网格 / BEV）
 - $a_t$ 是驾驶动作（速度、转向角）
 - $c$ 是上下文（HD Map、天气、交通规则）
 - $\hat{o}_{t+1:t+H}$ 是未来 $H$ 步的预测
@@ -293,8 +293,8 @@ $$
 a^*_{t:t+H-1} = \arg\max_{a_{t:t+H-1}} \mathbb{E}_{\hat{o} \sim \mathcal{W}_\theta}\left[\sum_{k=0}^{H-1} r(o_{t+k}, a_{t+k})\right]
 $$
 
-奖励函数 $r$ 包括\n
-**安全**：$r_{\text{safe}} = -\mathbb{1}[\text{碰撞}]$（不碰撞）
+奖励函数 $r$ 包括：
+- **安全**：$r_{\text{safe}} = -\mathbb{1}[\text{碰撞}]$（不碰撞）
 - **舒适**：$r_{\text{comfort}} = -\|a_t - a_{t-1}\|^2$（动作平滑）
 - **效率**：$r_{\text{progress}} = v_t \cos(\theta_t)$（沿目标方向前进）
 

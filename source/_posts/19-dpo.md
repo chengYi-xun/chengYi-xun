@@ -3,10 +3,10 @@ title: 笔记｜生成模型（十八）：大模型对齐的另一条路：DPO 
 date: 2025-08-18 10:00:00
 cover: false
 mathjax: true
-categories\n
-Notes
-tags\n
-Deep learning
+categories:
+ - Notes
+tags:
+ - Deep learning
  - Generative models theory
  - Reinforcement Learning
  - DPO
@@ -23,8 +23,8 @@ series: Diffusion Models theory
 2. **RM**：给同一道编程题生成两份代码（A 和 B），让人类标注哪份更好，训练一个"代码评审员"（奖励模型）。
 3. **RL**：让模型自己去写代码，"评审员"给分，模型根据分数用 PPO 算法调整自己。
 
-这个流程极其繁琐，且在 PPO 阶段，显存中需要同时驻留**四个**庞大的模型\n
-**Actor 模型**（正在训练的策略网络，即写代码的学生）
+这个流程极其繁琐，且在 PPO 阶段，显存中需要同时驻留**四个**庞大的模型：
+- **Actor 模型**（正在训练的策略网络，即写代码的学生）
 - **Critic 模型**（价值网络，通常与 Actor 同等规模，估计代码题的"难度"）
 - **Reference 模型**（冻结的 SFT 模型，防止学生学偏）
 - **Reward 模型**（冻结的奖励模型，即代码评审员）

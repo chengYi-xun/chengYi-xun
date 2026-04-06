@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术
 date: 2026-04-06 00:05:00
-categories\n
-Tutorials
-tags\n
-BLIP-2
+categories:
+ - Tutorials
+tags:
+ - BLIP-2
  - Q-Former
  - Cross-Attention
  - Vision-Language Model

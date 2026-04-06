@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制
 date: 2026-04-06 00:35:00
-categories\n
-Tutorials
-tags\n
-Dreamer
+categories:
+ - Tutorials
+tags:
+ - Dreamer
  - RSSM
  - Model-based RL
  - World Model
@@ -250,8 +250,8 @@ $$
 
 DayDreamer（Wu et al., 2022）将 Dreamer 思路部署到四种真实机器人平台，证明世界模型不只在模拟器中有效。
 
-关键挑战\n
-真实传感器噪声远大于模拟器
+关键挑战：
+- 真实传感器噪声远大于模拟器
 - 执行动作有延迟
 - 不能"重置"环境
 

@@ -1,10 +1,10 @@
 ---
 title: 笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛
 date: 2026-04-06 01:00:00
-categories\n
-Tutorials
-tags\n
-World Model
+categories:
+ - Tutorials
+tags:
+ - World Model
  - 4D Generation
  - WorldScore
  - Embodied AI

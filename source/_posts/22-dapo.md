@@ -3,10 +3,10 @@ title: 笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理
 date: 2026-04-05 10:00:00
 cover: false
 mathjax: true
-categories\n
-Notes
-tags\n
-Deep learning
+categories:
+ - Notes
+tags:
+ - Deep learning
  - Generative models theory
  - Reinforcement Learning
 series: Diffusion Models theory

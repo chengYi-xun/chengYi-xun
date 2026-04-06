@@ -1,10 +1,10 @@
 ---
 title: 笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础
 date: 2026-04-05 23:55:00
-categories\n
-Tutorials
-tags\n
-Multimodal Learning
+categories:
+ - Tutorials
+tags:
+ - Multimodal Learning
  - Fusion
  - Cross-Attention
  - Computer Vision
@@ -235,13 +235,13 @@ $$
 
 其中 $f_v^{\text{cls}}$ 和 $f_t^{\text{cls}}$ 分别输出各模态的 logits，$\lambda$ 为混合权重。
 
-**优点**\n
-各模态编码器可以独立预训练
+**优点**：
+- 各模态编码器可以独立预训练
 - 推理时可以单模态部署（图像检索只需图像编码器）
 - 计算效率高——编码后只需一次点积
 
-**缺点**\n
-模态之间的交互仅限于最终的相似度计算
+**缺点**：
+- 模态之间的交互仅限于最终的相似度计算
 - 无法捕获细粒度的跨模态对应关系（如"红色"对应图片中车的颜色）
 
 **PyTorch 实现**：
@@ -524,8 +524,8 @@ $$
 Z_{ijk} = \tilde{v}_i \cdot \tilde{a}_j \cdot \tilde{t}_k
 $$
 
-由于加了常数 1，$\mathbf{Z}$ 实际上包含\n
-**一阶项**：$v_i, a_j, t_k$（当其他两个取到常数 1 时）
+由于加了常数 1，$\mathbf{Z}$ 实际上包含：
+- **一阶项**：$v_i, a_j, t_k$（当其他两个取到常数 1 时）
 - **二阶项**：$v_i a_j, v_i t_k, a_j t_k$
 - **三阶项**：$v_i a_j t_k$
 

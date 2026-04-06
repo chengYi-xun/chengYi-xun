@@ -3,10 +3,10 @@ title: 笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆
 date: 2026-04-05 18:00:00
 cover: false
 mathjax: true
-categories\n
-Notes
-tags\n
-Deep learning
+categories:
+ - Notes
+tags:
+ - Deep learning
  - LLM
  - Memory mechanism
  - AI Companion
@@ -27,8 +27,8 @@ Deep learning
 | **第 8 天** | 你：我在考虑学数据分析还是机器学习方向 |
 | **第 10 天** | 你：你觉得以我的情况，应该走哪个方向？ |
 
-一个**没有长期记忆**的 ChatGPT，在第 10 天面对这个问题时\n
-不记得你第 1 天的分手经历（无法给出有温度的回复）
+一个**没有长期记忆**的 ChatGPT，在第 10 天面对这个问题时：
+- 不记得你第 1 天的分手经历（无法给出有温度的回复）
 - 不记得你第 3 天才开始学 Python（无法评估你的技术水平）
 - 不知道你读了哪本书、进度如何（无法给出针对性建议）
 
@@ -194,8 +194,8 @@ $$
 R = e^{-t/S}
 $$
 
-其中\n
-$R \in [0, 1]$：**记忆保持率**（retention），即还能记住多少
+其中：
+- $R \in [0, 1]$：**记忆保持率**（retention），即还能记住多少
 - $t$：距离上次学习/回忆经过的**时间**
 - $S$：**记忆强度**（strength），取决于学习深度和复习次数
 
@@ -443,8 +443,8 @@ ChatGPT 使用 LlamaIndex 构建索引（借助 GPT-3.5 的嵌入能力），开
 
 （格式：英文 / 中文）
 
-**关键发现**\n
-**MemoryBank 对所有 LLM 都有效**：三个后端的记忆检索准确率都超过了 70%
+**关键发现**：
+1. **MemoryBank 对所有 LLM 都有效**：三个后端的记忆检索准确率都超过了 70%
 2. **基座模型能力决定上限**：ChatGPT 在回复正确性和连贯性上远超开源模型，说明 MemoryBank 是"锦上添花"而非"雪中送炭"——基座能力越强，记忆增强的效果越好
 3. **语言差异**：ChatGLM 和 ChatGPT 在英文上表现更好，BELLE 在中文上更优
 
