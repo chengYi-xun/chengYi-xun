@@ -155,6 +155,7 @@ class CameraHead(nn.Module):
 ```
 
 **关键设计**：
+
 - 每次迭代预测的是**增量** $\Delta g$，逐步精炼
 - `detach()` 阻断梯度回传到上一次迭代，避免计算图爆炸
 - 使用 **AdaLN**（Adaptive Layer Normalization，与 DiT 中的设计相同）将上一步预测作为条件注入

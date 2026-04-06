@@ -121,6 +121,7 @@ $$
 其中 $\epsilon$ 是一个超参数（通常设为 0.2）。
 
 这个公式有三个部分：
+
 1. **第一项**：$r_t(\theta) \hat{A}_t$ 是正常的替代目标（与 TRPO 相同）。
 2. **第二项**：$\text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t$ 将重要性比率强行截断在 $[0.8, 1.2]$ 之间。
 3. **取最小值 (min)**：构建悲观的下界（Pessimistic Bound）。
@@ -174,6 +175,7 @@ PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 
 在 PPO 中，我们不仅需要加载庞大的 Actor 模型，还需要加载一个同样庞大的 Critic 模型来估计价值函数。这往往超出了单张甚至多张 GPU 的显存极限。
 
 为了解决这个问题，学术界演化出了两条不同的路线：
+
 1. **绕过强化学习**：直接使用偏好数据优化语言模型，即 **DPO (Direct Preference Optimization)** 算法。
 2. **改进强化学习**：丢弃 Critic 网络，通过组内相对评分估计优势，即 **GRPO (Group Relative Policy Optimization)** 算法。
 

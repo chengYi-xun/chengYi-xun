@@ -39,6 +39,7 @@ $$
 $$p_\theta(x) = \frac{\exp(-E_\theta(x))}{Z_\theta}$$
 
 其中：
+
 - $E_\theta(x)$ 为能量函数，由参数 $\theta$ 参数化
 - $Z_\theta = \int \exp(-E_\theta(x)) \mathrm{d}x$ 为配分函数，确保归一化条件 $\int p_\theta(x) \mathrm{d}x = 1$ 成立
 

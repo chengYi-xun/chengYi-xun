@@ -181,6 +181,7 @@ log_prob_z = -0.5 * torch.sum(z**2, dim=1) - 0.5 * z.shape[1] * torch.log(2 * to
 ```
 
 代码与公式的对应关系：
+
 - `torch.sum(z**2, dim=1)` ↔ $\|z\|^2$ （向量的平方和）
 - `-0.5 * z.shape[1] * torch.log(2 * torch.pi)` ↔ $-\frac{d}{2}\log(2\pi)$ （归一化常数）
 

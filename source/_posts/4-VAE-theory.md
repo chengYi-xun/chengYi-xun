@@ -44,6 +44,7 @@ $$
 缺点：
 
 1. **潜在空间无规律性**：自编码器训练时只关注重构误差，并不保证潜在空间 $z$ 的连续性和规律性。这意味着：
+
    - 相似的输入可能被映射到潜在空间中相距很远的位置
    - 潜在空间中相邻的点解码后可能产生完全不同的输出
    - 无法通过在潜在空间中插值来生成有意义的新样本
@@ -58,6 +59,7 @@ $$
 为了解决上述问题，我们需要对传统自编码器进行根本性的改进。核心思想是**引入概率框架**，将确定性的编码-解码过程转换为概率生成模型。具体而言：
 
 1. **概率化建模**：
+
    - 编码器：$q_\phi(z|x)$ - 将输入数据映射为潜在变量的概率分布
    - 解码器：$p_\theta(x|z)$ - 从潜在变量生成数据的概率分布  
    - 先验分布：$p(z)$ - 对潜在空间结构的约束
@@ -129,6 +131,7 @@ $$Loss = \mathbb{E}_{z \sim q(z|x)}[-\log p_\theta(x|z)] + \text{KL}(q_\phi(z|x)
    \end{align*}$$
    
    当假设各维度独立时，$\Sigma_\phi(x) = \text{diag}(\sigma^2_\phi(x)_1, ..., \sigma^2_\phi(x)_d)$，则：
+
    - $\text{tr}(\Sigma_\phi(x)) = \sum_{i=1}^{d} \sigma^2_\phi(x)_i$
    - $\mu_\phi(x)^T\mu_\phi(x) = \sum_{i=1}^{d} \mu^2_\phi(x)_i$
    - $\log\det(\Sigma_\phi(x)) = \sum_{i=1}^{d} \log\sigma^2_\phi(x)_i$
@@ -160,6 +163,7 @@ $$Loss = \mathbb{E}_{z \sim q(z|x)}[-\log p_\theta(x|z)] + \text{KL}(q_\phi(z|x)
    $$-\log p_\theta(x|z) = \frac{D}{2}\log(2\pi) + \frac{1}{2}\log\det(\Sigma_\theta(z)) + \frac{1}{2}(x - \mu_\theta(z))^T\Sigma_\theta^{-1}(z)(x - \mu_\theta(z))$$
 
    其中：
+
    - **D** 是数据的维度（例如，对于28×28的MNIST图像，D=784）
    - 第一项 $\frac{D}{2}\log(2\pi)$ 是归一化常数项
    - 第二项是协方差矩阵行列式的对数
@@ -172,6 +176,7 @@ $$= \frac{D}{2}\log(2\pi) + \frac{D}{2}\log\sigma^2 + \frac{1}{2\sigma^2}\|x - \
 $$\Rightarrow \frac{1}{2\sigma^2}\|x - \mu_\theta(z)\|^2 \quad \text{(MSE Loss!)}$$
 
 **注意事项**：
+
 1. nn.MSELoss在计算均方误差时默认是对所有维度上取平均的，返回值是针对一个像素维度的平均值。也就是对每个样本的所有元素的平方差进行求和，然后除以元素总数，这意味着在每个样本的所有预测值和目标值之间的所有元素上都会计算平均值。
 2. 但是二项KL散度的结果是在latent维度上的和，两loss在量级上容易失衡
 3. 方法一：MSELoss在batch维度算平均；方法二：KL项前加系数缩小

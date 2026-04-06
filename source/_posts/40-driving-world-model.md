@@ -280,6 +280,7 @@ $$
 $$
 
 其中：
+
 - $o_t$ 是观测（像素 / 点云 / 占用网格 / BEV）
 - $a_t$ 是驾驶动作（速度、转向角）
 - $c$ 是上下文（HD Map、天气、交通规则）
@@ -294,6 +295,7 @@ a^*_{t:t+H-1} = \arg\max_{a_{t:t+H-1}} \mathbb{E}_{\hat{o} \sim \mathcal{W}_\the
 $$
 
 奖励函数 $r$ 包括：
+
 - **安全**：$r_{\text{safe}} = -\mathbb{1}[\text{碰撞}]$（不碰撞）
 - **舒适**：$r_{\text{comfort}} = -\|a_t - a_{t-1}\|^2$（动作平滑）
 - **效率**：$r_{\text{progress}} = v_t \cos(\theta_t)$（沿目标方向前进）
