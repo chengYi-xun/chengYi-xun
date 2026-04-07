@@ -62,20 +62,40 @@ $$\sigma_R = \sqrt{\frac{(1-0.5)^2 + (1-0.5)^2 + (0-0.5)^2 + (0-0.5)^2}{4}} = 0.
 
 ---
 
+# GRPO 的理论根源：从 REINFORCE 到组内相对优势
+
+在深入数学推导之前，先理清 GRPO 的理论脉络——它并不是凭空发明的，而是 **REINFORCE with Baseline** 的一个聪明的工程变体。
+
+回顾第一篇（RL 基础）中的 REINFORCE with Baseline：
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot (G_t - b(s_t)) \right]
+$$
+
+其中基线 $b(s_t)$ 可以是任何不依赖于动作 $a_t$ 的量——经典选择是**学习一个价值网络** $V_\phi(s_t)$，这就是 Actor-Critic / PPO 的路线（需要 Critic 模型，显存翻倍）。
+
+**GRPO 的关键洞察**：在语言模型场景中，基线有一个更自然的选择——**同一个 Prompt 下多个采样回答的经验均值**。这个选择的理论合理性在于：
+
+- 数学上，$b(s) = \mathbb{E}_{o \sim \pi_\theta(\cdot|s)}[r(o)]$ 是最优基线（方差最小），而组内均值 $\mu_R = \frac{1}{G}\sum_i r_i$ 正是这个期望的无偏蒙特卡洛估计。
+- 当 $G \to \infty$ 时，$\mu_R \to \mathbb{E}[r]$，组内相对优势 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R}$ 收敛到标准化的优势函数。
+- 标准化（除以 $\sigma_R$）确保优势的尺度不依赖于奖励的绝对值——无论奖励是 $[0, 1]$ 还是 $[-100, 100]$，优势都在 $[-3, 3]$ 左右，梯度尺度稳定。
+
+**与 RLOO 的关系**：RLOO（REINFORCE Leave-One-Out）是另一种去 Critic 的基线选择，它用"除了第 $i$ 个之外其余回答的均值"作为第 $i$ 个回答的基线：$b_i = \frac{1}{G-1}\sum_{j \neq i} r_j$。RLOO 的优势估计方差理论上更低（因为基线与 $r_i$ 独立），但实践中 GRPO 的组内标准化效果同样优秀，且实现更简单。
+
+---
+
 # GRPO 的数学推导与损失函数构建
 
 ## 1. 组内相对优势计算
 
-**一般化的算法原理**：
-
-给定一个输入状态 $s$，策略网络 $\pi_\theta$ 采样出 $G$ 个输出（通常 $G=4 \sim 8$）：
+给定一个输入 Prompt $s$，策略网络 $\pi_\theta$ 采样出 $G$ 个输出（通常 $G=4 \sim 16$）：
 $$
 o_1, o_2, \dots, o_G \sim \pi_\theta(\cdot|s)
 $$
 
-奖励模型对每个输出打分，得到奖励集合 $R = \{r_1, r_2, \dots, r_G\}$。
+奖励模型（或规则判题器）对每个输出打分，得到奖励集合 $R = \{r_1, r_2, \dots, r_G\}$。
 
-我们计算这组奖励的均值 $\mu_R$ 和标准差 $\sigma_R$：
+计算组内均值和标准差：
 $$
 \mu_R = \frac{1}{G} \sum_{i=1}^G r_i, \quad \sigma_R = \sqrt{\frac{1}{G} \sum_{i=1}^G (r_i - \mu_R)^2}
 $$
@@ -84,79 +104,249 @@ $$
 $$
 \hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}
 $$
-其中 $\epsilon$ 是一个极小的常数，防止除以零。
+其中 $\epsilon$ 是极小常数，防止除以零（当所有回答奖励相同时 $\sigma_R = 0$）。
 
 回到数学题的例子：$\mu_R = 0.5$, $\sigma_R = 0.5$, 所以 $\hat{A}_1 = \hat{A}_2 = +1$, $\hat{A}_3 = \hat{A}_4 = -1$。正确答案获得正优势，错误答案获得负优势——无需 Critic 网络，纯粹靠组内对比。
 
-## 2. KL 散度正则化
+**极端情况分析**：
+- 全对 $r = [1,1,1,1]$：$\sigma_R = 0$，$\hat{A}_i = 0$ → 不更新（都对了，没什么可学的）。
+- 全错 $r = [0,0,0,0]$：$\sigma_R = 0$，$\hat{A}_i = 0$ → 不更新（都错了，没有正样本可以学习）。
+- 一对三错 $r = [1,0,0,0]$：$\hat{A}_1 = +1.73$，$\hat{A}_{2,3,4} = -0.58$ → 大力强化唯一的正确回答。
 
-为了防止模型在追求高奖励的过程中"钻空子"（Reward Hacking）或丧失语言的连贯性，我们需要约束更新后的策略 $\pi_\theta$ 不要偏离初始参考策略 $\pi_{\text{ref}}$ 太远。
+这种"全对/全错时不更新"的行为看似浪费，但实际上非常合理——它避免了在没有区分信号时引入噪声梯度。
 
-在 GRPO 中，KL 散度惩罚被直接集成到损失函数中，采用了一种无偏的估计量：
+## 2. KL 散度正则化：为什么用这个特殊形式？
+
+为了防止策略"钻空子"（Reward Hacking）或丧失语言连贯性，需要约束 $\pi_\theta$ 不偏离参考策略 $\pi_{\text{ref}}$ 太远。
+
+标准的 KL 散度 $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \mathbb{E}_{o \sim \pi_\theta}\left[\log \frac{\pi_\theta(o|s)}{\pi_{\text{ref}}(o|s)}\right]$ 需要对 $\pi_\theta$ 的完整分布求期望，但我们手头只有来自 $\pi_{\theta_{\text{old}}}$ 的采样。GRPO 使用了一种**基于样本的无偏 KL 估计量**：
+
 $$
-\mathbb{D}_{\text{KL}}(\pi_\theta || \pi_{\text{ref}}) = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - \log \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - 1
+\hat{D}_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - \log \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - 1
 $$
+
+**这个公式从何而来？** 令 $u = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}$，则上式就是 $f(u) = u - \log u - 1$。这是一个以 $u=1$ 为最小值点的非负凸函数（$f(1) = 0$, $f''(u) = 1/u^2 > 0$）。它本质上是**反向 KL 散度**的 $f$-散度形式。
+
+更直观地理解：
+- 当 $\pi_\theta = \pi_{\text{ref}}$ 时，$u = 1$，惩罚为 0——不偏离，不惩罚。
+- 当 $\pi_\theta(o_i|s) \ll \pi_{\text{ref}}(o_i|s)$ 时，$u \gg 1$，$u - \log u - 1$ 近似为 $u$（线性增长）——模型大幅减小某些回答概率时受到惩罚。
+- 当 $\pi_\theta(o_i|s) \gg \pi_{\text{ref}}(o_i|s)$ 时，$u \to 0$，$-\log u$ 主导（对数增长）——模型大幅增大某些回答概率时也受到惩罚。
+
+> **与 PPO (RLHF) 的 KL 惩罚对比**：PPO 中的 KL 惩罚 $\beta \cdot (\log \pi_\theta - \log \pi_{\text{ref}})$ 是逐 token 加到奖励上的（见上一篇的 `kl_penalty`）。GRPO 则将 KL 惩罚直接作为损失的一部分，并使用了这种非对称的 $f$-散度形式，对"概率塌缩"（某些回答概率趋近 0）更加敏感。
+
+### Token 级别的操作
+
+在语言模型中，一个回答 $o_i$ 是一个 token 序列 $o_i = (o_i^1, o_i^2, \dots, o_i^T)$。**重要性比率和 KL 散度都是在 token 级别计算后求和的**：
+
+$$
+\log \pi_\theta(o_i|s) = \sum_{t=1}^{T} \log \pi_\theta(o_i^t | s, o_i^{<t})
+$$
+
+$$
+\rho_i(\theta) = \exp\left(\sum_{t=1}^{T} \left[\log \pi_\theta(o_i^t | s, o_i^{<t}) - \log \pi_{\theta_{\text{old}}}(o_i^t | s, o_i^{<t})\right]\right)
+$$
+
+实际实现中，通常对每个 token 分别计算比率后取平均（而非序列级乘积），以避免长序列导致比率指数级爆炸或塌缩。
 
 ## 3. GRPO 最终目标函数
 
 结合 PPO 的裁剪机制和组内相对优势，GRPO 的最终目标函数（需要最大化）定义为：
 
 $$
-\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{s \sim P(S), \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}} \left[ \frac{1}{G} \sum_{i=1}^G \left( \min \left( \rho_i(\theta) \hat{A}_i, \text{clip}(\rho_i(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_i \right) - \beta \mathbb{D}_{\text{KL}}(\pi_\theta || \pi_{\text{ref}}) \right) \right]
+\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{s \sim P(S), \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}} \left[ \frac{1}{G} \sum_{i=1}^G \left( \min \left( \rho_i(\theta) \hat{A}_i, \text{clip}(\rho_i(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_i \right) - \beta \hat{D}_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) \right) \right]
 $$
 
 其中：
 
 - $\rho_i(\theta) = \frac{\pi_\theta(o_i|s)}{\pi_{\theta_{\text{old}}}(o_i|s)}$ 是重要性采样比率（同 PPO）。
-- $\epsilon$ 是裁剪阈值（如 0.2）。
-- $\beta$ 是 KL 惩罚系数。
+- $\epsilon$ 是裁剪阈值（如 0.2），防止单步更新过大。
+- $\beta$ 是 KL 惩罚系数，控制偏离参考策略的代价。
+- $\hat{A}_i$ 是组内归一化优势，$\hat{D}_{\text{KL}}$ 是 $f$-散度形式的 KL 估计。
 
 回到数学题的例子，这个公式做了两件事：
 
-1. 用 PPO 的裁剪机制，限制正确答案 $o_1, o_2$ 的概率不会一次涨太多（$\hat{A}_i = +1$），错误答案 $o_3, o_4$ 的概率不会一次降太多（$\hat{A}_i = -1$）。
-2. 用 KL 散度约束模型不要为了做对数学题而丧失自然语言能力。
+1. **裁剪机制**：限制正确答案 $o_1, o_2$ 的概率不会一次涨太多（$\hat{A}_i = +1$），错误答案 $o_3, o_4$ 的概率不会一次降太多（$\hat{A}_i = -1$）——保证信任域约束。
+2. **KL 正则**：约束模型不要为了做对数学题而丧失自然语言能力——维持生成质量。
 
 ---
 
-# GRPO 与 PPO 的对比总结
+# GRPO 的完整实现
 
-| 特性 | PPO | GRPO / RLOO |
-| :--- | :--- | :--- |
-| **基线 (Baseline) 估计** | 依赖独立的 Critic 网络预测绝对价值 $V(s)$ | 依赖同一 Prompt 下 $G$ 个采样的经验均值 |
-| **显存开销** | 极高（需要加载 Actor 和 Critic 两个大模型） | 显著降低（彻底抛弃 Critic 网络） |
-| **计算开销** | 较低（每个 Prompt 采样 1 次即可更新） | 较高（每个 Prompt 需要采样 $G$ 次） |
-| **优势估计方差** | 较低（Critic 经过充分训练后预测稳定） | 依赖于组大小 $G$，$G$ 越小方差越大，但无偏差 |
-| **核心优势** | 经典、稳定，适用于所有 RL 任务 | 完美契合大模型生成任务，实现高效在线 RL |
+以下是 GRPO 的完整 PyTorch 实现伪代码，包括数据准备、模型定义、采样、优势计算和训练循环。
 
-**用数学题的例子理解核心区别**：PPO 需要一个 Critic 网络来回答"这道积分题的平均得分大概是多少"——这需要额外的显存和训练。GRPO 则说"不用猜了，我直接让模型做 4 遍，用这 4 次的实际得分算平均就行"——用计算（多次采样）换显存（去掉 Critic），这对生成式大模型来说是一笔极其划算的交易。
+**Step 1: 数据格式 — Prompt 数据集 + 奖励函数**
 
-**开源代码参考：**
-GRPO 随着 DeepSeek 的开源而爆火，目前 Hugging Face 的 **TRL** 库已经快速跟进并提供了 `trl.GRPOTrainer`。其核心的优势计算与损失函数的 PyTorch 伪代码如下：
+与 DPO 不同，GRPO 是**在线**算法：不需要预先收集偏好对，只需要 Prompt 和一个能打分的奖励函数。
 
 ```python
-# rewards: 形状为 [batch_size, G] 的奖励张量
-# log_probs, old_log_probs, ref_log_probs: 形状均为 [batch_size, G] 的对数概率
+"""
+GRPO 数据格式：只需要 Prompt 集合 + 奖励函数
+- Prompt 集合: 来自训练数据（如数学题、编程题、对话 Prompt）
+- 奖励函数: 可以是规则判题器（数学题判对错）、奖励模型、或两者结合
 
-# 1. 计算组内相对优势
-mean_rewards = rewards.mean(dim=1, keepdim=True)
-std_rewards = rewards.std(dim=1, keepdim=True)
-advantages = (rewards - mean_rewards) / (std_rewards + 1e-8)
-
-# 2. 计算重要性采样比率
-ratio = torch.exp(log_probs - old_log_probs)
-
-# 3. 计算 PPO 风格的裁剪损失
-surr1 = ratio * advantages
-surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * advantages
-policy_loss = -torch.min(surr1, surr2)
-
-# 4. 计算 KL 散度惩罚
-kl = torch.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1.0
-
-# 5. 总损失
-loss = (policy_loss + beta * kl).mean()
+与 DPO 的本质区别:
+  DPO: 离线 — 需要预先标注好的 (prompt, chosen, rejected) 三元组
+  GRPO: 在线 — 只需要 prompt，模型自己生成 + 自己评判
+"""
+prompts = load_dataset("math_problems")  # 只有 Prompt，没有标注答案
+def reward_fn(prompt, response):
+    """奖励函数：判题器 (可以是规则匹配、奖励模型、或混合)"""
+    return 1.0 if verify_math_answer(prompt, response) else 0.0
 ```
 
-GRPO 优雅地去除了 Critic 网络，用组内相对优势实现了高效的对比学习。它证明了在生成式大模型时代，简单的经验统计往往比复杂的神经网络预测更加鲁棒和高效。
+**Step 2: 模型定义 — 只需要两个模型！**
+
+GRPO 的一大优势：与 DPO 一样只需要两个模型，但保留了在线 RL 的探索能力。
+
+```python
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# 模型 1: 待训练的策略模型 (Actor)
+actor = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+# 模型 2: 冻结的参考模型 (Reference) — SFT 后的快照
+ref_model = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+ref_model.requires_grad_(False)
+
+# 对比:
+#   PPO:  Actor + Critic + Reference + Reward Model = 4 个模型
+#   DPO:  Actor + Reference = 2 个模型 (但是离线)
+#   GRPO: Actor + Reference = 2 个模型 (在线!)
+
+tokenizer = AutoTokenizer.from_pretrained("sft_checkpoint")
+optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
+
+# 超参数
+G = 8            # 每个 Prompt 采样的回答数量
+clip_range = 0.2 # PPO 裁剪阈值 ε
+beta = 0.04      # KL 惩罚系数
+K_epochs = 2     # 每批数据的更新轮数 (重要性采样允许多次更新)
+```
+
+**Step 3: 在线采样 + 奖励收集**
+
+这是 GRPO 与 DPO 的核心区别——GRPO 用当前策略**在线生成**回答并即时评分：
+
+```python
+def collect_group_rollouts(actor, prompts_batch, G, reward_fn):
+    """对每个 Prompt 采样 G 个回答并打分"""
+    all_prompt_ids, all_response_ids, all_rewards = [], [], []
+    all_old_log_probs, all_ref_log_probs = [], []
+
+    actor.eval()
+    with torch.no_grad():
+        for prompt in prompts_batch:
+            prompt_ids = tokenizer.encode(prompt, return_tensors="pt")
+            for _ in range(G):
+                # 用当前策略采样一个回答 (temperature sampling)
+                response_ids = actor.generate(prompt_ids, max_new_tokens=512,
+                                               do_sample=True, temperature=0.7)
+                response_text = tokenizer.decode(response_ids[0])
+
+                # 奖励函数打分 (规则判题器 / 奖励模型)
+                reward = reward_fn(prompt, response_text)
+
+                # 计算当前策略和参考策略的 token 级对数概率
+                old_logps = compute_token_log_probs(actor, prompt_ids, response_ids)
+                ref_logps = compute_token_log_probs(ref_model, prompt_ids, response_ids)
+
+                all_prompt_ids.append(prompt_ids)
+                all_response_ids.append(response_ids)
+                all_rewards.append(reward)
+                all_old_log_probs.append(old_logps)
+                all_ref_log_probs.append(ref_logps)
+
+    actor.train()
+    return all_prompt_ids, all_response_ids, all_rewards, all_old_log_probs, all_ref_log_probs
+```
+
+**Step 4: 组内相对优势计算**
+
+```python
+def compute_group_advantages(rewards, G):
+    """
+    将 rewards (长度为 batch_size * G) 重塑为 (batch_size, G)，
+    在 G 维度上做标准化
+    """
+    rewards = torch.tensor(rewards).reshape(-1, G)   # (batch_size, G)
+    mean_r = rewards.mean(dim=1, keepdim=True)        # 组内均值
+    std_r = rewards.std(dim=1, keepdim=True)           # 组内标准差
+    advantages = (rewards - mean_r) / (std_r + 1e-8)  # 标准化
+    return advantages.reshape(-1)                      # 展平回 (batch_size * G,)
+```
+
+**Step 5: 完整训练循环**
+
+```python
+for step in range(total_steps):
+    # --- 阶段 1: 在线采样 (GRPO 独有的 — DPO 没有这一步) ---
+    prompts_batch = sample_prompts(prompts, batch_size=8)
+    prompt_ids, response_ids, rewards, old_log_probs, ref_log_probs = \
+        collect_group_rollouts(actor, prompts_batch, G, reward_fn)
+
+    # --- 阶段 2: 计算组内相对优势 ---
+    advantages = compute_group_advantages(rewards, G)
+
+    # --- 阶段 3: 多 epoch 更新 (重要性采样允许复用数据) ---
+    for epoch in range(K_epochs):
+        for idx in minibatch_indices(len(response_ids), batch_size=16):
+            # 用当前 actor 重新计算 token 级对数概率
+            new_log_probs = compute_token_log_probs(actor, prompt_ids[idx], response_ids[idx])
+
+            # 重要性采样比率 (token 级求和后取 exp)
+            log_ratio = new_log_probs - old_log_probs[idx]
+            ratio = torch.exp(log_ratio)
+
+            # PPO 裁剪目标
+            adv = advantages[idx]
+            surr1 = ratio * adv
+            surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * adv
+            policy_loss = -torch.min(surr1, surr2).mean()
+
+            # KL 散度惩罚 (f-散度形式: u - log u - 1, 其中 u = π_ref/π_θ)
+            log_ref_ratio = ref_log_probs[idx] - new_log_probs
+            kl_penalty = (torch.exp(log_ref_ratio) - log_ref_ratio - 1.0).mean()
+
+            # 总损失
+            loss = policy_loss + beta * kl_penalty
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
+            optimizer.step()
+
+    # --- 阶段 4: 同步旧策略 ---
+    # old_policy ← current_policy (下一轮采样用更新后的策略)
+    # 注意: 与 PPO 不同，GRPO 通常每轮都重新采样，不需要显式的 old_policy 拷贝
+```
+
+> **与 DPO 训练循环的关键对比**：
+> - DPO 只有"前向传播 + 损失计算 + 反向传播"，与标准 SFT 训练几乎一样。
+> - GRPO 多了"在线采样"阶段（调用 `actor.generate()`），这是计算开销的主要来源，但也是在线 RL 探索能力的来源。
+> - DPO 的 batch 是固定的偏好对；GRPO 的 batch 是模型自己实时生成的，每步训练都能看到新的探索结果。
+
+---
+
+# GRPO 与 PPO / DPO 的全景对比
+
+| 维度 | PPO (RLHF) | DPO | GRPO |
+| :---: | :---: | :---: | :---: |
+| **模型数量** | 4 (Actor+Critic+Ref+RM) | 2 (Actor+Ref) | 2 (Actor+Ref) + 外部奖励函数 |
+| **训练方式** | 在线 RL | 离线监督学习 | 在线 RL |
+| **基线估计** | Critic 网络 $V_\phi(s)$ | 无需基线 | 组内经验均值 $\mu_R$ |
+| **显存开销** | 极高 (4 个大模型) | 低 (2 个大模型) | 低 (2 个大模型) |
+| **计算开销** | 中等 (每 Prompt 采样 1 次) | 最低 (纯前向传播) | 较高 (每 Prompt 采样 G 次) |
+| **探索能力** | 强 | 弱 (离线数据) | 强 |
+| **核心优势** | 经典稳定 | 极简高效 | 省显存 + 在线探索 |
+
+**用数学题的例子理解三者区别**：
+- **PPO**：需要一个 Critic 网络回答"这道积分题的平均得分大概是多少"——需要额外显存训练 Critic。
+- **DPO**：需要一份标注好的数据"正确答案 $\frac{1}{3}$ vs 错误答案 $\frac{1}{2}$"——需要预先标注，无法在线探索。
+- **GRPO**：让模型做 8 遍，用 8 次实际得分算平均——用计算（多次采样）换显存（去掉 Critic），保留在线探索。
+
+**开源代码参考：** GRPO 随 DeepSeek 开源而爆火，Hugging Face **TRL** 库 ([`trl.GRPOTrainer`](https://huggingface.co/docs/trl/grpo_trainer)) 提供了生产级实现。
+
+GRPO 证明了在生成式大模型时代，简单的经验统计（组内均值）往往比复杂的神经网络预测（Critic）更加鲁棒和高效。
 
 > 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/21-flow-grpo/)

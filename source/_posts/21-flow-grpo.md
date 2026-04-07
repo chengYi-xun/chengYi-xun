@@ -51,119 +51,249 @@ series: Diffusion Models theory
 
 **核心思考出发点**：由于像 Flux 这样的图像生成模型参数量达到百亿级别，传统的 PPO 算法由于需要额外的 Critic 网络，显存根本无法承受。因此，Flow-GRPO 采用了 GRPO 算法——彻底抛弃 Critic，用"组内相对评分"来实现高效的在线强化学习。
 
-## 核心挑战：连续时间步的动作空间
+## 核心挑战：如何在连续生成过程中定义 $\log \pi_\theta$？
 
-在 LLM 中，动作（Action）是离散的词表（Token），计算 $\log \pi_\theta(a|s)$ 很直接。而在 Flow Matching 中，生成过程是一个连续的常微分方程（ODE）求解过程。
+在 LLM 中，动作（Action）是离散的词表 Token，$\log \pi_\theta(a|s)$ 就是 softmax 输出的对数概率——定义清晰、计算简单。然而在 Flow Matching 中，生成过程是一个**连续的常微分方程（ODE）求解过程**，没有天然的"离散动作"概念。
 
-**用例子理解**：LLM 生成文本就像逐字写作——每个字是一个离散的"动作"。而 Flux 生成图像像是画画——每个时间步的"动作"是在画布上做一次连续的涂抹（从噪声图向清晰图的一步变换）。
+**用例子理解**：LLM 生成文本就像逐字写作——每个字是一个离散的"动作"，概率就是词表上的 softmax。而 Flux 生成图像像是画画——每个时间步的"动作"是在画布上做一次**连续的涂抹**（从噪声图向清晰图的一步变换），这是一个高维连续向量，不存在离散概率。
 
-**如何定义图像生成中的 Action？**
-Flow-GRPO 将**整个去噪轨迹**视为一个宏观的 Action。在计算对数概率 $\log \pi_\theta(a|s)$ 时，将其分解为每个时间步 $t$ 的转移概率 $\log p_\theta(x_{t-\Delta t} | x_t)$ 的累加。
+### 将去噪过程建模为 MDP
+
+Flow-GRPO 的第一个关键设计是：将 Flow Matching 的去噪过程定义为一个 **马尔可夫决策过程**：
+
+| MDP 要素 | LLM (GRPO) | 图像生成 (Flow-GRPO) |
+|:---:|:---|:---|
+| **状态** $s_t$ | $(x, y_{<t})$ (Prompt + 已生成 token) | $(x_t, t, c)$ (当前噪声图 + 时间步 + 文本条件) |
+| **动作** $a_t$ | 下一个 token $y_t \in \mathcal{V}$（离散） | 预测的速度场 $v_\theta(x_t, t, c)$（连续向量） |
+| **转移** | 确定性：拼接 $y_t$ 到序列 | 确定性 ODE 步：$x_{t-\Delta t} = x_t - \Delta t \cdot v_\theta$ |
+| **奖励** | 只在最后一步（整句完成后打分） | 只在最后一步（整张图生成后打分） |
+
+### 推导 Flow Matching 中的对数概率
+
+在 Flow Matching 框架中，前向过程（加噪）定义为线性插值：
+
+$$
+x_t = (1 - t) \cdot x_0 + t \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
+$$
+
+其中 $x_0$ 是干净图像，$\epsilon$ 是纯噪声，$t \in [0, 1]$。模型 $v_\theta(x_t, t, c)$ 学习预测速度场（即 $x_0$ 到 $\epsilon$ 方向的向量场）。
+
+在去噪（生成）过程中，每一步的转移可以写成：
+
+$$
+x_{t - \Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c)
+$$
+
+**如何从这个过程中提取对数概率？** 关键观察：如果我们在每一步都加入微小的高斯扰动（将 ODE 变成 SDE），那么转移概率就有了明确的定义：
+
+$$
+p_\theta(x_{t-\Delta t} | x_t, c) = \mathcal{N}\left(x_{t-\Delta t}; \; x_t - \Delta t \cdot v_\theta(x_t, t, c), \; \sigma_t^2 I\right)
+$$
+
+对应的对数概率为：
+
+$$
+\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\| x_{t-\Delta t} - (x_t - \Delta t \cdot v_\theta(x_t, t, c)) \|^2}{2\sigma_t^2} + \text{const}
+$$
+
+**直觉理解**：模型预测的"涂抹方向"是 $v_\theta$，实际走的方向可能略有偏差。偏差越小（$\|x_{t-\Delta t} - \hat{x}_{t-\Delta t}\|^2$ 越小），对数概率越高——模型对自己的生成轨迹越"有信心"。
+
+整条轨迹（$T$ 步去噪）的总对数概率是所有时间步的累加：
+
+$$
+\log \pi_\theta(\text{trajectory} | c) = \sum_{k=1}^{T} \log p_\theta(x_{t_k - \Delta t} | x_{t_k}, c)
+$$
+
+这就与 LLM 中 token 级对数概率求和的形式完全对应了——至此，GRPO 的整套框架可以无缝迁移到图像生成。
 
 ---
 
-# Flux 模型的 GRPO 训练流程
+# Flow-GRPO 完整实现
 
-结合 `flow_grpo` 仓库中的代码，Flux 模型的 GRPO 训练流程可以用橘猫的例子串起来：
-
-## 1. 奖励模型设计 (Reward Composition)
-
-在 `flow_grpo/rewards.py` 中，框架支持组合多种奖励函数：
-
-- **Aesthetic Score**：美学评分（画面构图、色彩是否和谐）
-- **ImageReward / PickScore**：综合评分（是否符合人类偏好）
-- **CLIP Score**：图文匹配度（图像是否忠实于 Prompt "一只橘猫坐在蓝色沙发上"）
-
-在我们的例子中，图 3（白猫）的 CLIP Score 会很低（颜色不匹配），所以总奖励最低。
-
-## 2. 组内采样与优势计算 (Group Sampling & Advantage)
-
-对于每个 Prompt，模型并行生成 $G$ 张图像（通常 $G=4$ 或 $8$），然后用我们在上一篇推导的公式计算相对优势 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$。
-
-## 3. 损失计算与梯度反传 (Loss Computation)
-
-这是最核心的部分。在代码实现中（参考 `flow_grpo/diffusers_patch/`）：
-
-- 模型不仅输出生成的图像，还会记录生成轨迹中每一步的隐变量 $x_t$ 和模型预测的速度场 $v_\theta$。
-- 通过计算 $\log p_\theta(x_{t-\Delta t} | x_t)$，累加得到整条轨迹的对数概率 $\log P_\theta$。
-- 参考模型（冻结的预训练模型）同样计算这条轨迹的对数概率 $\log P_{\text{ref}}$。
-
-**GRPO 损失函数代码级映射**：
-$$
-\mathcal{L} = - \frac{1}{G} \sum_{i=1}^G \left( \exp(\log P_\theta^{(i)} - \log P_{\theta_{\text{old}}}^{(i)}) \cdot \hat{A}_i - \beta (\log P_{\text{ref}}^{(i)} - \log P_\theta^{(i)}) \right)
-$$
-*(注：实际代码中会包含 PPO 的 Clip 操作，此处为简化表达)*
-
-在我们的橘猫例子中：图 1（清晰橘猫，$\hat{A} = +1.27$）的正向梯度会推动模型在类似 Prompt 下生成更清晰、颜色更准确的图像；图 3（白猫，$\hat{A} = -1.50$）的负向梯度会抑制模型产生颜色错误的输出。
-
----
-
-# 代码级解析：深入 `train_flux.py`
+## 1. 模型定义与奖励函数
 
 ```python
-# 1. 初始化模型
-actor_model = FluxPipeline(...) # 需要微调的模型 (通常加 LoRA)
-ref_model = FluxPipeline(...)   # 冻结的参考模型
-reward_model = PickScore(...)   # 奖励模型
+import torch
+import torch.nn.functional as F
 
-for batch in dataloader:
-    prompts = batch["prompts"] # [Batch_size]
-    
-    # 2. 组内采样 (Group Sampling)
-    duplicated_prompts = duplicate(prompts, G)
-    
+# --- 模型定义: 与 LLM GRPO 相同，只需 Actor + Reference ---
+actor_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")
+actor_model.enable_lora(rank=32)  # 用 LoRA 微调，节省显存
+ref_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")
+ref_model.requires_grad_(False)
+
+# 奖励模型: 组合多种评分函数
+reward_models = {
+    "aesthetic": AestheticScore(),     # 美学评分（构图、色彩）
+    "pick_score": PickScore(),         # 人类偏好综合评分
+    "clip_score": CLIPScore(),         # 图文匹配度
+}
+reward_weights = {"aesthetic": 0.3, "pick_score": 0.5, "clip_score": 0.2}
+
+def compute_reward(images, prompts):
+    """组合多种奖励（加权求和）"""
+    total = sum(w * reward_models[k](images, prompts)
+                for k, w in reward_weights.items())
+    return total
+
+optimizer = torch.optim.AdamW(actor_model.lora_parameters(), lr=1e-5)
+G = 4           # 每个 Prompt 生成的图像数
+clip_eps = 0.2  # PPO 裁剪阈值
+beta = 0.01     # KL 惩罚系数
+num_steps = 50  # 去噪步数
+```
+
+## 2. 计算 Flow Matching 轨迹的对数概率
+
+这是 Flow-GRPO 区别于 LLM GRPO 的**核心函数**：
+
+```python
+def compute_trajectory_log_prob(model, trajectory, prompt_embeds, sigma=0.01):
+    """
+    计算一条去噪轨迹的总对数概率。
+
+    trajectory: 记录的中间状态列表 [(x_T, t_T), (x_{T-1}, t_{T-1}), ..., (x_0, t_0)]
+    每一步的对数概率 ∝ -||x_{t-Δt} - (x_t - Δt·v_θ(x_t, t))||² / (2σ²)
+    """
+    total_log_prob = 0.0
+    for k in range(len(trajectory) - 1):
+        x_t, t_k = trajectory[k]
+        x_next_actual, t_next = trajectory[k + 1]
+        dt = t_k - t_next  # Δt (正数，因为从 t=1 向 t=0 去噪)
+
+        # 模型预测速度场
+        v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)
+
+        # 模型预期的下一状态
+        x_next_predicted = x_t - dt * v_pred
+
+        # 对数概率: 高斯转移核
+        log_prob_step = -0.5 * ((x_next_actual - x_next_predicted) ** 2).sum() / (sigma ** 2)
+        total_log_prob = total_log_prob + log_prob_step
+
+    return total_log_prob
+```
+
+## 3. 在线采样：生成图像并记录轨迹
+
+```python
+def generate_with_trajectory(model, prompt_embeds, num_steps):
+    """生成图像，同时记录完整的去噪轨迹用于计算对数概率"""
+    x_t = torch.randn(1, 16, 64, 64)  # 初始纯噪声 (VAE 隐空间)
+    timesteps = torch.linspace(1.0, 0.0, num_steps + 1)
+    trajectory = [(x_t.clone(), timesteps[0])]
+
+    for i in range(num_steps):
+        t_k = timesteps[i]
+        t_next = timesteps[i + 1]
+        dt = t_k - t_next
+
+        with torch.no_grad():
+            v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)
+
+        # Euler 步进 + 微量随机扰动 (将 ODE 变为 SDE，使概率有定义)
+        x_t = x_t - dt * v_pred + sigma * torch.randn_like(x_t) * (dt ** 0.5)
+        trajectory.append((x_t.clone(), t_next))
+
+    image = vae_decode(x_t)
+    return image, trajectory
+```
+
+## 4. 完整训练循环
+
+```python
+for step in range(total_steps):
+    prompts_batch = sample_prompts(dataset, batch_size=4)
+    prompt_embeds = encode_text(prompts_batch)
+
+    # --- 阶段 1: 组内采样 (每个 Prompt 生成 G 张图像) ---
+    all_images, all_trajectories, all_old_logps, all_ref_logps = [], [], [], []
+
     with torch.no_grad():
-        # actor_model 生成图像，并返回轨迹的 log_probs
-        images, old_log_probs, trajectories = actor_model.generate_with_logprob(duplicated_prompts)
-        
-        # 计算奖励（美术老师给每张图打分）
-        rewards = reward_model(images, duplicated_prompts)
-        
-        # 计算参考模型的 log_probs
-        ref_log_probs = ref_model.compute_logprob(trajectories, duplicated_prompts)
-    
-    # 3. 计算相对优势 (Advantage) —— GRPO 的核心
-    # rewards 形状为 [Batch_size, G]
-    mean_rewards = rewards.mean(dim=1, keepdim=True)
-    std_rewards = rewards.std(dim=1, keepdim=True)
-    advantages = (rewards - mean_rewards) / (std_rewards + 1e-8)
-    
-    # 4. 策略更新 (Policy Update)
-    for _ in range(ppo_epochs):
-        current_log_probs = actor_model.compute_logprob(trajectories, duplicated_prompts)
-        
+        for emb in prompt_embeds:
+            for _ in range(G):
+                image, trajectory = generate_with_trajectory(actor_model, emb, num_steps)
+                old_logp = compute_trajectory_log_prob(actor_model, trajectory, emb)
+                ref_logp = compute_trajectory_log_prob(ref_model, trajectory, emb)
+                all_images.append(image)
+                all_trajectories.append(trajectory)
+                all_old_logps.append(old_logp)
+                all_ref_logps.append(ref_logp)
+
+    # --- 阶段 2: 奖励打分 + 组内相对优势 ---
+    rewards = compute_reward(all_images, repeat_prompts(prompts_batch, G))  # (batch*G,)
+    rewards_grouped = rewards.reshape(-1, G)                                 # (batch, G)
+    mean_r = rewards_grouped.mean(dim=1, keepdim=True)
+    std_r = rewards_grouped.std(dim=1, keepdim=True)
+    advantages = ((rewards_grouped - mean_r) / (std_r + 1e-8)).reshape(-1)  # (batch*G,)
+
+    old_logps = torch.stack(all_old_logps)
+    ref_logps = torch.stack(all_ref_logps)
+
+    # --- 阶段 3: 多 epoch 策略更新 ---
+    for epoch in range(K_epochs):
+        # 重新计算当前策略的对数概率 (需要梯度!)
+        new_logps = torch.stack([
+            compute_trajectory_log_prob(actor_model, traj, emb)
+            for traj, emb in zip(all_trajectories, repeat_embeds(prompt_embeds, G))
+        ])
+
         # 重要性采样比率
-        ratio = torch.exp(current_log_probs - old_log_probs)
-        
-        # 裁剪目标（同 PPO）
-        surr1 = ratio * advantages.view(-1)
-        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * advantages.view(-1)
+        ratio = torch.exp(new_logps - old_logps)
+
+        # PPO 裁剪目标 (与 LLM GRPO 完全相同)
+        surr1 = ratio * advantages
+        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
-        
-        # KL 散度惩罚（此处使用一阶近似 E[log(π_θ/π_ref)]，
-        # 与上一篇 GRPO 中的闭合形式 e^(log π_ref - log π_θ) - (log π_ref - log π_θ) - 1 等价于低阶展开，
-        # 在连续动作空间中计算更稳定）
-        kl_loss = (current_log_probs - ref_log_probs).mean()
-        
-        # 总损失
+
+        # KL 散度惩罚
+        kl_loss = (new_logps - ref_logps).mean()
+
         loss = policy_loss + beta * kl_loss
-        
+        optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(actor_model.lora_parameters(), max_norm=1.0)
         optimizer.step()
 ```
 
-## Flow-GRPO-Fast 的优化
+> **与 LLM GRPO 的代码结构对比**：整体框架（组采样 → 优势计算 → 裁剪更新 → KL 惩罚）完全一致。唯一的区别在于**对数概率的计算方式**：LLM 用 token 级 softmax 对数概率求和，Flow-GRPO 用高斯转移核的对数密度求和。
 
-由于生成 $G$ 张图像需要进行几十步的 ODE 求解，采样过程极其耗时。`flow_grpo` 提出了 **Flow-GRPO-Fast** 变体。
+---
 
-**用例子理解**：生成一张 1024x1024 的图像，Flux 默认需要 50 步去噪。生成 4 张就是 200 步。Flow-GRPO-Fast 的做法是：不从纯噪声 $t=1$ 开始，而是从中间时间步 $t_{\text{start}}$ 开始（比如 $t=0.5$），或者减少每张图的采样步数。这极大加速了组内采样的速度。
+## Flow-GRPO-Fast：加速采样的工程优化
 
-**开源代码参考与算法对比：**
-在图像生成的 RLHF 领域，之前主要使用 DPO（如 `Diffusion-DPO`）或 PPO（如 `DDPO`）。
+全量去噪采样是 Flow-GRPO 的计算瓶颈——生成一张 1024×1024 图像，Flux 默认需要 50 步 ODE 求解。每个 Prompt 生成 $G=4$ 张就是 200 步，每个训练 step 有 4 个 Prompt 就是 800 步。Flow-GRPO 提出了两种加速策略：
 
-- **Diffusion-DPO** 只能进行离线学习，无法在训练中探索新的图像空间。
-- **DDPO** 使用了 PPO，但需要维护 Critic 网络，对于 Flux 这种 12B 的模型几乎不可能单卡运行。
-- **Flow-GRPO** 完美结合了 Flow Matching 和 GRPO，彻底抛弃了 Critic，使得百亿参数图像大模型的在线 RL 成为可能。
+### 策略 1：部分去噪（Partial Denoising）
+
+不从纯噪声 $t=1$ 开始，而是从中间时间步 $t_{\text{start}}$ 开始（如 $t=0.5$）：
+
+$$
+x_{t_{\text{start}}} = (1 - t_{\text{start}}) \cdot x_0^{\text{ref}} + t_{\text{start}} \cdot \epsilon
+$$
+
+其中 $x_0^{\text{ref}}$ 是参考模型生成的一张"参考图"。这样只需去噪 $t_{\text{start}} \times T$ 步（比如 25 步而非 50 步），速度翻倍。
+
+**代价**：生成多样性降低（所有 $G$ 张图都从同一个"参考半成品"出发），但对于微调场景通常足够。
+
+### 策略 2：减少采样步数
+
+直接减少 ODE 求解步数（如从 50 步减到 20 步），配合高阶 ODE 求解器（如 DPM-Solver++）。精度略有下降，但速度大幅提升。
+
+---
+
+# 算法对比与开源生态
+
+| 维度 | Diffusion-DPO | DDPO (PPO) | Flow-GRPO |
+|:---:|:---:|:---:|:---:|
+| **训练方式** | 离线（偏好对） | 在线 RL | 在线 RL |
+| **需要 Critic** | 否 | 是 | **否** |
+| **基线估计** | 无 | Critic $V_\phi$ | 组内均值 |
+| **适用模型** | DDPM / LDM | DDPM / LDM | **Flow Matching (Flux)** |
+| **显存** | 低 | 极高 | **低** |
+| **探索能力** | 弱 | 强 | 强 |
+
+**开源代码参考：** [flow_grpo](https://github.com/yifan123/flow_grpo) 提供了基于 Flux 的完整实现，支持 LoRA 微调、多 GPU 训练和 Flow-GRPO-Fast 加速。
 
 ---
 

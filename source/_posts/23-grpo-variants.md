@@ -95,19 +95,60 @@ $$
 
 其中 $C_\varepsilon^{\pm}$ 是 PPO 风格的裁剪，$o^+$ 和 $o^-$ 是根据奖励划分的正确/错误回答。
 
-**代码对比**：
+### 2-GRPO 的完整实现
 
 ```python
-# 标准 16-GRPO
-prompts = sample(32)                        # 32 个 Prompt
-responses = model.generate(prompts, G=16)   # 每个 16 个回答 → 512 rollouts
-advantages = group_normalize(rewards)       # 组内归一化
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM
 
-# 2-GRPO（相同总 rollout 数 = 512）
-prompts = sample(256)                       # 256 个 Prompt
-responses = model.generate(prompts, G=2)    # 每个 2 个回答 → 512 rollouts
-advantages = group_normalize(rewards)       # 退化为 ±1 对比
+# 模型定义: 与标准 GRPO 完全相同
+actor = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+ref_model = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+ref_model.requires_grad_(False)
+optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
+
+G = 2            # 核心区别: 只用 2 个 rollout!
+clip_range = 0.2
+beta = 0.04
+
+for step in range(total_steps):
+    # 2-GRPO 用更多 Prompt 补偿 G 的减少 (保持总 rollout 数不变)
+    # 标准 GRPO: 32 prompts × 16 rollouts = 512 总量
+    # 2-GRPO:   256 prompts × 2 rollouts  = 512 总量 (Prompt 多样性 ↑)
+    prompts_batch = sample_prompts(dataset, batch_size=256)
+
+    with torch.no_grad():
+        all_responses, all_rewards, all_old_logps, all_ref_logps = [], [], [], []
+        for prompt in prompts_batch:
+            for _ in range(G):
+                response = actor.generate(prompt, do_sample=True)
+                reward = reward_fn(prompt, response)
+                old_logp = compute_log_probs(actor, prompt, response)
+                ref_logp = compute_log_probs(ref_model, prompt, response)
+                all_responses.append(response)
+                all_rewards.append(reward)
+                all_old_logps.append(old_logp)
+                all_ref_logps.append(ref_logp)
+
+    # G=2 时的优势计算: 退化为简单的符号翻转
+    rewards = torch.tensor(all_rewards).reshape(-1, 2)         # (256, 2)
+    valid_mask = (rewards[:, 0] != rewards[:, 1])               # 只保留一对一错的组
+    if valid_mask.sum() == 0:
+        continue
+
+    mean_r = rewards[valid_mask].mean(dim=1, keepdim=True)
+    std_r = rewards[valid_mask].std(dim=1, keepdim=True)
+    advantages = ((rewards[valid_mask] - mean_r) / (std_r + 1e-8)).reshape(-1)
+    # 对于二值奖励 (+1, -1), advantages 恰好是 (+1, -1) — 纯粹的对比信号
+
+    # 多 epoch 更新 (与标准 GRPO 相同)
+    for epoch in range(K_epochs):
+        # ... (裁剪损失 + KL 惩罚，代码结构与 GRPO 完全一致)
+        pass
 ```
+
+**2-GRPO 的核心优势**：相同总 rollout 预算下，2-GRPO 用了 256 个不同的 Prompt（vs 标准 GRPO 的 32 个），**Prompt 多样性提升 8 倍**。实验表明，更多的 Prompt 比更精确的基线估计更重要。
 
 **总结**：GRPO 的第一重面孔——它是**在线版的 DPO**，核心机制是**对比学习**，不是精确的基线估计。
 
@@ -201,6 +242,74 @@ f-GRPO 在 Qwen2.5-Math 1.5B/7B 上的数学推理实验中，**所有测试的 
 | 逆 KL | 79.41 | +5.15 |
 
 Pearson $\chi^2$ 散度在数学推理任务上表现最优，可能是因为其对奖励分布尾部的二次敏感性更适合稀疏二值奖励场景。
+
+### f-GRPO 的具体实现
+
+不同 f-散度的选择对应不同的链接函数 $g$ 和共轭函数 $f^*$。以下是几种常见散度的实现：
+
+```python
+import torch
+import torch.nn.functional as F
+
+def f_grpo_loss(log_probs, ref_log_probs, old_log_probs, advantages,
+                loss_mask, f_type="pearson_chi2", beta=0.1):
+    """
+    f-GRPO 损失函数，支持多种 f-散度。
+
+    核心区别: 对正优势和负优势的回答使用不同的链接函数，
+    而标准 GRPO 对两侧使用相同的裁剪机制。
+    """
+    # 隐式奖励 (与 DPO 相同的定义)
+    implicit_reward = beta * (log_probs - ref_log_probs)
+
+    # 将回答分为正侧 (A > 0) 和负侧 (A ≤ 0)
+    pos_mask = (advantages > 0).float().unsqueeze(-1) * loss_mask
+    neg_mask = (advantages <= 0).float().unsqueeze(-1) * loss_mask
+
+    if f_type == "pearson_chi2":
+        # f(t) = (t-1)², f*(s) = s + s²/4
+        # 正侧: g(r) = r (identity link)
+        # 负侧: f*(g(r)) = r + r²/4
+        pos_loss = -implicit_reward                             # 最大化隐式奖励
+        neg_loss = implicit_reward + implicit_reward ** 2 / 4   # 二次惩罚偏离
+
+    elif f_type == "hellinger":
+        # f(t) = (√t - 1)², f*(s) = s/(1-s)
+        # 正侧: g(r) = 1 - exp(-r) (饱和链接)
+        # 负侧: f*(g(r)) 
+        g_r = 1.0 - torch.exp(-implicit_reward)
+        pos_loss = -g_r
+        neg_loss = g_r / (1.0 - g_r + 1e-8)
+
+    elif f_type == "reverse_kl":
+        # f(t) = -ln t, f*(s) = -1 - ln(-s)
+        pos_loss = -implicit_reward
+        neg_loss = -1.0 - torch.log(-implicit_reward.clamp(max=-1e-8))
+
+    elif f_type == "js":
+        # Jensen-Shannon: f(t) = t ln t - (t+1) ln((t+1)/2)
+        ratio = torch.exp(implicit_reward / beta)
+        pos_loss = -(ratio * implicit_reward / beta - (ratio + 1) * torch.log((ratio + 1) / 2))
+        neg_loss = -pos_loss
+
+    else:
+        raise ValueError(f"未知 f-散度类型: {f_type}")
+
+    # 用绝对优势值作为权重 (优势越大/越小，权重越高)
+    abs_adv = advantages.abs().unsqueeze(-1)
+    loss = (pos_loss * pos_mask * abs_adv + neg_loss * neg_mask * abs_adv)
+    total_tokens = loss_mask.sum()
+    return loss.sum() / total_tokens
+```
+
+**使用方式与标准 GRPO 完全一致**——只需将 `grpo_loss(...)` 替换为 `f_grpo_loss(..., f_type="pearson_chi2")`：
+
+```python
+# 在标准 GRPO 训练循环中，将损失函数替换为:
+loss = f_grpo_loss(new_log_probs, ref_log_probs, old_log_probs,
+                    advantages, loss_mask, f_type="pearson_chi2", beta=0.1)
+# 其余部分（采样、优势计算、优化器）完全不变!
+```
 
 ---
 
@@ -296,31 +405,117 @@ $$
 2. **选择更好的散度**（f-GRPO：用 Pearson $\chi^2$ 替代 KL）
 3. **构建更稳定的训练**（GIFT：MSE 替代裁剪策略梯度）
 
+### GIFT 的完整实现
+
+**Step 1: 模型定义 — 与 GRPO/DPO 相同**
+
 ```python
-# GIFT 核心实现
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM
+
+actor = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+ref_model = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+ref_model.requires_grad_(False)
+optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
+
+G = 8  # 每个 Prompt 采样的回答数
+```
+
+**Step 2: GIFT 损失函数**
+
+```python
 def gift_loss(log_probs, ref_log_probs, rewards):
     """
-    log_probs: 当前策略 log π_θ(y|x), shape [batch, N]
-    ref_log_probs: 参考策略 log π_ref(y|x), shape [batch, N]
-    rewards: 外部奖励 r_φ(x,y), shape [batch, N]
-    """
-    # 隐式奖励（不含 β 和 Z(x)）
-    implicit_rewards = log_probs - ref_log_probs  # shape [batch, N]
+    GIFT 损失: 让归一化后的隐式奖励匹配归一化后的外部奖励。
     
-    # 组内归一化（消除 Z(x)）
+    log_probs: 当前策略 log π_θ(y|x), shape [batch, G]
+    ref_log_probs: 参考策略 log π_ref(y|x), shape [batch, G]
+    rewards: 外部奖励 r_φ(x,y), shape [batch, G]
+    
+    数学推导:
+      隐式奖励 = β·log(π_θ/π_ref) + β·log Z(x)
+      组内归一化后 β·log Z(x) 被消除 → 不需要知道 β 和 Z(x)!
+    """
+    # 隐式奖励 (不含 β 和 Z(x)，它们会在归一化中被消除)
+    implicit_rewards = log_probs - ref_log_probs  # shape [batch, G]
+    
+    # 组内归一化 (在 G 维度上做标准化 → 消除 Z(x))
     impl_mean = implicit_rewards.mean(dim=1, keepdim=True)
     impl_std = implicit_rewards.std(dim=1, keepdim=True) + 1e-8
     norm_implicit = (implicit_rewards - impl_mean) / impl_std
     
-    # 外部奖励同样组内归一化
+    # 外部奖励同样组内归一化 (使得两个分布尺度一致)
     rew_mean = rewards.mean(dim=1, keepdim=True)
     rew_std = rewards.std(dim=1, keepdim=True) + 1e-8
     norm_rewards = (rewards - rew_mean) / rew_std
     
-    # MSE 损失
-    loss = F.mse_loss(norm_implicit, norm_rewards)
+    # MSE 损失 — GIFT 的核心: 简单、凸、稳定
+    loss = F.mse_loss(norm_implicit, norm_rewards.detach())
     return loss
 ```
+
+**Step 3: 完整训练循环**
+
+```python
+for step in range(total_steps):
+    prompts_batch = sample_prompts(dataset, batch_size=32)
+    
+    # --- 阶段 1: 在线采样 (与 GRPO 完全相同) ---
+    all_log_probs, all_ref_log_probs, all_rewards = [], [], []
+    
+    with torch.no_grad():
+        for prompt in prompts_batch:
+            group_logps, group_ref_logps, group_rewards = [], [], []
+            for _ in range(G):
+                response = actor.generate(prompt, do_sample=True)
+                reward = reward_fn(prompt, response)
+                ref_logp = compute_seq_log_prob(ref_model, prompt, response)
+                group_rewards.append(reward)
+                group_ref_logps.append(ref_logp)
+            all_rewards.append(torch.tensor(group_rewards))
+            all_ref_log_probs.append(torch.stack(group_ref_logps))
+    
+    rewards = torch.stack(all_rewards)           # (batch, G)
+    ref_logps = torch.stack(all_ref_log_probs)   # (batch, G)
+    
+    # 过滤零方差组 (与 DAPO 类似)
+    valid = rewards.std(dim=1) > 0
+    if valid.sum() == 0:
+        continue
+    
+    # --- 阶段 2: GIFT 更新 ---
+    # GIFT 不需要"多 epoch 更新"和"重要性采样比率"!
+    # 它直接对当前策略做前向传播计算隐式奖励
+    
+    for prompt_idx in valid.nonzero(as_tuple=True)[0]:
+        prompt = prompts_batch[prompt_idx]
+        responses = all_responses[prompt_idx]  # G 个回答
+        
+        # 用当前策略重新计算对数概率 (需要梯度)
+        log_probs = torch.stack([
+            compute_seq_log_prob(actor, prompt, resp)
+            for resp in responses
+        ]).unsqueeze(0)  # (1, G)
+        
+        ref_lps = ref_logps[prompt_idx].unsqueeze(0)   # (1, G)
+        rews = rewards[prompt_idx].unsqueeze(0)          # (1, G)
+        
+        # GIFT 损失: MSE(归一化隐式奖励, 归一化外部奖励)
+        loss = gift_loss(log_probs, ref_lps, rews)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
+        optimizer.step()
+```
+
+> **GIFT vs GRPO 训练的关键区别**：
+> - **没有裁剪**：GIFT 用 MSE 替代了 PPO 的裁剪机制，不需要 $\varepsilon$ 超参数。
+> - **没有重要性采样**：GIFT 不需要 `old_log_probs` 和比率 `ratio = exp(new - old)`。
+> - **没有 KL 惩罚**：KL 约束被隐含在参考模型的对数概率中。
+> - **凸损失函数**：MSE 是凸函数，比裁剪策略梯度（分段线性）更稳定。
+> - 代价是 GIFT 需要每步都重新前向传播（不能像 PPO/GRPO 那样多 epoch 复用旧数据）。
 
 > 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/24-superflow/)
 

@@ -56,7 +56,20 @@ $$
 
 其中 $r_{i,t}(\theta) = \frac{\pi_\theta(o_{i,t} | q, o_{<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} | q, o_{<t})}$ 是 Token 级别的重要性采样比率。
 
-**关键参数选择**：DAPO 论文中使用 $\varepsilon_{\text{low}} = 0.2$，$\varepsilon_{\text{high}} = 0.28$。高侧放宽意味着概率上升的空间更大（允许比率最大到 $1.28$ 而不是 $1.2$），从而让"探索性"Token 有更大的成长空间，避免熵崩溃。
+**关键参数选择**：DAPO 论文中使用 $\varepsilon_{\text{low}} = 0.2$，$\varepsilon_{\text{high}} = 0.28$。
+
+**为什么这能防止熵崩溃？** 考虑策略梯度对一个 Token $o_t$ 的更新。当 $\hat{A}_t > 0$（这个 Token 出现在好的回答中），PPO 裁剪目标的有效梯度为：
+
+$$
+\nabla_\theta J \propto \begin{cases}
+\hat{A}_t \cdot \nabla_\theta \log \pi_\theta(o_t) & \text{if } r_t(\theta) < 1 + \varepsilon_{\text{high}} \\
+0 & \text{if } r_t(\theta) \geq 1 + \varepsilon_{\text{high}}
+\end{cases}
+$$
+
+对于低概率的探索性 Token（$\pi_{\theta_{\text{old}}}(o_t)$ 很小），$r_t$ 达到上界 $1 + \varepsilon_{\text{high}}$ 时对应的新概率为 $\pi_{\theta_{\text{old}}}(o_t) \cdot (1 + \varepsilon_{\text{high}})$。提高 $\varepsilon_{\text{high}}$ 意味着这个"天花板"更高，梯度信号能持续更多步更新才被截断——低概率 Token 获得了更充分的增长机会。
+
+而对于 $\hat{A}_t < 0$（坏回答中的 Token），概率下降的底线仍然由 $\varepsilon_{\text{low}} = 0.2$ 控制——惩罚力度不变。这种**不对称设计的本质是：鼓励多探索、同等力度惩罚错误**。
 
 **直觉对比**：
 
@@ -64,7 +77,10 @@ $$
 |---|---|---|
 | 裁剪范围 | $[1-\varepsilon, 1+\varepsilon] = [0.8, 1.2]$ | $[1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}}] = [0.8, 1.28]$ |
 | 概率 0.01 的 Token 可涨到 | $0.012$ | $0.0128$ |
+| 经过 10 次更新后 | $0.012^{10} \approx 0.062$ | $0.0128^{10} \approx 0.112$ |
 | 效果 | 探索被压制，熵崩溃 | 探索空间更大，策略保持多样性 |
+
+> **与 GRPO 中 KL 惩罚的关系**：GRPO 使用 $\beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ 来约束策略不偏离太远，但 KL 惩罚是**全局性**的——它惩罚所有概率变化，包括有益的探索。Clip-Higher 则是**局部性**的约束——只在比率超出范围时截断梯度，保留了范围内的自由度。DAPO 论文发现，Clip-Higher 足以替代 KL 惩罚的约束功能，同时避免了 KL 惩罚对探索的抑制，因此**完全移除了 KL 正则项和参考模型**。这进一步减少了一个大模型的显存占用。
 
 ---
 
@@ -197,73 +213,153 @@ $$
 
 注意 DAPO **移除了 KL 散度正则项**——通过 Clip-Higher 和动态采样的协同作用，策略已经被有效约束在合理范围内，不再需要显式的参考模型约束。
 
-## 核心代码实现
+## 完整实现代码
+
+以下是 DAPO 的完整 PyTorch 实现，将四个技术组合为一个端到端的训练流程。
+
+**Step 1: 模型定义与超参数**
 
 ```python
 import torch
 import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-def dapo_loss(
-    log_probs,          # 当前策略 log π_θ(o_t|q), shape: [B*G, T]
-    old_log_probs,      # 采样策略 log π_old(o_t|q), shape: [B*G, T]
-    advantages,         # 组内相对优势 Â_i (广播到每个 token), shape: [B*G, T]
-    loss_mask,          # 有效 token 掩码 (排除 padding), shape: [B*G, T]
-    eps_low=0.2,
-    eps_high=0.28,
-):
-    ratio = torch.exp(log_probs - old_log_probs)
-    
-    surr1 = ratio * advantages
-    surr2 = torch.clamp(ratio, 1.0 - eps_low, 1.0 + eps_high) * advantages
-    
-    token_loss = -torch.min(surr1, surr2)
-    
-    # Token-Level 归一化：除以所有有效 token 总数
-    total_tokens = loss_mask.sum()
-    loss = (token_loss * loss_mask).sum() / total_tokens
-    
-    return loss
+# 模型定义: DAPO 移除了 KL 惩罚，不需要参考模型!
+actor = AutoModelForCausalLM.from_pretrained("Qwen2.5-32B-SFT")
+# 对比: GRPO 需要 Actor + Reference; DAPO 只需要 Actor!
+# (但实际工程中通常仍保留 ref_model 用于监控 KL 漂移)
 
+tokenizer = AutoTokenizer.from_pretrained("Qwen2.5-32B-SFT")
+optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
 
-def dynamic_sampling(model, dataset, target_size, G, batch_multiplier=3, max_rounds=10):
-    """动态采样：只保留 σ_R > 0 的 Prompt 组"""
-    cache = []
-    
-    for round_idx in range(max_rounds):
-        prompts = dataset.sample(target_size * batch_multiplier)
-        
-        for prompt, answer in prompts:
-            responses = model.generate(prompt, num_return_sequences=G)
-            rewards = judge_responses(responses, answer)
-            
-            if rewards.std() > 0:
-                n_correct = (rewards > 0).sum().item()
-                if 0 < n_correct < G:
-                    cache.append({
-                        "prompt": prompt,
-                        "responses": responses,
-                        "rewards": rewards,
-                    })
-        
-        if len(cache) >= target_size:
-            return cache[:target_size]
-    
-    raise RuntimeError(f"经过 {max_rounds} 轮仍无法收集 {target_size} 个有效样本")
+# DAPO 超参数
+G = 16                    # 每个 Prompt 的采样数 (DAPO 论文用 16)
+eps_low = 0.2             # 裁剪下界 (与标准 PPO 相同)
+eps_high = 0.28           # 裁剪上界 (Clip-Higher: 比 PPO 的 0.2 更宽)
+K_epochs = 2              # 每批数据的更新轮数
+target_batch_size = 512   # 目标有效 Prompt 数
+batch_multiplier = 3      # 动态采样的过采样倍率
+max_len = 20480           # 最大回答长度
+buffer_len = 4096         # 超长惩罚缓冲区
+```
 
+**Step 2: 四大核心函数**
 
-def overlong_reward_shaping(rewards, response_lengths, max_len=20480, buffer_len=4096, penalty=1.0):
-    """超长奖励塑形"""
+```python
+def overlong_reward_shaping(rewards, response_lengths, max_len=20480,
+                             buffer_len=4096, penalty=1.0):
+    """技术四: 超长奖励塑形"""
     threshold = max_len - buffer_len
     shaped = rewards.clone()
-    
-    for i in range(len(rewards)):
-        if response_lengths[i] > threshold:
-            excess = response_lengths[i] - threshold
-            penalty_value = -(excess / buffer_len) * penalty
-            shaped[i] = min(rewards[i].item(), penalty_value)
-    
+    over_mask = response_lengths > threshold
+    excess = (response_lengths[over_mask] - threshold).float()
+    penalty_values = -(excess / buffer_len) * penalty
+    shaped[over_mask] = torch.min(rewards[over_mask], penalty_values)
     return shaped
+
+
+def dynamic_sampling(model, dataset, target_size, G, batch_multiplier=3,
+                      max_rounds=10):
+    """技术二: 动态采样 — 只保留有区分度的 Prompt 组"""
+    cache = []
+    for round_idx in range(max_rounds):
+        prompts = dataset.sample(target_size * batch_multiplier)
+        for prompt, answer in prompts:
+            responses = model.generate(prompt, num_return_sequences=G,
+                                       max_new_tokens=max_len, do_sample=True)
+            raw_rewards = judge_responses(responses, answer)
+            lengths = torch.tensor([len(r) for r in responses])
+            rewards = overlong_reward_shaping(raw_rewards, lengths)
+
+            n_correct = (rewards > 0).sum().item()
+            if 0 < n_correct < G:
+                old_logps = compute_token_log_probs(model, prompt, responses)
+                cache.append({
+                    "prompt": prompt, "responses": responses,
+                    "rewards": rewards, "old_log_probs": old_logps,
+                    "lengths": lengths,
+                })
+
+            if len(cache) >= target_size:
+                return cache[:target_size]
+
+    return cache[:target_size]
+
+
+def compute_group_advantages(rewards_list, G):
+    """GRPO 组内相对优势 (与 GRPO 完全相同)"""
+    rewards = torch.stack(rewards_list).reshape(-1, G)  # (batch, G)
+    mean_r = rewards.mean(dim=1, keepdim=True)
+    std_r = rewards.std(dim=1, keepdim=True)
+    advantages = (rewards - mean_r) / (std_r + 1e-8)
+    return advantages.reshape(-1)
+
+
+def dapo_loss(log_probs, old_log_probs, advantages, loss_mask,
+              eps_low=0.2, eps_high=0.28):
+    """技术一 + 技术三: Clip-Higher + Token-Level 归一化"""
+    ratio = torch.exp(log_probs - old_log_probs)
+
+    # 技术一: 非对称裁剪
+    surr1 = ratio * advantages
+    surr2 = torch.clamp(ratio, 1.0 - eps_low, 1.0 + eps_high) * advantages
+    token_loss = -torch.min(surr1, surr2)
+
+    # 技术三: Token-Level 归一化 (除以有效 Token 总数)
+    total_tokens = loss_mask.sum()
+    loss = (token_loss * loss_mask).sum() / total_tokens
+    return loss
 ```
+
+**Step 3: 完整训练循环**
+
+```python
+for step in range(total_steps):
+    # === 阶段 1: 动态采样 (技术二 + 技术四) ===
+    # 反复采样直到积累够 target_batch_size 个有效 Prompt 组
+    batch = dynamic_sampling(actor, dataset, target_batch_size, G, batch_multiplier)
+
+    # === 阶段 2: 计算组内相对优势 ===
+    all_rewards = [item["rewards"] for item in batch]
+    advantages = compute_group_advantages(all_rewards, G)
+    # 将序列级优势广播到每个 Token
+    # advantages shape: (batch*G,) → 需要展开到 (batch*G, T)
+
+    # === 阶段 3: 多 Epoch 更新 (技术一 + 技术三) ===
+    for epoch in range(K_epochs):
+        for mini_batch in create_minibatches(batch, minibatch_size=64):
+            # 用当前策略重新计算 Token 级对数概率
+            new_log_probs = compute_token_log_probs(actor,
+                                                     mini_batch["prompts"],
+                                                     mini_batch["responses"])
+            old_log_probs = mini_batch["old_log_probs"]
+            adv = mini_batch["advantages"].unsqueeze(-1).expand_as(new_log_probs)
+            mask = mini_batch["loss_mask"]
+
+            # DAPO 损失 (Clip-Higher + Token-Level)
+            # 注意: 没有 KL 惩罚项! (对比 GRPO 的 loss = policy_loss + β·kl)
+            loss = dapo_loss(new_log_probs, old_log_probs, adv, mask,
+                            eps_low=eps_low, eps_high=eps_high)
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
+            optimizer.step()
+
+    # === 阶段 4: 监控 (可选但推荐) ===
+    with torch.no_grad():
+        mean_reward = torch.stack(all_rewards).mean().item()
+        entropy = compute_policy_entropy(actor, batch)
+        # 如果 entropy 持续下降，可能需要增大 eps_high
+```
+
+> **与 GRPO 训练循环的关键区别**：
+> 1. 动态采样替代了固定采样——过滤无效组，每次更新都有充分的梯度信号。
+> 2. `dapo_loss` 使用非对称裁剪 + Token 级归一化——不再是 `torch.clamp(ratio, 1-ε, 1+ε)`。
+> 3. **没有 KL 惩罚项**——`loss = policy_loss` 而不是 `loss = policy_loss + β * kl_penalty`。这是 DAPO 与 GRPO 最显著的差异。
+> 4. 奖励在采样时就经过了超长塑形——长回答在进入优势计算前已被惩罚。
+
+**开源代码参考：** DAPO 的官方实现基于 verl 框架，NVIDIA NeMo RL 也提供了 [DAPO 训练指南](https://docs.nvidia.com/nemo/rl/latest/guides/dapo.html)。
 
 ---
 
