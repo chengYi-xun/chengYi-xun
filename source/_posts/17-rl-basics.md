@@ -530,4 +530,9 @@ for step in range(max_steps):
 **开源代码参考：**
 在实际应用中，REINFORCE 由于方差过大，几乎不再被单独用于复杂任务；Actor-Critic（特别是其变体 A2C/A3C）则被广泛使用。目前最主流的强化学习开源库如 **Stable-Baselines3** 和 Hugging Face 的 **TRL (Transformer Reinforcement Learning)** 都提供了这些基础算法的实现。上面三个算法各自的完整 PyTorch 实现已附在对应小节末尾，从模型定义、数据采集到参数更新的完整前向流程可以直接参考。
 
+**这些基础算法与大模型 RLHF 的关系：** 本文介绍的三种算法都是经典 RL 场景中的理论基础，它们本身没有直接的 RLHF 版本，但它们的核心思想直接催生了大模型对齐中的关键算法：
+
+- **Actor-Critic → PPO**：PPO 本质上是加了裁剪机制的 Actor-Critic，是目前 RLHF 中最主流的算法。在 RLHF 场景下需要四个模型（Actor、Critic、Reference、Reward）协同工作，详见[下一篇](/chengYi-xun/posts/18-trpo-ppo/)。
+- **REINFORCE → GRPO**：GRPO（Group Relative Policy Optimization）的核心思想来自 REINFORCE——对同一个 prompt 生成一组回答，用组内相对排名替代 Critic 的价值估计，彻底去掉了 Critic 模型。
+
 > 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/18-trpo-ppo/)

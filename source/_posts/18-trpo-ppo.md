@@ -85,7 +85,7 @@ $$V^{\pi_\text{new}}(s_1) = 0.99 \times 15 + 0.01 \times 5 = 14.9$$
 
 ## 替代目标函数 (Surrogate Objective)
 
-**问题**：上一节说了不能一步迈太大，但实际训练中我们只有旧策略 $\pi_\text{old}$ 采集的数据。如何用这批旧数据来评估并优化新策略 $\pi_\text{new}$ 的效果？
+**为什么叫"替代"？** 我们**真正想优化**的目标是新策略的期望回报 $J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[\sum_t \gamma^t r_t]$。但这个真实目标**没法直接优化**——计算它需要用新策略 $\pi_\theta$ 去采集数据，而参数 $\theta$ 每一步都在变，不可能每次梯度更新都重新采样。实际训练中我们手头只有旧策略 $\pi_\text{old}$ 采集的数据。因此我们需要构造一个"替代品"——一个可以用旧数据计算、且在旧策略邻域内能忠实反映真实目标的近似函数。如何用这批旧数据来评估并优化新策略 $\pi_\text{new}$ 的效果？
 
 关键工具是**重要性比率（Probability Ratio）**：
 $$
@@ -98,7 +98,15 @@ $$r = \frac{0.84}{0.70} = 1.2$$
 $r = 1.2$ 意味着新策略选这个动作的概率是旧策略的 1.2 倍。TRPO 用 $r$ 乘以旧策略下估计的优势 $\hat{A}$，构建**替代目标函数**来近似新策略的实际表现：
 $$\mathcal{L}^{\text{CPI}}(\theta) = \mathbb{E}_{t} \left[ r_t(\theta) \hat{A}_t \right]$$
 
+上标 $\text{CPI}$ 来自 Kakade & Langford (2002) 提出的 **Conservative Policy Iteration**（保守策略迭代），这是最早引入替代目标思想的工作。
+
 直觉很简单：如果 $\hat{A} > 0$（好动作），$r > 1$（新策略增加了这个动作的概率），那么 $r \cdot \hat{A}$ 就是一个正的信号，说明新策略比旧策略更好。
+
+**"替代"的数学含义。** 替代目标和真实目标 $J(\theta)$ 之间有严格的数学关系，就像泰勒展开中的一阶近似和原函数的关系：
+
+1. **在旧策略处两者相等**：当 $\theta = \theta_\text{old}$ 时，$r_t = 1$，$\mathcal{L}^{\text{CPI}}(\theta_\text{old}) = \mathbb{E}_t[\hat{A}_t] = 0$。真实目标的改进量同样为 $0$（策略没变，表现不变）。
+2. **在旧策略处梯度相同**：$\nabla_\theta \mathcal{L}^{\text{CPI}} \big|_{\theta=\theta_\text{old}} = \nabla_\theta J(\theta) \big|_{\theta=\theta_\text{old}}$。这保证了在旧策略的邻域内，替代目标的上升方向就是真实目标的上升方向。
+3. **远离旧策略后偏离加剧**：当 $\theta$ 偏离 $\theta_\text{old}$ 越远，替代目标对真实表现的近似就越不准确——这正是后文 KL 约束和裁剪机制存在的根本原因。
 
 但为什么乘一个比率 $r$ 就能用旧数据评估新策略？这背后的数学工具叫做**重要性采样（Importance Sampling）**。
 
@@ -275,6 +283,8 @@ critic_optimizer.step()
 old_actor.load_state_dict(actor.state_dict())
 ```
 
+注意：上面的代码是 vanilla RL（经典强化学习）场景中的 TRPO。**TRPO 从未被应用于大模型 RLHF**——原因正是前文详述的二阶优化瓶颈：Fisher 矩阵和共轭梯度法在数十亿参数的语言模型上根本无法计算。当 2022-2023 年 RLHF 成为大模型对齐的核心技术时，学界直接选择了 PPO 而跳过了 TRPO。这正是 PPO 诞生的全部意义——用一阶裁剪替代二阶约束，使信任区域方法能够扩展到工业级大模型。
+
 ---
 
 # PPO：大道至简的"裁剪"艺术
@@ -412,14 +422,104 @@ for epoch in range(K_epochs):
         optimizer.step()
 ```
 
+**开源代码参考：** Vanilla PPO 在经典 RL（游戏、机器人控制等）中的主流实现是 **Stable-Baselines3** 库（`stable_baselines3.PPO`），其核心逻辑与上述代码一致。
+
+上面的代码展示的是经典强化学习场景中的 PPO，只需要 Actor 和 Critic 两个模型。但在大模型 RLHF 中，PPO 实际上需要**四个模型**同时在线。
+
+## RLHF 中的 PPO：四模型架构
+
+在 RLHF 场景下，PPO 的"环境"不再是游戏或物理模拟器，而是**语言生成 + 奖励模型打分**。整个系统需要四个模型协同工作：
+
+1. **Actor（策略模型）** $\pi_\theta$：正在训练的语言模型，负责根据 prompt 生成回答。
+2. **Critic（价值模型）** $V_\phi$：估计当前生成状态的价值，通常与 Actor 共享底座（backbone），只在顶部加一个标量输出头。
+3. **Reference 模型** $\pi_\text{ref}$：**冻结的 SFT 模型**，即 Actor 训练前的初始状态。它的作用是防止 Actor 在 RL 训练过程中"学偏"——如果没有约束，Actor 可能学会生成一些得分很高但语无伦次的"奖励黑客"（Reward Hacking）输出。通过惩罚 Actor 偏离 Reference 的程度（KL 散度），可以确保生成的回答保持合理的语言质量。
+4. **Reward 模型** $R_\psi$：**冻结的奖励模型**，用人类偏好数据预训练而成，负责为 Actor 的回答打分。
+
+**RLHF-PPO 的核心区别**在于奖励的计算。Vanilla PPO 的奖励直接来自环境，而 RLHF-PPO 的奖励经过 KL 惩罚修正：
+$$
+r_t = R_\psi(\text{prompt}, \text{response}) - \beta \cdot \text{KL}[\pi_\theta \| \pi_\text{ref}]
+$$
+其中 $\beta$ 控制 KL 惩罚的强度：$\beta$ 越大，Actor 越不敢偏离 Reference。
+
+下面是 RLHF-PPO 的完整实现。对比上面的 vanilla 版本，核心差异在 Step 1（数据采集方式）和 Step 2（KL 惩罚修正奖励）：
+
+```python
+import torch
+import torch.nn.functional as F
+
+# ============================================================
+# RLHF-PPO 的四模型架构
+# ============================================================
+actor = LanguageModel(...)                 # 正在训练的策略 π_θ
+critic = ValueHead(actor.backbone)         # 价值网络 V_φ, 通常共享 Actor 底座
+ref_model = LanguageModel(...)             # 冻结的 SFT 模型 π_ref
+ref_model.requires_grad_(False)
+reward_model = RewardModel(...)            # 冻结的奖励模型 R_ψ
+reward_model.requires_grad_(False)
+
+optimizer = torch.optim.Adam(
+    list(actor.parameters()) + list(critic.parameters()), lr=1e-5
+)
+clip_range = 0.2
+kl_coef = 0.1      # β, KL 惩罚系数
+
+# ============================================================
+# Step 1: 数据采集 — "环境"是: prompt → 生成回答 → 奖励模型打分
+# ============================================================
+prompts = sample_prompts(dataset)
+with torch.no_grad():
+    responses, old_log_probs = actor.generate(prompts, return_log_probs=True)
+    old_values = critic(prompts, responses)
+    ref_log_probs = ref_model.log_probs(prompts, responses)  # π_ref 的对数概率
+    scores = reward_model(prompts, responses)                 # R_ψ 打分
+
+# ============================================================
+# Step 2: 计算 KL 惩罚修正后的奖励 (vanilla PPO 没有这一步!)
+# r = R_ψ - β·(log π_θ - log π_ref)
+# ============================================================
+kl_penalty = kl_coef * (old_log_probs - ref_log_probs)      # 逐 token KL 惩罚
+adjusted_rewards = compute_token_rewards(scores, kl_penalty) # 最后 token 加 R_ψ, 其余 -KL
+
+# ============================================================
+# Step 3: 优势估计 (同 vanilla PPO)
+# ============================================================
+with torch.no_grad():
+    advantages = compute_gae(adjusted_rewards, old_values, gamma=1.0, lam=0.95)
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    returns = advantages + old_values
+
+# ============================================================
+# Step 4: 多 epoch 小批量更新 (同 vanilla PPO)
+# ============================================================
+for epoch in range(K_epochs):
+    for idx in minibatch_indices(len(prompts), batch_size):
+        new_log_probs = actor.log_probs(prompts[idx], responses[idx])
+        values = critic(prompts[idx], responses[idx])
+        entropy = compute_entropy(actor, prompts[idx])
+
+        ratio = torch.exp(new_log_probs - old_log_probs[idx])
+        surr1 = ratio * advantages[idx]
+        surr2 = torch.clamp(ratio, 1 - clip_range, 1 + clip_range) * advantages[idx]
+        policy_loss = -torch.min(surr1, surr2).mean()
+
+        value_loss = F.mse_loss(values, returns[idx])
+        loss = policy_loss + vf_coef * value_loss - entropy_coef * entropy
+
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(
+            list(actor.parameters()) + list(critic.parameters()), max_norm=1.0
+        )
+        optimizer.step()
+```
+
 **开源代码参考：** 目前大模型 RLHF 微调中最常用的 PPO 实现是 Hugging Face 的 **TRL (Transformer Reinforcement Learning)** 库（`trl.PPOTrainer`），其核心逻辑与上述代码一致。
 
 ## PPO 在大模型微调中的痛点
 
 PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 RLHF 的标准算法。
 
-然而，随着模型参数量飙升到百亿（10B）甚至千亿级别，PPO 暴露出一个致命的缺点：**显存开销巨大**。
-在 PPO 中，我们不仅需要加载庞大的 Actor 模型，还需要加载一个同样庞大的 Critic 模型来估计价值函数。这往往超出了单张甚至多张 GPU 的显存极限。
+然而，从上面的四模型架构可以看出，RLHF-PPO 的**显存开销巨大**：需要同时加载 Actor、Critic、Reference、Reward 四个模型。当模型参数量飙升到百亿（10B）甚至千亿级别时，即便 Reference 和 Reward 不需要梯度，仅它们的前向推理也会占据大量显存，加上 Actor 和 Critic 的参数、梯度和优化器状态，这往往远超单张甚至多张 GPU 的显存极限。
 
 为了解决这个问题，学术界演化出了两条不同的路线：
 
