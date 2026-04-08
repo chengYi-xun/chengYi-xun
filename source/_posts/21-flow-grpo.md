@@ -113,30 +113,30 @@ $$
 ## 1. 模型定义与奖励函数
 
 ```python
-import torch
-import torch.nn.functional as F
+import torch  # PyTorch：张量与自动求导，策略梯度与 PPO 更新依赖计算图
+import torch.nn.functional as F  # 函数式接口，便于扩展额外正则或其它可微损失
 
 # --- 模型定义: 与 LLM GRPO 相同，只需 Actor + Reference ---
-actor_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")
+actor_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")  # Actor π_θ：当前可训练策略，用于采样与重要性采样比
 actor_model.enable_lora(rank=32)  # 用 LoRA 微调，节省显存
-ref_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")
-ref_model.requires_grad_(False)
+ref_model = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev")  # 参考策略 π_ref：与 Actor 同初始化，用于 KL 惩罚稳定训练
+ref_model.requires_grad_(False)  # 冻结参考模型，保证 KL 是相对固定锚点而非共同漂移
 
 # 奖励模型: 组合多种评分函数
-reward_models = {
+reward_models = {  # 多专家打分合成标量回报 r，供 GRPO 组内归一化得到相对优势
     "aesthetic": AestheticScore(),     # 美学评分（构图、色彩）
     "pick_score": PickScore(),         # 人类偏好综合评分
     "clip_score": CLIPScore(),         # 图文匹配度
 }
-reward_weights = {"aesthetic": 0.3, "pick_score": 0.5, "clip_score": 0.2}
+reward_weights = {"aesthetic": 0.3, "pick_score": 0.5, "clip_score": 0.2}  # 加权系数，决定 RL 目标更偏重美感、偏好还是对齐
 
 def compute_reward(images, prompts):
     """组合多种奖励（加权求和）"""
-    total = sum(w * reward_models[k](images, prompts)
-                for k, w in reward_weights.items())
-    return total
+    total = sum(w * reward_models[k](images, prompts)  # 对每条样本累加加权奖励，得到可与优势相乘的标量 r
+                for k, w in reward_weights.items())  # 遍历各奖励头，合成单一 RL 回报信号
+    return total  # 返回总奖励，后续按每组 G 条 reshape 后减组内均值、除标准差
 
-optimizer = torch.optim.AdamW(actor_model.lora_parameters(), lr=1e-5)
+optimizer = torch.optim.AdamW(actor_model.lora_parameters(), lr=1e-5)  # 仅更新 LoRA 参数，与 PPO/GRPO 的策略更新对象一致
 G = 4           # 每个 Prompt 生成的图像数
 clip_eps = 0.2  # PPO 裁剪阈值
 beta = 0.01     # KL 惩罚系数
@@ -155,23 +155,23 @@ def compute_trajectory_log_prob(model, trajectory, prompt_embeds, sigma=0.01):
     trajectory: 记录的中间状态列表 [(x_T, t_T), (x_{T-1}, t_{T-1}), ..., (x_0, t_0)]
     每一步的对数概率 ∝ -||x_{t-Δt} - (x_t - Δt·v_θ(x_t, t))||² / (2σ²)
     """
-    total_log_prob = 0.0
-    for k in range(len(trajectory) - 1):
-        x_t, t_k = trajectory[k]
-        x_next_actual, t_next = trajectory[k + 1]
+    total_log_prob = 0.0  # 轨迹对数概率初值；累加后对应 log π_θ(trajectory|c)，供 ratio 与 KL
+    for k in range(len(trajectory) - 1):  # 遍历相邻时刻对，把连续去噪链拆成逐步转移
+        x_t, t_k = trajectory[k]  # 当前隐状态与时间：MDP 中的 (s_t, t)
+        x_next_actual, t_next = trajectory[k + 1]  # 采样时真实到达的下一状态（含 SDE 噪声后的 x）
         dt = t_k - t_next  # Δt (正数，因为从 t=1 向 t=0 去噪)
 
         # 模型预测速度场
-        v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)
+        v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)  # 策略输出：Flow 意义下的“动作”向量场
 
         # 模型预期的下一状态
-        x_next_predicted = x_t - dt * v_pred
+        x_next_predicted = x_t - dt * v_pred  # ODE 一步确定性预测均值，作为高斯转移核的中心
 
         # 对数概率: 高斯转移核
-        log_prob_step = -0.5 * ((x_next_actual - x_next_predicted) ** 2).sum() / (sigma ** 2)
-        total_log_prob = total_log_prob + log_prob_step
+        log_prob_step = -0.5 * ((x_next_actual - x_next_predicted) ** 2).sum() / (sigma ** 2)  # 实际步与预测均值偏差越小，log p 越大
+        total_log_prob = total_log_prob + log_prob_step  # 与 LLM 中 token log prob 求和类比：整条轨迹因子分解
 
-    return total_log_prob
+    return total_log_prob  # 供 new_logp、old_logp、ref_logp 计算重要性采样比与 KL
 ```
 
 ## 3. 在线采样：生成图像并记录轨迹
@@ -180,80 +180,80 @@ def compute_trajectory_log_prob(model, trajectory, prompt_embeds, sigma=0.01):
 def generate_with_trajectory(model, prompt_embeds, num_steps):
     """生成图像，同时记录完整的去噪轨迹用于计算对数概率"""
     x_t = torch.randn(1, 16, 64, 64)  # 初始纯噪声 (VAE 隐空间)
-    timesteps = torch.linspace(1.0, 0.0, num_steps + 1)
-    trajectory = [(x_t.clone(), timesteps[0])]
+    timesteps = torch.linspace(1.0, 0.0, num_steps + 1)  # 从 t=1 到 t=0 的离散时间表，对应 Flow 逆过程的时间网格
+    trajectory = [(x_t.clone(), timesteps[0])]  # 记录起点 (x_T, t_T)，供后续逐步累加 log p
 
-    for i in range(num_steps):
-        t_k = timesteps[i]
-        t_next = timesteps[i + 1]
-        dt = t_k - t_next
+    for i in range(num_steps):  # 逐步去噪：每一步是一次 MDP 转移，需记入轨迹算 log π
+        t_k = timesteps[i]  # 当前连续时间标量
+        t_next = timesteps[i + 1]  # 下一时刻，决定步长方向（向 t=0）
+        dt = t_k - t_next  # 本步 Δt>0，与 compute_trajectory_log_prob 中用法一致
 
-        with torch.no_grad():
-            v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)
+        with torch.no_grad():  # 采样阶段不反传，旧策略轨迹用于 off-policy 校正
+            v_pred = model.predict_velocity(x_t, t_k, prompt_embeds)  # 当前策略给出的速度场，即连续动作
 
         # Euler 步进 + 微量随机扰动 (将 ODE 变为 SDE，使概率有定义)
-        x_t = x_t - dt * v_pred + sigma * torch.randn_like(x_t) * (dt ** 0.5)
-        trajectory.append((x_t.clone(), t_next))
+        x_t = x_t - dt * v_pred + sigma * torch.randn_like(x_t) * (dt ** 0.5)  # SDE 步：与文中高斯转移核对应
+        trajectory.append((x_t.clone(), t_next))  # 保存真实后继状态，供轨迹对数概率与 ratio 使用
 
-    image = vae_decode(x_t)
-    return image, trajectory
+    image = vae_decode(x_t)  # 隐空间终点解码为像素图，供奖励模型打分
+    return image, trajectory  # 图用于 r，轨迹用于 log π_θ 与 PPO 目标
 ```
 
 ## 4. 完整训练循环
 
 ```python
-for step in range(total_steps):
-    prompts_batch = sample_prompts(dataset, batch_size=4)
-    prompt_embeds = encode_text(prompts_batch)
+for step in range(total_steps):  # 外层训练步：每步完成一组 on-policy 数据收集 + 多 epoch 更新
+    prompts_batch = sample_prompts(dataset, batch_size=4)  # 批条件 c：每个 prompt 将独立做 G 路采样
+    prompt_embeds = encode_text(prompts_batch)  # 文本编码，作为 Flow 条件输入（与 GRPO 中上下文类比）
 
     # --- 阶段 1: 组内采样 (每个 Prompt 生成 G 张图像) ---
-    all_images, all_trajectories, all_old_logps, all_ref_logps = [], [], [], []
+    all_images, all_trajectories, all_old_logps, all_ref_logps = [], [], [], []  # 缓存本步所有样本供优势与更新
 
-    with torch.no_grad():
-        for emb in prompt_embeds:
-            for _ in range(G):
-                image, trajectory = generate_with_trajectory(actor_model, emb, num_steps)
-                old_logp = compute_trajectory_log_prob(actor_model, trajectory, emb)
-                ref_logp = compute_trajectory_log_prob(ref_model, trajectory, emb)
-                all_images.append(image)
-                all_trajectories.append(trajectory)
-                all_old_logps.append(old_logp)
-                all_ref_logps.append(ref_logp)
+    with torch.no_grad():  # 采样与旧 log p 不算梯度，避免用当前图错误反传
+        for emb in prompt_embeds:  # 对每个 prompt 的条件嵌入分别展开
+            for _ in range(G):  # 同一 c 下 G 条轨迹：GRPO 的“组”，用于相对优势
+                image, trajectory = generate_with_trajectory(actor_model, emb, num_steps)  # 用当前 Actor  rollout
+                old_logp = compute_trajectory_log_prob(actor_model, trajectory, emb)  # 采样时策略下的 log π_old，作 PPO 分母
+                ref_logp = compute_trajectory_log_prob(ref_model, trajectory, emb)  # 参考策略在相同轨迹上的 log π_ref
+                all_images.append(image)  # 收集生成图，供奖励模型批处理打分
+                all_trajectories.append(trajectory)  # 保留状态序列，更新阶段重算 log π_θ
+                all_old_logps.append(old_logp)  # 采样时刻 Actor 的对数概率，用于 ratio 分母
+                all_ref_logps.append(ref_logp)  # 同轨迹上 ref 的 log p，用于 KL 正则项
 
     # --- 阶段 2: 奖励打分 + 组内相对优势 ---
-    rewards = compute_reward(all_images, repeat_prompts(prompts_batch, G))  # (batch*G,)
-    rewards_grouped = rewards.reshape(-1, G)                                 # (batch, G)
-    mean_r = rewards_grouped.mean(dim=1, keepdim=True)
-    std_r = rewards_grouped.std(dim=1, keepdim=True)
-    advantages = ((rewards_grouped - mean_r) / (std_r + 1e-8)).reshape(-1)  # (batch*G,)
+    rewards = compute_reward(all_images, repeat_prompts(prompts_batch, G))  # (batch*G,) 每条轨迹一个终局奖励 r
+    rewards_grouped = rewards.reshape(-1, G)                                 # (batch, G) 按 prompt 分组
+    mean_r = rewards_grouped.mean(dim=1, keepdim=True)  # 组内基线：GRPO 用组均值代替 Critic
+    std_r = rewards_grouped.std(dim=1, keepdim=True)  # 组内标准差，归一化使不同 prompt 尺度可比
+    advantages = ((rewards_grouped - mean_r) / (std_r + 1e-8)).reshape(-1)  # (batch*G,) 组内 z-score 优势，与 PPO 裁剪目标逐元素相乘
 
-    old_logps = torch.stack(all_old_logps)
-    ref_logps = torch.stack(all_ref_logps)
+    old_logps = torch.stack(all_old_logps)  # 旧策略对数概率张量，与 new_logps 逐元素比得 ratio
+    ref_logps = torch.stack(all_ref_logps)  # 参考策略 log p，用于近似 KL(log π_θ - log π_ref)
 
     # --- 阶段 3: 多 epoch 策略更新 ---
-    for epoch in range(K_epochs):
+    for epoch in range(K_epochs):  # 同一批数据上多轮 PPO 式更新，提高样本利用率
         # 重新计算当前策略的对数概率 (需要梯度!)
         new_logps = torch.stack([
-            compute_trajectory_log_prob(actor_model, traj, emb)
-            for traj, emb in zip(all_trajectories, repeat_embeds(prompt_embeds, G))
+            compute_trajectory_log_prob(actor_model, traj, emb)  # 对同一条轨迹用当前 θ 重算 log π_θ（可导）
+            for traj, emb in zip(all_trajectories, repeat_embeds(prompt_embeds, G))  # 轨迹与条件 c 与阶段 1 采样顺序严格对齐
         ])
 
         # 重要性采样比率
-        ratio = torch.exp(new_logps - old_logps)
+        ratio = torch.exp(new_logps - old_logps)  # r_t(θ)=exp(logπ_θ-logπ_old)，连续轨迹与离散 token 形式一致
 
         # PPO 裁剪目标 (与 LLM GRPO 完全相同)
-        surr1 = ratio * advantages
-        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * advantages
-        policy_loss = -torch.min(surr1, surr2).mean()
+        surr1 = ratio * advantages  # 未裁剪 surrogate：鼓励在正优势方向增大 ratio
+        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * advantages  # 裁剪后：限制策略单步变化
+        policy_loss = -torch.min(surr1, surr2).mean()  # 取悲观界并最小化负号即最大化目标，信任域内更新
 
         # KL 散度惩罚
-        kl_loss = (new_logps - ref_logps).mean()
+        kl_loss = (new_logps - ref_logps).mean()  # 与 ref 的 log 差均值作 KL 代理，防止偏离预训练过远
 
-        loss = policy_loss + beta * kl_loss
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(actor_model.lora_parameters(), max_norm=1.0)
-        optimizer.step()
+        loss = policy_loss + beta * kl_loss  # 总目标：PPO/GRPO 裁剪项 + β·KL
+        optimizer.zero_grad()  # 清空梯度，避免跨 epoch 错误累积
+        loss.backward()  # 梯度经 compute_trajectory_log_prob 回传到速度场/LoRA
+        torch.nn.utils.clip_grad_norm_(actor_model.lora_parameters(), max_norm=1.0)  # 稳定 RL 训练的大梯度
+        optimizer.step()  # 更新 Actor（LoRA）参数
 ```
 
 > **与 LLM GRPO 的代码结构对比**：整体框架（组采样 → 优势计算 → 裁剪更新 → KL 惩罚）完全一致。唯一的区别在于**对数概率的计算方式**：LLM 用 token 级 softmax 对数概率求和，Flow-GRPO 用高斯转移核的对数密度求和。

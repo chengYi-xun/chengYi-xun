@@ -192,7 +192,8 @@ DPO 数据格式：每条数据是一个三元组 (prompt, chosen, rejected)
     "rejected": "def sort(arr): arr.sort(); return arr  # 有副作用，修改了原数组"
 }
 """
-preference_dataset = load_dataset("preference_pairs")  # List of (prompt, chosen, rejected)
+# DPO 为离线对齐：无需环境交互，直接用人类标注的 (x, y_w, y_l) 做对比学习
+preference_dataset = load_dataset("preference_pairs")  # List of (prompt, chosen, rejected)；每条对应一次“胜者 vs 败者”的 BT 似然项
 ```
 
 **Step 2: 模型定义 — 只需要两个模型！**
@@ -200,21 +201,21 @@ preference_dataset = load_dataset("preference_pairs")  # List of (prompt, chosen
 DPO 最大的优势：相比 RLHF-PPO 的四模型架构，DPO 只需要两个模型：
 
 ```python
-import torch
-import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch  # 张量与自动求导：DPO 损失只对 π_θ 反传
+import torch.nn.functional as F  # log_softmax / logsigmoid：实现序列 log π 与 BT 负对数似然
+from transformers import AutoModelForCausalLM, AutoTokenizer  # 因果 LM：拟合策略分布 π(y|x)
 
 # 模型 1: 待训练的策略模型 (Actor)
-actor = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
+actor = AutoModelForCausalLM.from_pretrained("sft_checkpoint")  # 当前策略 π_θ，对齐要更新的对象
 # 模型 2: 冻结的参考模型 (Reference) — 就是 SFT 后的快照
-ref_model = AutoModelForCausalLM.from_pretrained("sft_checkpoint")
-ref_model.requires_grad_(False)
+ref_model = AutoModelForCausalLM.from_pretrained("sft_checkpoint")  # 冻结的 π_ref，作 KL 正则锚点
+ref_model.requires_grad_(False)  # 不训练参考模型，仅前向计算 log π_ref 以构造隐式奖励差
 
 # 对比 RLHF-PPO：不需要 Critic 模型，不需要 Reward 模型！
 # PPO 需要 4 个模型 → DPO 只需要 2 个，显存节省约 50%
 
-tokenizer = AutoTokenizer.from_pretrained("sft_checkpoint")
-optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
+tokenizer = AutoTokenizer.from_pretrained("sft_checkpoint")  # 将 prompt 与回答编成 token 序列，才能逐 token 累加 log π
+optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)  # 仅优化 Actor；DPO 等价于对偏好对的监督目标做一阶梯度下降
 
 beta = 0.1  # KL 惩罚系数，控制偏离参考模型的程度
 ```
@@ -230,57 +231,58 @@ $$
 ```python
 def compute_log_probs(model, input_ids, labels, attention_mask):
     """计算模型对给定序列的对数概率"""
+    # ref 模型用 no_grad 省显存；训练中的 actor 需保留计算图以回传 DPO 梯度
     with torch.no_grad() if not model.training else torch.enable_grad():
-        logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+        logits = model(input_ids=input_ids, attention_mask=attention_mask).logits  # 各步对词表的未归一化打分，用于下一 token 分布
     # logits: (batch, seq_len, vocab_size) → 取每个位置上真实 token 的对数概率
-    log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
+    log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)  # 因果 LM：位置 t 预测 t+1，故 logits 与 labels 错一位对齐
     # labels 向左移一位 (next-token prediction)
-    per_token_log_probs = torch.gather(log_probs, dim=-1, index=labels[:, 1:].unsqueeze(-1)).squeeze(-1)
+    per_token_log_probs = torch.gather(log_probs, dim=-1, index=labels[:, 1:].unsqueeze(-1)).squeeze(-1)  # 取出真实续写 token 的 log π(y_t|x,y_{<t})
     # 只对回答部分求和 (mask 掉 prompt 部分)
-    return (per_token_log_probs * attention_mask[:, 1:]).sum(dim=-1)
+    return (per_token_log_probs * attention_mask[:, 1:]).sum(dim=-1)  # 序列级 log π(y|x)，供 log-ratio 与 β·(···) 使用
 ```
 
 **Step 4: 完整训练循环**
 
 ```python
-for epoch in range(num_epochs):
-    for batch in dataloader(preference_dataset, batch_size=4):
-        prompts, chosen_responses, rejected_responses = batch
+for epoch in range(num_epochs):  # 多轮扫偏好数据；无在线 rollout，与 SFT 式 epoch 类似
+    for batch in dataloader(preference_dataset, batch_size=4):  # 批内并行多条 (x,y_w,y_l)，稳定梯度估计
+        prompts, chosen_responses, rejected_responses = batch  # Unpack：提示 + 人类偏好胜/负回答
 
         # --- 拼接 prompt + response，分别对 chosen 和 rejected 做 tokenize ---
-        chosen_ids, chosen_mask, chosen_labels = tokenize(prompts, chosen_responses)
-        rejected_ids, rejected_mask, rejected_labels = tokenize(prompts, rejected_responses)
+        chosen_ids, chosen_mask, chosen_labels = tokenize(prompts, chosen_responses)  # y_w 的 token 与 mask；labels 用于算 log π(y_w|x)
+        rejected_ids, rejected_mask, rejected_labels = tokenize(prompts, rejected_responses)  # y_l 同理，与 y_w 共享同一 prompt x
 
         # --- 前向传播: 计算四组对数概率 ---
         # 当前策略 π_θ 对好/坏回答的对数概率
-        policy_chosen_logps = compute_log_probs(actor, chosen_ids, chosen_labels, chosen_mask)
-        policy_rejected_logps = compute_log_probs(actor, rejected_ids, rejected_labels, rejected_mask)
+        policy_chosen_logps = compute_log_probs(actor, chosen_ids, chosen_labels, chosen_mask)  # log π_θ(y_w|x)，对齐要抬高的项
+        policy_rejected_logps = compute_log_probs(actor, rejected_ids, rejected_labels, rejected_mask)  # log π_θ(y_l|x)，对齐要压低的项
 
         # 参考策略 π_ref 对好/坏回答的对数概率 (不需要梯度)
         with torch.no_grad():
-            ref_chosen_logps = compute_log_probs(ref_model, chosen_ids, chosen_labels, chosen_mask)
-            ref_rejected_logps = compute_log_probs(ref_model, rejected_ids, rejected_labels, rejected_mask)
+            ref_chosen_logps = compute_log_probs(ref_model, chosen_ids, chosen_labels, chosen_mask)  # log π_ref(y_w|x)，隐式奖励里的基准
+            ref_rejected_logps = compute_log_probs(ref_model, rejected_ids, rejected_labels, rejected_mask)  # log π_ref(y_l|x)；Z(x) 在差分中消掉
 
         # --- 计算 DPO 损失 (对应数学推导的最终公式) ---
         # 隐式奖励差: β · [log(π_θ(y_w)/π_ref(y_w)) - log(π_θ(y_l)/π_ref(y_l))]
-        chosen_logratios = policy_chosen_logps - ref_chosen_logps
-        rejected_logratios = policy_rejected_logps - ref_rejected_logps
-        logits = beta * (chosen_logratios - rejected_logratios)
+        chosen_logratios = policy_chosen_logps - ref_chosen_logps  # log π_θ - log π_ref 在 y_w：相对 ref 更偏好好答案的程度
+        rejected_logratios = policy_rejected_logps - ref_rejected_logps  # y_l 上的 log-ratio，与上式相减得 BT 指数内的标量
+        logits = beta * (chosen_logratios - rejected_logratios)  # 论文中的 β·(log-ratio 差)，即代入 σ 前的“隐式奖励差”
 
         # 负对数似然: -log σ(logits)
         # 使用 F.logsigmoid 而非 log(sigmoid(x))，避免数值下溢
-        loss = -F.logsigmoid(logits).mean()
+        loss = -F.logsigmoid(logits).mean()  # 最大化 σ(logits)≈p(y_w≻y_l|x)；最小化此项即拟合 Bradley-Terry 偏好
 
         # --- 反向传播 (标准的一阶梯度! 无需二阶优化) ---
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
-        optimizer.step()
+        optimizer.zero_grad()  # 每步先清空旧梯度，避免累积
+        loss.backward()  # 梯度含 σ(-r̂) 权重：难样本权重大，已对齐样本权重小（自适应课程）
+        torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)  # 防止大模型对齐时梯度爆炸
+        optimizer.step()  # 仅更新 π_θ；π_ref 始终冻结
 
         # --- 监控指标 ---
         with torch.no_grad():
-            implicit_reward_diff = logits.mean().item()  # 隐式奖励差 (越大越好)
-            accuracy = (logits > 0).float().mean().item()  # 分类准确率 (好答案得分是否 > 坏答案)
+            implicit_reward_diff = logits.mean().item()  # 隐式奖励差 (越大越好)；batch 内平均 BT 边强度
+            accuracy = (logits > 0).float().mean().item()  # 分类准确率 (好答案得分是否 > 坏答案)；偏好方向是否判对
 ```
 
 > **与 PPO 实现的关键对比**：

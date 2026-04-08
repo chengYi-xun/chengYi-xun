@@ -74,24 +74,28 @@ $$
 
 ```python
 def flux_step(model_output, latents, eta, sigmas, index, prev_sample, grpo, sde_solver):
-    sigma = sigmas[index]
-    dsigma = sigmas[index + 1] - sigma
-    prev_sample_mean = latents + dsigma * model_output
+    # Flow/SDE 单步更新：在视频/图像 GRPO 中用于定义连续动作 z_{t-1} 及其对数概率
+    sigma = sigmas[index]  # 当前扩散步的噪声尺度（调度表索引 index）
+    dsigma = sigmas[index + 1] - sigma  # 与下一步 sigma 的差分，用于欧拉型积分更新隐变量
+    prev_sample_mean = latents + dsigma * model_output  # 策略输出的确定性部分：下一步隐变量均值 μ_t（对应 MDP 中动作的均值）
     
-    delta_t = sigmas[index + 1] - sigmas[index]
-    std_dev_t = eta * torch.sqrt(torch.abs(delta_t))
+    delta_t = sigmas[index + 1] - sigmas[index]  # 形式上的时间步长，与 dsigma 一致，用于写清 SDE 离散化
+    std_dev_t = eta * torch.sqrt(torch.abs(delta_t))  # 随机策略的标准差 σ_t；η 控制探索强度，影响 log π 的方差项
     
     if grpo and prev_sample is None:
+        # Rollout 阶段：从 N(μ_t, σ_t²I) 采样实际动作 z_{t-1}，轨迹用于后续终端奖励与优势估计
         prev_sample = prev_sample_mean + torch.randn_like(prev_sample_mean) * std_dev_t
     
     if grpo:
+        # 高斯策略对数密度 log π_θ(z_{t-1}|z_t,c)：PPO/GRPO 重要性比率的分子分母都依赖此项
         log_prob = (
-            -((prev_sample.detach().float() - prev_sample_mean.float()) ** 2) / (2 * std_dev_t**2)
-            - math.log(std_dev_t)
-            - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
+            -((prev_sample.detach().float() - prev_sample_mean.float()) ** 2) / (2 * std_dev_t**2)  # 高斯指数项 -(z-μ)²/(2σ²)；detach 使对 z 不反传，对齐 PPO 行为
+            - math.log(std_dev_t)  # 各向同性高斯按维归一化带来的 -log σ 项
+            - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))  # 常数项 -½d·log(2π)，与维数相关的归一化（实现上可与上式合并理解）
         )
+        # 对除 batch 外的所有维（空间、通道、帧等）取均值，使每样本每步有一个标量 log π，便于沿时间步求和
         log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-        return prev_sample, pred_original_sample, log_prob
+        return prev_sample, pred_original_sample, log_prob  # 样本 z_{t-1}、（解码用中间量）、以及该步 log π
 ```
 
 **与 LLM GRPO 的对比**：
@@ -137,10 +141,12 @@ $$
 
 ```python
 # 分别计算 VQ 和 MQ 的组内优势
-vq_advantages = group_normalize(vq_rewards)  # 视觉质量优势
-mq_advantages = group_normalize(mq_rewards)  # 运动质量优势
+# VideoAlign 多维奖励：VQ/MQ 各自在同一 Prompt 的 G 条视频间做相对归一化，得到可比较的优势信号
+vq_advantages = group_normalize(vq_rewards)  # 视觉质量优势：引导画面清晰度、细节等
+mq_advantages = group_normalize(mq_rewards)  # 运动质量优势：引导时序连贯与动作合理性
 
 # 加权组合为总损失
+# 与 DanceGRPO 中 vq_coef / mq_coef 一致：多目标 GRPO，总目标为各维度裁剪策略梯度的加权和
 total_loss = vq_coef * ppo_loss(vq_advantages) + mq_coef * ppo_loss(mq_advantages)
 ```
 
@@ -186,32 +192,34 @@ $$
 # 训练循环核心（来自 DanceGRPO/fastvideo/train_grpo_flux.py）
 
 # 1. 组内优势计算
+# GRPO：同一 Prompt 下 G 条视频（或图像）共享组统计量，用相对排名稳定高维视觉生成的 RL
 if args.use_group:
-    for i in range(num_prompts):
-        start = i * args.num_generations
-        end = (i + 1) * args.num_generations
-        group_rewards = samples["rewards"][start:end]
-        group_mean = group_rewards.mean()
-        group_std = group_rewards.std() + 1e-8
-        advantages[start:end] = (group_rewards - group_mean) / group_std
+    for i in range(num_prompts):  # 逐个 Prompt 切片，每组 G 个样本
+        start = i * args.num_generations  # 当前组在 batch 中的起始下标
+        end = (i + 1) * args.num_generations  # 当前组结束下标（不含）
+        group_rewards = samples["rewards"][start:end]  # 该 Prompt 下 G 条轨迹的终端奖励（如 VideoAlign 标量或加权和）
+        group_mean = group_rewards.mean()  # 组内平均奖励 μ_R，作为基线
+        group_std = group_rewards.std() + 1e-8  # 组内标准差 σ_R，防止除零并缩放优势幅度
+        advantages[start:end] = (group_rewards - group_mean) / group_std  # 标准化优势 Â_i，对该 Prompt 下所有时间步复用（稀疏信用分配）
 
 # 2. 裁剪策略梯度损失
+# 子采样时间步以降低视频长轨迹的反传成本；fraction 越小每步更新越随机、方差越大
 train_timesteps = int(len(samples["timesteps"][0]) * args.timestep_fraction)
-for sample in samples_batched:
-    for step in range(train_timesteps):
-        new_log_probs = grpo_one_step(transformer, sample, step)
+for sample in samples_batched:  # 小批次轨迹：含存储的 z_t、z_{t-1}、旧 log π 等
+    for step in range(train_timesteps):  # 仅训练前 train_timesteps 个（或随机子集逻辑依实现而定）去噪步
+        new_log_probs = grpo_one_step(transformer, sample, step)  # 用当前 θ 重算 log π_θ，得到策略比率中的分子
         
         advantages_clipped = torch.clamp(
             sample["advantages"], -args.adv_clip_max, args.adv_clip_max
-        )
-        ratio = torch.exp(new_log_probs - sample["log_probs"][:, step])
+        )  # 限制极端优势，抑制视频 RL 中的梯度爆炸
+        ratio = torch.exp(new_log_probs - sample["log_probs"][:, step])  # ρ = π_new/π_old，连续隐空间下一步的重要性采样比
         
-        unclipped_loss = -advantages_clipped * ratio
+        unclipped_loss = -advantages_clipped * ratio  # 未裁剪的策略梯度项 -Â·ρ
         clipped_loss = -advantages_clipped * torch.clamp(
             ratio, 1.0 - args.clip_range, 1.0 + args.clip_range
-        )
-        loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
-        loss.backward()
+        )  # PPO 风格裁剪：限制单步策略变化，稳定高维动作上的更新
+        loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))  # 取 max 实现悲观界，标准 PPO surrogate
+        loss.backward()  # 梯度累积后更新去噪 Transformer（策略网络）
 ```
 
 ---
