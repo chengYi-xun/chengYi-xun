@@ -301,68 +301,11 @@ $$\nabla_d L = g - \lambda F d = 0 \implies d^* = \frac{1}{\lambda} F^{-1} g$$
 
 **复杂网络结构的问题。** 这一要求使得 TRPO 难以与现代深度网络结合：**Dropout** 在每次前向传播中随机丢弃神经元，使有效网络结构不断变化，FIM 在随机子网络上的估计变得不稳定；**BatchNorm** 的归一化统计量依赖于当前 mini-batch 中的所有样本，引入了样本间的相互依赖，而 FIM 的推导假设样本独立；**Transformer** 中的多头注意力、残差连接等组件使得损失函数的 Hessian 结构极其复杂，二阶导数的计算既慢又不稳定。这些因素叠加在一起，使得 TRPO 在参数动辄上亿的现代深度网络上几乎无法实际使用。
 
-## 广义优势估计（GAE）的实现
-
-在 TRPO 和 PPO 的代码中，优势函数 $\hat{A}_t$ 的估计都依赖 **GAE（Generalized Advantage Estimation）**。GAE 的核心思想是：用 TD 残差 $\delta_t$ 的指数加权和来估计优势，通过参数 $\lambda$ 在**偏差**（$\lambda \to 0$，只用单步 TD）和**方差**（$\lambda \to 1$，接近蒙特卡洛）之间权衡：
+在下面的 TRPO 和 PPO 代码中，优势函数 $\hat{A}_t$ 的估计都使用 **GAE（Generalized Advantage Estimation）**，其理论推导和代码实现详见[上一篇的 GAE 章节](/chengYi-xun/posts/17-rl-basics/#广义优势估计（GAE）：蒙特卡洛与-TD-的统一框架)。这里只回顾核心公式——GAE 通过参数 $\lambda$ 在偏差（$\lambda \to 0$，单步 TD）和方差（$\lambda \to 1$，蒙特卡洛）之间权衡：
 
 $$
 \hat{A}_t^{\text{GAE}(\gamma,\lambda)} = \sum_{l=0}^{T-t-1} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
 $$
-
-这个公式可以从后向前**递推**计算，避免显式求和：
-
-$$
-\hat{A}_t = \delta_t + \gamma \lambda \, \hat{A}_{t+1}
-$$
-
-下面是具体实现：
-
-```python
-def compute_gae(rewards, values, gamma=0.99, lam=0.95, dones=None):
-    """
-    广义优势估计 (Generalized Advantage Estimation)
-
-    rewards: Tensor [T]                  每步即时奖励
-    values:  Tensor [T] 或 [T+1]         Critic 对各状态的价值估计
-                                         推荐 T+1，最后一个元素是 bootstrap 值 V(s_T)
-    gamma:   折扣因子，控制对远期奖励的衰减（通常 0.99）
-    lam:     GAE 平滑参数 λ，越大方差越高但偏差越小（通常 0.95）
-    dones:   Tensor [T] (0/1)            1 表示回合在该步结束
-                                         用于在 episode 边界处截断 GAE 递推链
-    """
-    T = len(rewards)
-    # zeros_like 自动继承 device/dtype，多 GPU 训练时不会出错
-    advantages = torch.zeros_like(rewards)
-
-    # 没有提供 dones 时，默认全部为 0（假设一个连续回合，不推荐）
-    if dones is None:
-        dones = torch.zeros_like(rewards)
-
-    # 如果 values 长度为 T（没有 bootstrap），补一个 0
-    # 什么是 bootstrap？当回合被截断（达到最大步数但游戏未结束）时，
-    # 后面还有未知的奖励。我们用 Critic 的估计 V(s_T) 来"替代"看不到的未来回报，
-    # 这个"用估计代替真实值"的操作就叫 bootstrap。
-    # 截断场景下建议传 T+1 维度的 values，使末尾能正确 bootstrap
-    if len(values) == T:
-        values = torch.cat([values, torch.zeros(1, device=values.device)])
-
-    gae = 0.0  # 递推中的累积量，从末尾往前滚动
-
-    for t in reversed(range(T)):  # 从 t=T-1 向前递推到 t=0
-        # TD 残差 δ_t = r_t + γ·V(s_{t+1})·(1-done_t) − V(s_t)
-        # 当 done_t=1 时，回合已结束，V(s_{t+1}) 属于新回合，用 (1-done) 归零
-        delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
-        # GAE 递推：Â_t = δ_t + γλ·(1-done_t)·Â_{t+1}
-        # (1-done_t) 同时截断递推链，防止新回合的优势信号泄漏回旧回合
-        gae = delta + gamma * lam * (1 - dones[t]) * gae
-        advantages[t] = gae
-
-    return advantages  # [Â_0, Â_1, ..., Â_{T-1}]
-```
-
-> **GAE 的直觉**：$\lambda = 0$ 时退化为单步 TD 优势 $\hat{A}_t = \delta_t$（低方差、高偏差）；$\lambda = 1$ 时等价于蒙特卡洛回报减基线 $\hat{A}_t = \sum_{l \geq 0} \gamma^l r_{t+l} - V(s_t)$（低偏差、高方差）。实践中 $\lambda = 0.95$ 是一个好的折中。
->
-> **为什么需要 `dones`？** 一个 rollout buffer 往往包含多个回合片段（例如 CartPole 连续倒了 3 次）。没有 `dones`，GAE 会错误地将新回合的 $V(s_0)$ 当作旧回合末尾的 bootstrap 值。`(1 - done_t)` 在回合边界处同时归零 bootstrap 值和递推链，确保每段 episode 的优势估计互不干扰。
 
 ## TRPO 的实现
 
@@ -646,7 +589,24 @@ r_t = R_\psi(\text{prompt}, \text{response}) - \beta \cdot \text{KL}[\pi_\theta 
 $$
 其中 $\beta$ 控制 KL 惩罚的强度：$\beta$ 越大，Actor 越不敢偏离 Reference。
 
-下面是 RLHF-PPO 的完整实现。对比上面的 vanilla 版本，核心差异在 Step 1（数据采集方式）和 Step 2（KL 惩罚修正奖励）：
+下面是 RLHF-PPO 的完整实现。对比上面的 vanilla 版本，核心差异在 Step 1（数据采集方式）和 Step 2（KL 惩罚修正奖励）。
+
+**代码结构差异——为什么 RLHF 没有 `dist.sample()`？** Vanilla PPO 是**单步决策**：`dist = actor(s)` 返回一个分布对象，然后 `dist.sample()` 采一个动作、`dist.log_prob()` 算概率、`dist.entropy()` 算熵——一个 `dist` 对象就搞定一切。但语言模型生成回答是**逐 token 自回归**的：生成 $T$ 个 token 需要循环 $T$ 次，每一步的分布都依赖上一步的采样结果，不存在一个 `dist` 能代表整个回答。因此 RLHF 将采样封装在 `actor.generate()` 内部，训练时使用 **teacher forcing** 一次前向传播同时得到所有位置的 log_prob 和 entropy。
+
+> **什么是 Teacher Forcing？** 生成回答时，模型必须**逐 token 循环**——第 $t$ 步的输入依赖第 $t-1$ 步采样出的 token，无法并行，这就是 `generate()` 很慢的原因。但在训练阶段计算 `log_probs()` 和 `compute_entropy()` 时，回答已经生成好了（`responses` 是已知的固定序列）。此时可以把完整的 `[prompt, response]` **一次性喂给模型**，让模型在每个位置预测"下一个 token 应该是什么"——因为正确答案（response 中的实际 token）已经摆在那里当"老师"，所以叫 teacher forcing。这样只需**一次前向传播**就能并行算出所有 $T$ 个位置的 logits，再从中提取 log_prob 和 entropy，比自回归循环快 $T$ 倍。
+>
+> **为什么"一次前向传播"就能得到所有位置的概率？** 这靠的是 Transformer 的**因果遮罩（causal mask）**。直觉上语言模型是"输入序列 → 预测下一个 token"，但实际上 Transformer **同时**为序列中每个位置都预测了"下一个 token"。以输入 `[你, 好, 吗, 我]` 为例：
+>
+> | 位置 | 因果遮罩允许看到的内容 | 该位置的输出 |
+> |:---:|:---|:---|
+> | 0 ("你") | \[你\] | 预测"你"后面的 token |
+> | 1 ("好") | \[你, 好\] | 预测"好"后面的 token |
+> | 2 ("吗") | \[你, 好, 吗\] | 预测"吗"后面的 token |
+> | 3 ("我") | \[你, 好, 吗, 我\] | 预测"我"后面的 token |
+>
+> 每个位置只能 attend 到**自己和之前的位置**（通过 attention 中的三角遮罩矩阵实现），所以位置 2 的输出和"只输入 `[你, 好, 吗]`"时完全相同——不会因为后面还有 `我` 而"偷看"未来信息。这 4 个位置的预测是**并行计算**的。这就是为什么**生成时必须逐步循环**（因为下一个 token 还不知道），但**训练时可以一次性并行**（所有 token 都已知，因果遮罩保证不作弊）。
+
+代码中 `generate()`、`log_probs()` 和 `compute_entropy()` 的实现都展示在下方：
 
 ```python
 import torch
@@ -670,23 +630,26 @@ kl_coef = 0.1      # β, KL 惩罚系数
 # ============================================================
 # Step 1: 数据采集 — "环境"是: prompt → 生成回答 → 奖励模型打分
 # ============================================================
-prompts = sample_prompts(dataset)          # 从数据集中抽一批 prompt
+prompts = sample_prompts(dataset)          # [B, L]  B 个 prompt，每个长度 L
 with torch.no_grad():
     # 自回归生成完整回答，并记录采样时策略的 log π_θ（供 PPO 比率与 KL 项）
+    # generate() 内部逐 token 循环：logits → softmax → 采样 → 拼接，共 T 步
     responses, old_log_probs = actor.generate(prompts, return_log_probs=True)
-    old_values = critic(prompts, responses)  # 每个生成位置的价值估计
+    # responses: [B, T]        T 个生成 token
+    # old_log_probs: [B, T]    每个 token 位置的 log π_θ_old
+    old_values = critic(prompts, responses)  # [B, T] 每个生成位置的价值估计
     # 参考策略在相同 (prompt, response) 上的 log π_ref，用于逐 token KL
-    ref_log_probs = ref_model.log_probs(prompts, responses)  # π_ref 的对数概率
-    scores = reward_model(prompts, responses)                 # R_ψ 打分
+    ref_log_probs = ref_model.log_probs(prompts, responses)  # [B, T] π_ref 的对数概率
+    scores = reward_model(prompts, responses)                 # [B]    RM 整句打分（序列级标量）
 
 # ============================================================
 # Step 2: 计算 KL 惩罚修正后的奖励 (vanilla PPO 没有这一步!)
 # r = R_ψ - β·(log π_θ - log π_ref)
 # ============================================================
 # β·(log π_θ − log π_ref) 近似逐 token KL 惩罚，拉大与参考模型差异则扣分
-kl_penalty = kl_coef * (old_log_probs - ref_log_probs)      # 逐 token KL 惩罚
+kl_penalty = kl_coef * (old_log_probs - ref_log_probs)      # [B, T] 逐 token KL 惩罚
 # 将序列级 RM 分数与逐 token 惩罚合成 token 级奖励
-adjusted_rewards = compute_token_rewards(scores, kl_penalty)
+adjusted_rewards = compute_token_rewards(scores, kl_penalty)  # [B, T] 逐 token 奖励
 
 # ------ compute_token_rewards 的实现 ------
 # RM 给的是整句分数（一个标量），但 GAE 需要逐 token 的奖励。
@@ -701,6 +664,55 @@ def compute_token_rewards(scores, kl_penalty):
     rewards = -kl_penalty                       # 大部分 token：奖励 = −KL（偏离越大扣分越多）
     rewards[:, -1] += scores                    # 最后一个 token：叠加 RM 整句分数（句末结算）
     return rewards
+
+# ------ actor.generate() 的内部实现 ------
+# Vanilla PPO 是单步决策：dist = actor(s) → action = dist.sample()，一步完成。
+# 而语言模型生成回答是逐 token 自回归的——每个位置产生一个分布，
+# 后一个位置依赖前一个位置的采样结果，因此不存在一个 dist 对象能概括整个回答。
+# generate() 将采样循环封装在内部：
+def generate(self, prompts, return_log_probs=True, max_new_tokens=256):
+    """
+    prompts: [B, L]
+    return:  responses [B, T], log_probs [B, T]
+    """
+    tokens, log_probs_list = [], []
+    input_ids = prompts                                     # [B, L]
+    for t in range(max_new_tokens):
+        logits = self.forward(input_ids).logits[:, -1, :]   # 取最后位置 → [B, V]
+        probs = torch.softmax(logits, dim=-1)               # [B, V]
+        token = torch.multinomial(probs, num_samples=1)     # 采样 → [B, 1]
+        lp = torch.log_softmax(logits, dim=-1)              # [B, V]
+        token_lp = lp.gather(dim=-1, index=token)           # 取对应 token → [B, 1]
+        tokens.append(token)
+        log_probs_list.append(token_lp)
+        input_ids = torch.cat([input_ids, token], dim=-1)   # 自回归拼接
+    return torch.cat(tokens, dim=-1), torch.cat(log_probs_list, dim=-1)
+
+# ------ compute_entropy() 的实现 ------
+# 策略熵 S[π_θ](s) = −Σ_a π_θ(a|s) log π_θ(a|s)，衡量策略在当前状态下的"不确定性"。
+# 熵越大 → 策略越随机（均匀分布时熵最大）；熵越小 → 策略越确定（概率集中在一个 token）。
+# 在 PPO 损失中以负号出现（- entropy_coef * entropy），等价于鼓励策略保持多样性。
+# Vanilla PPO 直接调用 dist.entropy()；RLHF 中因为动作空间是整个词表（3~13万 token），
+# 需要从 logits 手动计算。
+def compute_entropy(actor, prompts, responses):
+    """
+    计算策略在 response 部分、所有生成位置上的平均熵
+
+    actor:     语言模型 π_θ
+    prompts:   [B, L]     prompt token ids —— 必须传入，因为 response 位置的概率分布
+                          取决于 prompt 提供的上下文（prompt 就是 RL 中的"状态 s"）
+    responses: [B, T]     response token ids
+    return:    标量，response 区域所有 batch × token 位置的平均熵
+    """
+    # prompt 和 response 拼接后一起输入：prompt 提供条件，response 提供预测目标
+    input_ids = torch.cat([prompts, responses], dim=-1)  # [B, L+T] 拼接完整序列
+    logits = actor(input_ids).logits                     # [B, L+T, V]  V = 词表大小
+    # 只取 response 部分的 logits（teacher forcing：位置 L-1 到 L+T-2 的输出预测位置 L 到 L+T-1 的 token）
+    resp_logits = logits[:, prompts.size(1)-1:-1, :]     # [B, T, V]
+    probs = torch.softmax(resp_logits, dim=-1)           # [B, T, V]
+    log_probs = torch.log_softmax(resp_logits, dim=-1)   # [B, T, V]  数值稳定版 log
+    token_entropy = -(probs * log_probs).sum(dim=-1)     # [B, T]  逐位置: −Σ_v p(v) log p(v)
+    return token_entropy.mean()                          # 标量
 
 # ============================================================
 # Step 3: 优势估计 (同 vanilla PPO)
@@ -719,7 +731,7 @@ for epoch in range(K_epochs):
     for idx in minibatch_indices(len(prompts), batch_size):
         new_log_probs = actor.log_probs(prompts[idx], responses[idx])  # 更新后策略对已生成 token 的 log π
         values = critic(prompts[idx], responses[idx])  # 当前 Critic 对同一前缀的价值预测
-        entropy = compute_entropy(actor, prompts[idx])  # 策略熵，鼓励多样性
+        entropy = compute_entropy(actor, prompts[idx], responses[idx])  # 策略熵，鼓励多样性
 
         ratio = torch.exp(new_log_probs - old_log_probs[idx])  # 与 vanilla PPO 相同的重要性权重 r
         surr1 = ratio * advantages[idx]  # 未裁剪替代项
@@ -738,7 +750,7 @@ for epoch in range(K_epochs):
         optimizer.step()
 ```
 
-**开源代码参考：** 目前大模型 RLHF 微调中最常用的 PPO 实现是 Hugging Face 的 **TRL (Transformer Reinforcement Learning)** 库（`trl.PPOTrainer`），其核心逻辑与上述代码一致。
+**开源代码参考：** 上述伪代码的生产级实现可参考 **[TRL](https://github.com/huggingface/trl)**（Hugging Face）和 **[OpenRLHF](https://github.com/OpenRLHF/OpenRLHF)**，两者都采用 prompt+response 拼接后一起前向传播、再通过 mask 提取 response 部分的方式计算 log_prob 和 entropy。
 
 ## PPO 在大模型微调中的痛点
 

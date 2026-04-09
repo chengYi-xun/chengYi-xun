@@ -533,6 +533,199 @@ for step in range(max_steps):  # 固定步数或可与 done 组合使用
 
 > 从 REINFORCE → + Baseline → Actor-Critic，算法的演进路线非常清晰：**先解决信号幅度过大的问题**（引入基线，将信号从绝对值拉到 0 附近），**再解决学习效率低的问题**（用 Critic 自举替代完整回报，将多步随机性压缩为单步，同时实现即时更新）。
 
+---
+
+# 广义优势估计（GAE）：蒙特卡洛与 TD 的统一框架
+
+上面三种算法分别用了蒙特卡洛（$G_t$）、蒙特卡洛减基线（$G_t - V$）、单步 TD（$\delta_t$）来估计优势。但蒙特卡洛无偏却方差大，TD 方差小却有偏——有没有一种方法能**在这两个极端之间自由调节**？这就是 **GAE（Generalized Advantage Estimation）**（[原始论文](https://arxiv.org/abs/1506.02438)）要解决的问题，它是后续 TRPO 和 PPO 算法的基础组件。
+
+## 三种优势估计方法的关系
+
+不同的估计方法，本质上是在回答同一个问题——**"估计 $Q(s_t, a_t)$ 时，我们应该多大程度地依赖真实观测（实际奖励），多大程度地依赖 Critic 的预测（$V_\phi$）？"**
+
+**方法 1：蒙特卡洛估计（完全不信 Critic）。** 从 $t$ 时刻开始，一直走到回合结束，用实际获得的累积奖励替代 $Q$：
+
+$$\hat{A}_t^{MC} = G_t - V(s_t) = \left(\sum_{l=0}^{T-t-1} \gamma^l r_{t+l}\right) - V(s_t)$$
+
+因为 $G_t$ 是 $Q(s_t, a_t)$ 的无偏估计（$\mathbb{E}[G_t | s_t, a_t] = Q(s_t, a_t)$），所以 $\hat{A}_t^{MC}$ 是真实优势的**无偏估计**。但它累积了从 $t$ 到 $T$ 每一步的随机性，方差极大。用面试的例子说：$G_1 = r_1 + r_2 + r_3$，后两轮的随机性全部混进了对第 1 轮决策的评价。
+
+**方法 2：单步 TD 误差（完全信任 Critic）。** 只看一步实际奖励，未来的部分全部交给 Critic 预测：
+
+$$\hat{A}_t^{TD} = \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
+
+$\delta_t$ 仅含一步随机性（$r_t$ 和 $s_{t+1}$），方差很低。但如果 $V(s_{t+1})$ 不准确，$\delta_t$ 就会有偏差。用面试的例子说：$\delta_1 = r_1 + V(s_2) - V(s_1) = 6 + 5 - 9 = +2$，这个 $+2$ 完全依赖 Critic 对 $V(s_2) = 5$ 的预估准不准。如果实际后续得分是 $6$ 而非 $5$，$\delta_1$ 就低估了真实优势。
+
+**方法 3：n 步估计（折中方案）。** 自然的想法是：多看几步实际奖励，减少对 Critic 的依赖。n 步优势估计为：
+
+$$\hat{A}_t^{(n)} = \left(\sum_{l=0}^{n-1} \gamma^l r_{t+l}\right) + \gamma^n V(s_{t+n}) - V(s_t)$$
+
+看 $n$ 步真实奖励，然后用 Critic 估计剩余部分。$n$ 越大，偏差越小（用了更多真实数据），但方差越大（累积了更多随机性）。容易验证：$n = 1$ 时退化为 TD 误差 $\delta_t$，$n = T - t$ 时退化为蒙特卡洛估计 $G_t - V(s_t)$。
+
+## n 步优势估计 = TD 误差的折扣累加
+
+一个关键的数学等式是：**n 步优势估计恰好等于前 n 个 TD 误差的折扣累加**：
+
+$$\hat{A}_t^{(n)} = \sum_{l=0}^{n-1} \gamma^l \delta_{t+l}$$
+
+我们用面试例子（$n = 3$，三轮面试，令 $\gamma = 1$ 简化）来**逐项展开**验证。先把 3 个 TD 误差写出来：
+
+$$\delta_1 = r_1 + V(s_2) - V(s_1), \quad \delta_2 = r_2 + V(s_3) - V(s_2), \quad \delta_3 = r_3 + V(s_4) - V(s_3)$$
+
+把它们加起来，按类型分组（$\color{blue}{\text{蓝色 = 真实奖励}}$、$\color{green}{\text{绿色 = 正 V 项}}$、$\color{red}{\text{红色 = 负 V 项}}$）：
+
+$$\delta_1 + \delta_2 + \delta_3 = \underbrace{\color{blue}{r_1 + r_2 + r_3}}_{\text{真实奖励}} + \underbrace{\color{green}{V(s_2) + V(s_3) + V(s_4)}}_{\text{来自 }+\gamma V(s_{t+l+1})} - \underbrace{\color{red}{V(s_1) + V(s_2) + V(s_3)}}_{\text{来自 }-V(s_{t+l})}$$
+
+现在逐项比较$\color{green}{\text{绿色}}$和$\color{red}{\text{红色}}$两组（$\color{gray}{\text{灰色}}$表示已抵消的项）：
+
+$$= \color{blue}{r_1 + r_2 + r_3} + \color{gray}{V(s_2)} + \color{gray}{V(s_3)} + \color{green}{V(s_4)} - \color{red}{V(s_1)} - \color{gray}{V(s_2)} - \color{gray}{V(s_3)}$$
+
+$\color{gray}{V(s_2)}$ 在绿色组出现一次（$+$），在红色组也出现一次（$-$），抵消变灰；$\color{gray}{V(s_3)}$ 同理抵消。**中间所有 $V$ 项两两对消，只剩下首尾**：
+
+$$= \color{blue}{(r_1 + r_2 + r_3)} + \color{green}{V(s_4)} - \color{red}{V(s_1)} = \hat{A}_1^{(3)} \quad \checkmark$$
+
+这正是 3 步优势估计的定义！如果回合在第 3 步结束（$V(s_4) = 0$），则 $= G_1 - V(s_1)$，退化为蒙特卡洛。
+
+**一般情况**（$\gamma \neq 1$）同理：每个正 $V$ 项 $\gamma^{l+1} V(s_{t+l+1})$ 与下一个负 $V$ 项 $\gamma^{l+1} V(s_{t+l+1})$ 配对抵消，最终只剩首尾：
+
+$$\sum_{l=0}^{n-1} \gamma^l \delta_{t+l} = \sum_{l=0}^{n-1} \gamma^l r_{t+l} + \gamma^n V(s_{t+n}) - V(s_t) = \hat{A}_t^{(n)} \quad \square$$
+
+**这个等式解释了一个常见的困惑：为什么"不属于第 $t$ 步"的后续 TD 误差 $\delta_{t+1}, \delta_{t+2}, \ldots$ 也被加进了对动作 $a_t$ 的优势评价？** 答案是：累加后续 TD 误差并不是在"重复衡量动作 $a_t$ 好不好"，而是在**用实际观测逐步替换 Critic 的预测**——每多加一个 $\delta$，就多看了一步真实奖励，少依赖一步 Critic 的猜测。
+
+用面试例子来说：$\delta_1 = +2$ 完全信任 Critic 对 $V(s_2) = 5$ 的预估。如果面试继续走下去，发现 $\delta_2 > 0$（第 2 步实际表现比 Critic 预估好），这说明 $V(s_2)$ 被低估了——而这正是 $\delta_1$ 被低估的同一个原因。把 $\delta_2$ 加进来（2 步估计 $\hat{A}_1^{(2)} = \delta_1 + \gamma\delta_2$），就是用第 2 步的实际奖励替换了 Critic 对 $V(s_2)$ 的不完美预测，修正了偏差。
+
+## 从 n 步估计到 GAE：指数加权平均
+
+现在问题变成了：**n 取多少合适？** $n=1$ 偏差大方差小，$n=T-t$ 偏差小方差大，中间的 $n$ 是某种折中。但每个 $n$ 都给出了真实优势的一个合理估计，选哪个都有道理。
+
+GAE 的巧妙之处在于：**不选任何单一的 $n$，而是把所有 n 步估计做指数加权平均**：
+
+$$\hat{A}_t^{\text{GAE}(\gamma,\lambda)} = (1-\lambda) \sum_{n=1}^{\infty} \lambda^{n-1} \hat{A}_t^{(n)}$$
+
+展开来看，各个 n 步估计分到的权重为：
+
+| n 步估计 | 含义 | 权重 | $\lambda = 0.95$ 时 |
+|:---:|:---|:---:|:---:|
+| $\hat{A}_t^{(1)} = \delta_t$ | 只看 1 步，完全信任 Critic | $(1-\lambda) = 0.05$ | 5% |
+| $\hat{A}_t^{(2)} = \delta_t + \gamma\delta_{t+1}$ | 看 2 步 | $(1-\lambda)\lambda = 0.0475$ | 4.75% |
+| $\hat{A}_t^{(3)} = \delta_t + \gamma\delta_{t+1} + \gamma^2\delta_{t+2}$ | 看 3 步 | $(1-\lambda)\lambda^2 = 0.0451$ | 4.51% |
+| $\vdots$ | $\vdots$ | $\vdots$ | $\vdots$ |
+
+权重总和为 $(1-\lambda)(1 + \lambda + \lambda^2 + \cdots) = (1-\lambda) \cdot \frac{1}{1-\lambda} = 1$。由于 $\lambda^n$ 随 $n$ 指数衰减，短步估计的权重总是更大。$\lambda$ 越接近 $0$，1 步估计的权重 $(1-\lambda)$ 越接近 $1$，几乎只用 $\delta_t$（低方差、高偏差）；$\lambda$ 越接近 $1$，各步估计的权重越均匀，等效于看更多步的实际奖励（低偏差、高方差）。
+
+将 $\hat{A}_t^{(n)} = \sum_{l=0}^{n-1} \gamma^l \delta_{t+l}$ 代入，对于固定的 $l$，$\delta_{t+l}$ 出现在所有 $n \geq l+1$ 的估计中。交换求和顺序：
+
+$$\hat{A}_t^{\text{GAE}} = (1-\lambda) \sum_{l=0}^{\infty} \gamma^l \delta_{t+l} \sum_{n=l+1}^{\infty} \lambda^{n-1} = (1-\lambda) \sum_{l=0}^{\infty} \gamma^l \delta_{t+l} \cdot \frac{\lambda^l}{1-\lambda} = \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}$$
+
+得到 GAE 的标准形式：
+
+$$\boxed{\hat{A}_t^{\text{GAE}(\gamma,\lambda)} = \sum_{l=0}^{T-t-1} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)}$$
+
+## 严格推导：$\lambda = 1$ 时 GAE 退化为蒙特卡洛（无偏）
+
+当 $\lambda = 1$ 时，GAE 公式变为 $\hat{A}_t = \sum_{l=0}^{T-t-1} \gamma^l \delta_{t+l}$。这和上面 n 步估计的 telescoping **完全相同**——只是 $n$ 取到了最大值 $T - t$（看完全程）。
+
+仍然用面试例子（$\gamma = 1$，3 轮面试，$T - t = 3$）具体展开：
+
+$$\hat{A}_1^{\text{GAE}(1,1)} = \delta_1 + \delta_2 + \delta_3$$
+
+$$= \underbrace{\color{blue}{r_1 + r_2 + r_3}}_{\text{真实奖励}} + \underbrace{\color{gray}{V(s_2)} + \color{gray}{V(s_3)} + \color{green}{V(s_4)}}_{\text{正 V 项}} - \underbrace{\color{red}{V(s_1)} + \color{gray}{V(s_2)} + \color{gray}{V(s_3)}}_{\text{负 V 项}}$$
+
+$$= \color{blue}{(r_1 + r_2 + r_3)} + \color{green}{V(s_4)} - \color{red}{V(s_1)}$$
+
+若 $s_4$ 为终止状态（$V(s_4) = 0$）：$= (r_1 + r_2 + r_3) - V(s_1) = G_1 - V(s_1)$，即蒙特卡洛估计。
+
+**一般情况**（$\gamma \neq 1$）同理，抵消规律与上面完全一致（只是每项多了 $\gamma^l$ 系数，不影响配对抵消），最终只剩首尾：
+
+$$\hat{A}_t^{\text{GAE}(\gamma,1)} = \sum_{l=0}^{T-t-1} \gamma^l r_{t+l} + \gamma^{T-t} V(s_T) - V(s_t)$$
+
+若回合在 $T$ 时刻终止（终止状态价值为零，$V(s_T) = 0$）：
+
+$$\hat{A}_t^{\text{GAE}(\gamma,1)} = \underbrace{\sum_{l=0}^{T-t-1} \gamma^l r_{t+l}}_{= \; G_t} - V(s_t) = G_t - V(s_t) = \hat{A}_t^{MC} \quad \square$$
+
+所有 $V$ 项被望远镜抵消消灭，估计中不再依赖 Critic 的任何预测——这就是 $\lambda = 1$ 无偏的根本原因。类似地，$\lambda = 0$ 时 $\hat{A}_t^{\text{GAE}(\gamma,0)} = \delta_t$，退化为单步 TD。
+
+## 蒙特卡洛、TD 误差与 GAE 的对比总结
+
+| | **蒙特卡洛** $G_t - V(s_t)$ | **TD 误差** $\delta_t$ | **GAE** $\sum (\gamma\lambda)^l \delta_{t+l}$ |
+|:---|:---:|:---:|:---:|
+| **等价于** | $\lambda = 1$ 的 GAE | $\lambda = 0$ 的 GAE | $\lambda \in (0,1)$ 的加权混合 |
+| **公式展开** | $\sum_{l} \gamma^l r_{t+l} - V(s_t)$ | $r_t + \gamma V(s_{t+1}) - V(s_t)$ | 所有 n 步估计的指数加权平均 |
+| **信任 Critic 程度** | 完全不信（只用 $V(s_t)$ 作基线） | 完全信任（用 $V(s_{t+1})$ 替代全部未来） | 部分信任（$\lambda$ 调节） |
+| **偏差** | 无（$G_t$ 是 $Q$ 的无偏估计） | 有（$V(s_{t+1})$ 可能不准） | 介于两者之间 |
+| **方差** | 高（累积 $T-t$ 步随机性） | 低（仅 1 步随机性） | 介于两者之间 |
+| **何时可计算** | 回合结束后 | 每走一步即可 | 回合结束后（需后续 $\delta$） |
+| **物理意义** | 动作 $a_t$ 走完全程后**实际**比平均好多少 | 动作 $a_t$ 的**即时**表现比 Critic 预期好多少 | 综合即时和多步信息的**平滑**估计 |
+
+实践中 $\lambda = 0.95$ 是一个好的折中——保留了 95% 的长期信息，同时通过 $0.95^l$ 的指数衰减使远处（方差大的）TD 误差权重递减，有效抑制方差。
+
+## GAE 的递推实现
+
+GAE 公式可以从后向前**递推**计算，避免显式求和：
+
+$$
+\hat{A}_t = \delta_t + \gamma \lambda \, \hat{A}_{t+1}
+$$
+
+下面是具体实现：
+
+```python
+def compute_gae(rewards, values, gamma=0.99, lam=0.95, dones=None):
+    """
+    广义优势估计 (Generalized Advantage Estimation)
+
+    rewards: Tensor [T]                  每步即时奖励
+    values:  Tensor [T] 或 [T+1]         Critic 对各状态的价值估计
+                                         推荐 T+1，最后一个元素是 bootstrap 值 V(s_T)
+    gamma:   折扣因子，控制对远期奖励的衰减（通常 0.99）
+    lam:     GAE 平滑参数 λ，越大方差越高但偏差越小（通常 0.95）
+    dones:   Tensor [T] (0/1)            1 表示回合在该步结束
+                                         用于在 episode 边界处截断 GAE 递推链
+    """
+    T = len(rewards)
+    # zeros_like 自动继承 device/dtype，多 GPU 训练时不会出错
+    advantages = torch.zeros_like(rewards)
+
+    # 没有提供 dones 时，默认全部为 0（假设一个连续回合，不推荐）
+    if dones is None:
+        dones = torch.zeros_like(rewards)
+
+    # 如果 values 长度为 T（没有 bootstrap），补一个 0
+    # 什么是 bootstrap？当回合被截断（达到最大步数但游戏未结束）时，
+    # 后面还有未知的奖励。我们用 Critic 的估计 V(s_T) 来"替代"看不到的未来回报，
+    # 这个"用估计代替真实值"的操作就叫 bootstrap。
+    # 截断场景下建议传 T+1 维度的 values，使末尾能正确 bootstrap
+    if len(values) == T:
+        values = torch.cat([values, torch.zeros(1, device=values.device)])
+
+    gae = 0.0  # 递推中的累积量，从末尾往前滚动
+
+    for t in reversed(range(T)):  # 从 t=T-1 向前递推到 t=0
+        # TD 残差 δ_t = r_t + γ·V(s_{t+1})·(1-done_t) − V(s_t)
+        # 当 done_t=1 时，回合已结束，V(s_{t+1}) 属于新回合，用 (1-done) 归零
+        delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
+        # GAE 递推：Â_t = δ_t + γλ·(1-done_t)·Â_{t+1}
+        # (1-done_t) 同时截断递推链，防止新回合的优势信号泄漏回旧回合
+        gae = delta + gamma * lam * (1 - dones[t]) * gae
+        advantages[t] = gae
+
+    return advantages  # [Â_0, Â_1, ..., Â_{T-1}]
+```
+
+> **什么是 Bootstrap？** 在 TD 误差 $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ 中，$V(s_{t+1})$ 就是 bootstrap——我们不知道从 $s_{t+1}$ 开始真正能拿多少分，所以**用 Critic 的预测值 $V(s_{t+1})$ 来"代替"看不到的未来回报**，这种"用估计值替代真实值"的操作就叫 bootstrap（自举）。
+>
+> **为什么需要 `dones`？** 一个 rollout buffer 往往包含多个回合片段。用面试的例子来说：假设 AI 连续跑了两局面试，数据在 buffer 中紧挨着排列：
+>
+> | 位置 | $t=1$ | $t=2$ | $t=3$（第1局结束） | $t=4$（第2局开始） | $t=5$ | ... |
+> |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+> | 状态 | $s_1^{(1)}$ | $s_2^{(1)}$ | $s_3^{(1)}$ | $s_1^{(2)}$ | $s_2^{(2)}$ | ... |
+> | done | 0 | 0 | **1** | 0 | 0 | ... |
+>
+> **没有 `dones` 会怎样？** 计算 $t=3$（第 1 局最后一步）的 TD 误差时：$\delta_3 = r_3 + \gamma V(s_4) - V(s_3)$。但 $s_4$ 是第 2 局的初始状态——一场全新的面试！$V(s_4)$ 与第 1 局完全无关，不应被当作第 1 局末尾的 bootstrap 值。如果直接使用，等于把"第 2 局开局的预期分数"算进了第 1 局的优势评价，导致估计错误。
+>
+> **加上 `(1 - done_t)` 后**：当 $\text{done}_3 = 1$ 时，$(1 - \text{done}_3) = 0$，于是 $\delta_3 = r_3 + \gamma \cdot V(s_4) \cdot 0 - V(s_3) = r_3 - V(s_3)$。bootstrap 值被归零，第 1 局的最后一步不再"偷看"第 2 局的信息。同时，GAE 递推链 $\hat{A}_3 = \delta_3 + \gamma\lambda \cdot 0 \cdot \hat{A}_4 = \delta_3$ 也被截断，第 2 局的优势不会泄漏回第 1 局。
+
+---
+
 **开源代码参考：**
 在实际应用中，REINFORCE 由于方差过大，几乎不再被单独用于复杂任务；Actor-Critic（特别是其变体 A2C/A3C）则被广泛使用。目前最主流的强化学习开源库如 **Stable-Baselines3** 和 Hugging Face 的 **TRL (Transformer Reinforcement Learning)** 都提供了这些基础算法的实现。上面三个算法各自的完整 PyTorch 实现已附在对应小节末尾，从模型定义、数据采集到参数更新的完整前向流程可以直接参考。
 
