@@ -71,93 +71,245 @@ $$\text{信号} = \beta \left( \log \frac{\pi_\theta(y_w|x)}{\pi_\text{ref}(y_w|
 
 ### Step 1：RLHF 的 KL 约束优化目标
 
-在传统的 RLHF 中（上一篇 PPO 的四模型架构），我们的目标是最大化奖励，同时用 KL 散度约束策略不要偏离参考模型太远：
+先约定符号：
+
+| 符号 | 含义 |
+|:---:|:---|
+| $x$ | 用户的提示词（Prompt），例如"用 Python 写一个排序函数" |
+| $y$ | 模型生成的回答（Response），例如一段代码 |
+| $\mathcal{D}$ | 提示词数据集，所有训练用的用户问题集合 |
+| $\pi(y \mid x)$ | 当前策略（即正在训练的语言模型），表示给定 $x$ 时生成 $y$ 的概率 |
+| $\pi_{\text{ref}}(y \mid x)$ | 参考模型（冻结的 SFT 模型），用来"拴住"当前模型，防止它学偏 |
+| $r(x, y)$ | 奖励函数，衡量回答 $y$ 对于问题 $x$ 的质量 |
+| $\beta$ | KL 惩罚系数，控制当前模型偏离参考模型的程度，$\beta$ 越大约束越强 |
+
+在传统的 RLHF 中（上一篇 PPO 的四模型架构），我们的目标可以用一句话概括：**让模型回答得尽量好，但又不能跑偏太远**。数学上写成：
+
 $$
-\max_{\pi} \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right] - \beta \cdot D_{\text{KL}}(\pi \| \pi_{\text{ref}})
+\max_{\pi} \underbrace{\mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right]}_{\text{让回答质量尽量高}} - \underbrace{\beta \cdot D_{\text{KL}}(\pi \| \pi_{\text{ref}})}_{\text{别偏离参考模型太远}}
 $$
 
-将 KL 散度展开，等价于：
+第一项好理解：从训练集 $\mathcal{D}$ 中随机抽一道题 $x$，让当前模型 $\pi$ 生成回答 $y$，用奖励函数 $r(x,y)$ 打分，希望**期望分数越高越好**。
+
+第二项是"缰绳"：$D_{\text{KL}}(\pi \| \pi_{\text{ref}})$ 衡量当前模型 $\pi$ 和参考模型 $\pi_{\text{ref}}$ 之间的"距离"。如果没有这条缰绳，模型为了拿高分会走捷径——比如对所有问题都输出同一个高分模板答案，完全丧失通用能力（这叫 **reward hacking**，奖励欺骗）。$\beta$ 就是缰绳的松紧度：$\beta$ 越大，缰绳越紧，模型越保守。
+
+现在把 KL 散度展开。KL 散度的定义是：
+
 $$
-\max_{\pi} \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]
+D_{\text{KL}}(\pi \| \pi_{\text{ref}}) = \mathbb{E}_{y \sim \pi(\cdot|x)} \left[ \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]
 $$
+
+直觉上，$\log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)}$ 衡量的是：对于某个具体回答 $y$，当前模型 $\pi$ 给它的概率相比参考模型 $\pi_{\text{ref}}$ **偏高了多少**。如果 $\pi$ 给某个回答的概率是 $\pi_{\text{ref}}$ 的 10 倍，这项就是 $\log 10 \approx 2.3$，说明模型在这个回答上"跑偏"了很多。KL 散度就是这个"跑偏程度"在所有可能回答上的期望值。
+
+代入优化目标：
+
+$$
+\max_{\pi} \underbrace{\mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right]}_{\text{第一项：期望奖励}} - \beta \cdot \underbrace{\mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]}_{\text{第二项：KL 散度展开后}}
+$$
+
+由于两项的期望都在**同一分布** $x \sim \mathcal{D}, y \sim \pi$ 下，根据期望的线性性（$\mathbb{E}[A] - \beta \mathbb{E}[B] = \mathbb{E}[A - \beta B]$），可以合并为一个期望：
+
+$$
+\max_{\pi} \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ \underbrace{r(x, y)}_{\text{奖励}} - \underbrace{\beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)}}_{\text{跑偏惩罚}} \right]
+$$
+
+直觉上：对于每一个具体的回答 $y$，模型获得的"净收益"= 奖励 $r(x,y)$ 减去跑偏惩罚。模型需要在"拿高分"和"别跑偏"之间做平衡。
 
 这正是上一篇 RLHF-PPO 中的奖励修正公式。PPO 用在线采样 + 裁剪来近似求解这个问题。**DPO 的出发点是：这个问题是否有解析解（闭式解）？**
 
 ### Step 2：推导最优策略的闭式解
 
-对于固定的 Prompt $x$，上述目标关于 $\pi(\cdot|x)$ 的优化可以写成：
+接下来我们从上面的目标函数出发，通过纯代数变换，一步步**自然推出**最优策略的形式。
+
+#### Step 2.1：变号——从 max 到 min
+
+上面的目标是：
 
 $$
-\max_{\pi(\cdot|x)} \sum_y \pi(y|x) \left[ r(x, y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]
+\max_{\pi} \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]
 $$
 
-这是一个带归一化约束（$\sum_y \pi(y|x) = 1$）的凸优化问题。我们定义一个特殊的分布：
+**为什么要变号？** 我们的最终目标是把这个式子变成 KL 散度的形式（因为 KL 散度有漂亮的最小值性质：$D_{\text{KL}} \geq 0$，且等号成立时我们直接就能读出最优解）。而 KL 散度的标准形式是 $\mathbb{E}\left[\log \frac{P}{Q}\right]$，是一个**最小化**问题。所以我们先把 max 转成 min。
+
+具体做法：固定一个 Prompt $x$，只看内层关于 $y$ 的优化。先除以 $\beta$（$\beta > 0$，除正数不改变 $\max$ 方向），再取反（$\max$ 变 $\min$）：
 
 $$
-\pi^*(y|x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left( \frac{r(x, y)}{\beta} \right), \quad Z(x) = \sum_y \pi_{\text{ref}}(y|x) \exp\left( \frac{r(x, y)}{\beta} \right)
+\min_{\pi} \mathbb{E}_{y \sim \pi(y|x)} \left[ \underbrace{\log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)}}_{\text{跑偏程度}} - \underbrace{\frac{1}{\beta} r(x, y)}_{\text{缩放后的奖励}} \right]
 $$
 
-其中 $Z(x)$ 是**配分函数（Partition Function）**，确保 $\pi^*$ 是一个合法的概率分布（所有 $y$ 的概率之和为 1）。
+现在的含义很清晰：我们要找一个策略 $\pi$，使得"跑偏程度减去奖励收益"尽量小——即在尽量不跑偏的前提下，尽量拿高奖励。
 
-**为什么 $\pi^*$ 是最优解？** 将目标函数改写为与 $\pi^*$ 的 KL 散度（具体推导见下）：
+#### Step 2.2：合并对数——把两项塞进一个 log 分数
 
-$$
-\begin{aligned}
-&\sum_y \pi(y|x) \left[ r(x, y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right] \\
-&= \sum_y \pi(y|x) \left[ \beta \log \pi^*(y|x) + \beta \log Z(x) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right] \\
-&\quad \text{（因为 } r(x,y) = \beta \log \pi^*(y|x) - \beta \log \pi_{\text{ref}}(y|x) + \beta \log Z(x) \text{）} \\
-&= \beta \log Z(x) + \beta \sum_y \pi(y|x) \log \frac{\pi^*(y|x)}{\pi(y|x)} \\
-&= \beta \log Z(x) - \beta \cdot D_{\text{KL}}(\pi \| \pi^*)
-\end{aligned}
-$$
+**为什么要合并？** 上式有两项（log 比值 - 奖励），如果能合并成一个 $\log \frac{\text{分子}}{\text{分母}}$ 的形式，就离 KL 散度只差一步了。
 
-由于 $D_{\text{KL}}(\pi \| \pi^*) \geq 0$，且当且仅当 $\pi = \pi^*$ 时取等号，所以**目标函数在 $\pi = \pi^*$ 时取到最大值** $\beta \log Z(x)$。
-
-**直觉理解 $\pi^*$**：最优策略是参考策略经过**奖励加权**后的版本——高奖励的回答被指数级放大（$\exp(r/\beta)$），低奖励的被压制。$\beta$ 控制放大的程度：$\beta$ 越小，最优策略越激进地集中在高奖励回答上；$\beta$ 越大，越接近原始参考策略。
-
-### Step 3：用策略反向表示奖励
-
-既然 $\pi^*(y|x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left( \frac{r(x, y)}{\beta} \right)$，对两边取对数并重排，我们可以**用最优策略的概率来表示奖励**：
+技巧：把 $\frac{1}{\beta} r(x,y)$ 也变成 log 形式。利用恒等式 $a = \log e^a$（取指数再取对数，值不变）：
 
 $$
-r(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_{\text{ref}}(y|x)} + \beta \log Z(x)
+\frac{1}{\beta} r(x,y) = \log \exp\left(\frac{1}{\beta} r(x,y)\right)
 $$
 
-这一步至关重要：它建立了**奖励函数**和**策略概率**之间的双向映射。如果我们有最优策略 $\pi^*$，就不需要显式的奖励模型了——奖励已经被隐式地编码在策略的概率中。
-
-### Step 4：Bradley-Terry 偏好模型
-
-**Bradley-Terry (BT) 模型**是偏好学习中最经典的概率模型。它假设：人类选择 $y_w$ 胜过 $y_l$ 的概率，取决于两者奖励之差通过 Sigmoid 函数的映射：
+两项都是 log 了，就可以用 $\log A - \log B = \log \frac{A}{B}$ 合并：
 
 $$
-p(y_w \succ y_l | x) = \sigma(r(x, y_w) - r(x, y_l))
+\log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} - \log \exp\left(\frac{1}{\beta} r(x, y)\right) = \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x) \cdot \exp\left(\frac{1}{\beta} r(x, y)\right)}
 $$
 
-其中 $\sigma(z) = \frac{1}{1 + e^{-z}}$ 是 Sigmoid 函数。
+优化目标变为：
 
-**直觉理解**：如果好回答的奖励远高于坏回答（$r(x, y_w) \gg r(x, y_l)$），Sigmoid 输出接近 1（人类几乎一定偏好 $y_w$）；如果两者奖励接近，Sigmoid 输出接近 0.5（人类难以区分）。BT 模型正是传统 RLHF 中训练奖励模型 $R_\psi$ 的理论基础——用人类偏好数据最大化上式的似然来拟合 $R_\psi$。
+$$
+\min_{\pi} \mathbb{E}_{y \sim \pi(y|x)} \left[ \log \frac{\pi(y|x)}{\underbrace{\pi_{\text{ref}}(y|x) \cdot \exp\left(\frac{1}{\beta} r(x, y)\right)}_{\text{一个和 } \pi \text{ 无关的量}}} \right]
+$$
+
+这已经非常像 KL 散度了！KL 散度的形式是 $\mathbb{E}_{P}\left[\log \frac{P}{Q}\right]$——分子是 $\pi$（采样分布），分母如果也是一个合法的概率分布，那这就**是** KL 散度了。
+
+#### Step 2.3：引入配分函数 $Z(x)$——让分母成为合法概率分布
+
+**现在的问题**：分母 $\pi_{\text{ref}}(y|x) \cdot \exp\left(\frac{1}{\beta} r(x, y)\right)$ 虽然对每个 $y$ 都是正数，但它对所有 $y$ 求和未必等于 1——也就是说，它还**不是一个合法的概率分布**，我们还不能直接说这是 KL 散度。
+
+**解决办法**：给它做**归一化**，就像把一组正数除以它们的总和变成概率一样。这个总和就叫**配分函数（Partition Function）**：
+
+$$
+Z(x) = \sum_{y} \pi_{\text{ref}}(y|x) \exp\left(\frac{1}{\beta} r(x, y)\right)
+$$
+
+$Z(x)$ 的含义：它是参考模型 $\pi_{\text{ref}}$ 对所有可能回答的"奖励加权总和"。注意它只跟固定的 $x$、$r$、$\pi_{\text{ref}}$ 有关，**与我们要优化的 $\pi$ 完全无关**——这一点后面至关重要。
+
+为了把 $Z(x)$ 引入分母做归一化，我们在分母上乘以 $\frac{Z(x)}{Z(x)} = 1$（数值不变，纯粹是数学等价变换）。相应地，多出来的 $Z(x)$ 项从 log 里提出来变成 $-\log Z(x)$：
+
+$$
+\min_{\pi} \mathbb{E}_{y \sim \pi(y|x)} \left[ \log \frac{\pi(y|x)}{\frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left(\frac{1}{\beta} r(x, y)\right)} - \log Z(x) \right]
+$$
+
+> **这步的数学细节**：原本分母是 $A$，乘上 $\frac{Z}{Z}$ 后分母变成 $\frac{A}{Z} \cdot Z$。log 里提出 $Z$：$\log \frac{\pi}{\frac{A}{Z} \cdot Z} = \log \frac{\pi}{\frac{A}{Z}} - \log Z$。
+
+#### Step 2.4：定义 $\pi^*$——最优策略自然浮现
+
+现在看分母里的 $\frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left(\frac{1}{\beta} r(x, y)\right)$：
+
+- 每个 $y$ 对应的值都 $> 0$（概率和指数函数都是正数）。
+- 对所有 $y$ 求和恰好等于 1（因为 $Z(x)$ 就是按这个定义的）。
+
+**所以它就是一个合法的概率分布！** 我们给它一个名字 $\pi^*$：
+
+$$
+\pi^*(y|x) \triangleq \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left(\frac{1}{\beta} r(x, y)\right)
+$$
+
+代入优化目标，第一项就变成了标准的 KL 散度形式 $\mathbb{E}_{\pi}\left[\log \frac{\pi}{\pi^*}\right] = D_{\text{KL}}(\pi \| \pi^*)$：
+
+$$
+\min_{\pi} \left[ \underbrace{D_{\text{KL}}(\pi \| \pi^*)}_{\geq 0, \text{ 当 } \pi = \pi^* \text{ 时}= 0} - \underbrace{\log Z(x)}_{\text{与 } \pi \text{ 无关的常数}} \right]
+$$
+
+#### Step 2.5：得出结论
+
+$\log Z(x)$ 与 $\pi$ 无关，在 $\min_\pi$ 中是常数，可以忽略。所以最小化上式等价于最小化 $D_{\text{KL}}(\pi \| \pi^*)$。
+
+KL 散度有一个关键性质：$D_{\text{KL}}(\pi \| \pi^*) \geq 0$，**当且仅当** $\pi = \pi^*$ 时取到最小值 0。
+
+因此，**最优策略就是 $\pi^*$**：
+
+$$
+\boxed{\pi^*(y|x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left(\frac{r(x, y)}{\beta}\right)}
+$$
+
+$\pi^*$ 不是我们凭空猜的，而是从目标函数经过代数变换**自然推导出来的**。
+
+**用例子理解 $\pi^*$ 的含义**：假设参考模型对"排序函数"这个问题有三种可能回答，奖励和概率如下（$\beta = 1$）：
+
+| 回答 $y$ | $\pi_{\text{ref}}(y\|x)$ | $r(x,y)$ | $\exp(r/\beta)$ | $\pi_{\text{ref}} \cdot \exp(r/\beta)$ | $\pi^*(y\|x)$（归一化后） |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 纯函数版 | 0.3 | 2.0 | 7.39 | 2.22 | **0.69** |
+| 副作用版 | 0.5 | 0.5 | 1.65 | 0.82 | 0.26 |
+| 报错版 | 0.2 | -1.0 | 0.37 | 0.07 | 0.02 |
+
+参考模型原本最偏好"副作用版"（概率 0.5），但它奖励不高。最优策略 $\pi^*$ 把高奖励的"纯函数版"指数级放大到 0.69，把低奖励的"报错版"压制到 0.02。**这就是 $\exp(r/\beta)$ 的作用：它像一个"奖励放大器"，让好答案的概率暴涨，坏答案的概率暴跌。**
+
+$\beta$ 控制放大的激进程度：$\beta$ 越小，$\exp(r/\beta)$ 对奖励差异越敏感，最优策略越集中在最高分回答上；$\beta$ 越大，放大效果越温和，$\pi^*$ 越接近原始参考策略 $\pi_{\text{ref}}$。
+
+### Step 3：用策略反向表示奖励——"反解"
+
+Step 2 告诉我们：给定奖励函数 $r$，可以求出最优策略 $\pi^*$（正向：$r \to \pi^*$）。现在我们做一件反过来的事：**从 $\pi^*$ 的公式中把 $r$ 解出来**（反向：$\pi^* \to r$）。
+
+从 $\pi^*$ 的定义出发：
+
+$$
+\pi^*(y|x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp\left( \frac{r(x, y)}{\beta} \right)
+$$
+
+两边取对数（log 把乘法变加法，把指数变线性，方便移项）：
+
+$$
+\log \pi^*(y|x) = \log \pi_{\text{ref}}(y|x) + \frac{r(x, y)}{\beta} - \log Z(x)
+$$
+
+把 $r(x,y)$ 移到左边，其余移到右边，再乘以 $\beta$：
+
+$$
+r(x, y) = \beta \log \pi^*(y|x) - \beta \log \pi_{\text{ref}}(y|x) + \beta \log Z(x) = \beta \log \frac{\pi^*(y|x)}{\pi_{\text{ref}}(y|x)} + \beta \log Z(x)
+$$
+
+**这一步的意义**：奖励函数 $r$ 可以完全由两个概率分布的比值来表示。换句话说，**奖励被隐式地编码在了策略的概率中**——$\pi^*$ 相比 $\pi_{\text{ref}}$ 越偏好某个回答 $y$（即 $\frac{\pi^*}{\pi_{\text{ref}}}$ 越大），这个回答的奖励就越高。如果我们能直接训练出 $\pi^*$，就根本不需要显式的奖励模型了！
+
+> **$\beta \log Z(x)$ 是什么？** 它只依赖于问题 $x$，不依赖于具体回答 $y$。对于同一道题的不同回答，这一项都是一样的常数。后面 Step 5 会看到：在比较两个回答的奖励差时，这个常数会被完美消除。
+
+### Step 4：Bradley-Terry 偏好模型——给"谁更好"建模
+
+到目前为止，我们一直假设有一个奖励函数 $r(x,y)$ 来给回答打分。但在现实中，人类标注员不会给每个回答打一个精确的数字分（"这个回答 7.3 分"），而是给出**相对偏好**（"A 比 B 好"）。我们需要一个模型来连接"奖励分数"和"相对偏好概率"——这就是 **Bradley-Terry (BT) 模型**。
+
+BT 模型假设：人类选择 $y_w$（好回答）胜过 $y_l$（坏回答）的概率，等于两者奖励之差通过 **Sigmoid 函数**的映射：
+
+$$
+p(y_w \succ y_l | x) = \sigma\big(r(x, y_w) - r(x, y_l)\big), \quad \text{其中 } \sigma(z) = \frac{1}{1 + e^{-z}}
+$$
+
+**用具体数字感受一下** Sigmoid 怎么把奖励差映射为概率：
+
+| $r(x, y_w) - r(x, y_l)$ | $\sigma(\cdot)$ | 含义 |
+|:---:|:---:|:---|
+| $+5$ | $0.993$ | 好答案奖励远高于坏答案 → 人类几乎一定选好答案 |
+| $+1$ | $0.731$ | 有一定差距 → 人类大概率选好答案 |
+| $0$ | $0.500$ | 奖励一样 → 人类掷硬币，五五开 |
+| $-2$ | $0.119$ | 坏答案奖励反而更高 → 人类大概率选"坏答案"（标注可能有误） |
+
+BT 模型正是传统 RLHF 中训练奖励模型的理论基础——用人类偏好数据最大化上式的似然来拟合 $R_\psi$。
 
 ### Step 5：消除奖励模型——DPO 的关键一步
 
-现在，DPO 论文的核心洞察来了：**将 Step 3 中用策略表示的奖励，代入 Step 4 的 BT 模型**，奖励模型就被完全消除了：
+现在，DPO 论文的核心洞察来了：**将 Step 3 的"奖励 = 策略概率"代入 Step 4 的 BT 模型**。由于 BT 模型只关心两个回答的奖励**之差** $r(x,y_w) - r(x,y_l)$，我们来看看代入后会发生什么：
 
 $$
 \begin{aligned}
-r(x, y_w) - r(x, y_l) &= \left( \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} + \cancel{\beta \log Z(x)} \right) - \left( \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)} + \cancel{\beta \log Z(x)} \right) \\
-&= \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}
+r(x, y_w) - r(x, y_l) &= \left( \beta \log \frac{\pi^*(y_w|x)}{\pi_{\text{ref}}(y_w|x)} + \boxed{\beta \log Z(x)} \right) - \left( \beta \log \frac{\pi^*(y_l|x)}{\pi_{\text{ref}}(y_l|x)} + \boxed{\beta \log Z(x)} \right) \\
+&= \beta \log \frac{\pi^*(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta \log \frac{\pi^*(y_l|x)}{\pi_{\text{ref}}(y_l|x)}
 \end{aligned}
 $$
 
-难以计算的配分函数 $\beta \log Z(x)$ 在相减时**被完全抵消了**！这个消除至关重要——$Z(x) = \sum_y \pi_{\text{ref}}(y|x) \exp(r(x,y)/\beta)$ 需要对所有可能的回答 $y$ 求和，在语言模型中这个求和空间是天文数字级别的，根本无法计算。DPO 通过配对对比巧妙地绕过了这个问题。
+两个框中的 $\beta \log Z(x)$ 完全相同，一减一加恰好**抵消为零**。
+
+$\beta \log Z(x)$ 在相减时**被完全抵消了**！
+
+**为什么这个消除如此重要？** 回忆 $Z(x) = \sum_y \pi_{\text{ref}}(y|x) \exp(r(x,y)/\beta)$——它要对**所有可能的回答** $y$ 求和。语言模型的输出空间是所有可能的 token 序列，数量是天文数字级别（几万词汇表的几百次方），$Z(x)$ 根本无法计算。但 DPO 通过配对对比（$y_w$ vs $y_l$），让 $Z(x)$ 在做差时自动消失了，优雅地绕过了这个计算难题。
+
+现在奖励差里只剩下 $\pi^*$ 和 $\pi_{\text{ref}}$ 的概率比。在实际训练中，我们把理论上的最优策略 $\pi^*$ 换成我们正在训练的策略 $\pi_\theta$（因为训练的目标就是让 $\pi_\theta$ 逼近 $\pi^*$）。
 
 ### DPO 的最终损失函数
 
-将上述结果代入 BT 模型的负对数似然，我们得到 **DPO 的损失函数**：
+将上述奖励差代入 BT 模型的负对数似然（$-\log p(y_w \succ y_l | x)$，越小说明模型越能正确区分好坏），我们得到 **DPO 的损失函数**：
+
 $$
-\mathcal{L}_{\text{DPO}}(\theta) = - \mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)} \right) \right]
+\mathcal{L}_{\text{DPO}}(\theta) = - \mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \underbrace{\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)}}_{\text{模型对好答案的"偏爱度"}} - \underbrace{\beta \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}}_{\text{模型对坏答案的"偏爱度"}} \right) \right]
 $$
 
-回到排序函数的例子，这个损失函数的含义就很清晰了：它通过 Sigmoid + 负对数的方式，推动模型让好答案（纯函数版排序）的"相对偏好度"大于坏答案（修改原数组版排序）。最小化这个损失，就是在最大化人类偏好 $y_w$ 被正确区分的概率。
+**逐层拆解这个公式的含义**：
+
+- $\log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)}$：当前模型 $\pi_\theta$ 相比参考模型 $\pi_{\text{ref}}$，有多偏爱好答案 $y_w$。如果 $\pi_\theta$ 把 $y_w$ 的概率提高了 3 倍，这一项就是 $\log 3 \approx 1.1$。
+- 两个"偏爱度"做差：如果模型学会了正确区分好坏（好答案偏爱度 > 坏答案偏爱度），差值为正。
+- $\sigma(\cdot)$：Sigmoid 把差值压到 $(0, 1)$ 区间，解释为"模型正确区分好坏的概率"。
+- $-\log$：负对数似然，差值越大 → $\sigma$ 越接近 1 → $-\log$ 越接近 0 → 损失越小。
+
+**回到排序函数的例子**：如果训练后 $\pi_\theta$ 把"纯函数版"的概率提高了 5 倍，"副作用版"只提高了 1.2 倍，那么 Sigmoid 内的差值就是 $\beta(\log 5 - \log 1.2) \approx 1.43\beta > 0$，经过 $\sigma$ 后接近 1，损失接近 0——说明模型学对了。
 
 ### DPO 梯度分析：损失函数在做什么？
 
