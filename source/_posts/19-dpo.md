@@ -274,13 +274,59 @@ $$
 
 ### Step 4：Bradley-Terry 偏好模型——给"谁更好"建模
 
-到目前为止，我们一直假设有一个奖励函数 $r(x,y)$ 来给回答打分。但在现实中，人类标注员不会给每个回答打一个精确的数字分（"这个回答 7.3 分"），而是给出**相对偏好**（"A 比 B 好"）。我们需要一个模型来连接"奖励分数"和"相对偏好概率"——这就是 **Bradley-Terry (BT) 模型**。
+到目前为止，我们一直假设有一个奖励函数 $r(x,y)$ 来给回答打分。但在现实中，人类标注员不会给每个回答打一个精确的数字分（"这个回答 7.3 分"），而是给出**成对比较**：在同一问题 $x$ 下，从两个候选回答里指出哪一个更好。我们需要一个模型来连接"隐含分数"和"被选中的概率"——这就是 **Bradley-Terry (BT) 模型**。
 
-BT 模型假设：人类选择 $y_w$（好回答）胜过 $y_l$（坏回答）的概率，等于两者奖励之差通过 **Sigmoid 函数**的映射：
+**符号约定（本节与 DPO 损失里都会出现）：**
+
+| 符号 | 含义 |
+|:---|:---|
+| $x$ | 用户问题（prompt） |
+| $y_w,\, y_l$ | 一次偏好数据里的胜 / 负回答（**w**in / **l**ose） |
+| $y_w \succ y_l$ | $y_w$ **严格优于** $y_l$（序关系） |
+| $p(y_w \succ y_l \mid x)$ | 给定 $x$ 时，人类选 $y_w$ 而非 $y_l$ 的概率。$\mid x$ 作用于「$y_w$ 优于 $y_l$」**整句事件**，不是只条件在单个 $y$ 上 |
+
+**BT 模型的核心等式**——我们要推导的结论：
 
 $$
-p(y_w \succ y_l | x) = \sigma\big(r(x, y_w) - r(x, y_l)\big), \quad \text{其中 } \sigma(z) = \frac{1}{1 + e^{-z}}
+p(y_w \succ y_l \mid x) = \sigma\big(r(x, y_w) - r(x, y_l)\big), \quad \sigma(z) = \frac{1}{1 + e^{-z}}
 $$
+
+**这个 $\sigma$ 从哪里来？** 下面分四步推导。
+
+1. **效用 = 质量 + 噪声。** 人类标注不完美——走神、偏好、手滑都会干扰判断。我们把标注员感知到的效用建模为：
+   $$
+   u(x,y) = r(x,y) + \epsilon
+   $$
+   $r$ 是**真实质量**（要学的确定量），$\epsilon$ 是**随机噪声**。两个回答各有独立噪声 $\epsilon_w$、$\epsilon_l$。
+
+2. **「选谁」→ 不等式 → 概率。** 标注员选 $y_w$ 当且仅当 $u(x,y_w) > u(x,y_l)$，代入并移项：
+   $$
+   \underbrace{r(x,y_w) - r(x,y_l)}_{\triangleq\;\Delta\;\text{（质量差，确定数）}} \;>\; \underbrace{\epsilon_l - \epsilon_w}_{\triangleq\;\delta\;\text{（噪声差，随机变量）}}
+   $$
+   质量差 $\Delta$ 够大，噪声 $\delta$ 就推翻不了它。选对的概率就是 $\delta$ 的**累积分布函数 (CDF)** 在 $\Delta$ 处的值：
+   $$
+   p(y_w \succ y_l \mid x) = P(\delta < \Delta) = F_\delta(\Delta)
+   $$
+
+3. **Gumbel 噪声 → Sigmoid。** BT 模型假设每个 $\epsilon$ 独立服从**标准 Gumbel 分布**。在给出结论之前，先认识一下这两个分布。
+
+   > **Gumbel 分布**描述的是「很多个随机变量取最大值」的分布。想象 100 个标注员各自独立打分，取最高分——这个最高分的分布就趋向 Gumbel。CDF 和 PDF 为：$F_{\text{Gumbel}}(x) = e^{-e^{-x}}$，$f_{\text{Gumbel}}(x) = e^{-(x + e^{-x})}$。形状：不对称钟形，右尾比左尾长（极端大值偶尔出现）。
+   >
+   > **Logistic 分布**是对称的钟形分布，长得像正态但尾巴更厚。它最大的特点：CDF 恰好就是 Sigmoid 函数 $F_{\text{Logistic}}(x) = \frac{1}{1 + e^{-x}} = \sigma(x)$。
+
+   **关键结论**：若 $\epsilon_w, \epsilon_l \stackrel{\text{iid}}{\sim} \text{Gumbel}(0,1)$，则它们的差 $\delta = \epsilon_l - \epsilon_w$ 服从 Logistic 分布，CDF 恰好是 Sigmoid：
+   $$
+   F_\delta(\Delta) = \frac{1}{1+e^{-\Delta}} = \sigma(\Delta)
+   $$
+
+4. **代入得 BT 公式。** 将第 2 步的 $p = F_\delta(\Delta)$ 与第 3 步的 $F_\delta = \sigma$ 结合，即得：
+   $$
+   p(y_w \succ y_l \mid x) = \sigma\big(r(x,y_w) - r(x,y_l)\big)
+   $$
+
+一句话：**评分 + Gumbel 噪声 → Logistic 差 → Sigmoid 概率。**（若改用高斯噪声则得 probit 模型 $\Phi(\cdot)$，但 RLHF 中几乎都用 Sigmoid。）
+
+> **等价写法**：$p(y_w \succ y_l \mid x) = \frac{e^{r(x,y_w)}}{e^{r(x,y_w)} + e^{r(x,y_l)}}$，分子分母同除以 $e^{r(x,y_l)}$ 就回到 Sigmoid。
 
 **用具体数字感受一下** Sigmoid 怎么把奖励差映射为概率：
 
