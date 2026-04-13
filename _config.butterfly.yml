@@ -227,7 +227,7 @@ aside:
       link: https://github.com/chengYi-xun
   card_announcement:
     enable: true
-    content: 欢迎来到AAA高老庄旺铺招租的猪舍~（昼伏夜出型）
+    content: 欢迎来到牛大帅的猪舍~（昼伏夜出型）
   card_recent_post:
     enable: true
     limit: 5 # if set 0 will show all

@@ -3,11 +3,11 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: AAA高老庄旺铺招租的个人博客
+title: 牛大帅的个人博客
 subtitle: 分享编程与生活
 description: '个人技术博客，记录学习与生活'
 keywords: 编程,技术,博客,生活
-author: AAA高老庄旺铺招租
+author: 牛大帅
 language: zh-CN
 timezone: 'Asia/Shanghai'
 
@@ -46,18 +46,19 @@ render_drafts: false
 post_asset_folder: true
 relative_link: false
 future: true
+syntax_highlighter: shiki
 highlight:
-  enable: true
-  line_number: true
-  auto_detect: false
-  tab_replace: ''
-  wrap: true
-  hljs: false
+  enable: false
 prismjs:
   enable: false
-  preprocess: true
+
+shiki:
+  theme: one-dark-pro
+  themes:
+    light: one-light
+    dark: one-dark-pro
+  inject_styles: true
   line_number: true
-  tab_replace: ''
 
 # Home page setting
 # path: Root path for your blogs index page. (default = '')

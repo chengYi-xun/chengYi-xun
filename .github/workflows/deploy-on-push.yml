@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  GIT_USER: AAA高老庄旺铺招租
+  GIT_USER: 牛大帅
   GIT_EMAIL: ldq4399@163.com
   DEPLOY_REPO: chengYi-xun/chengYi-xun
   DEPLOY_BRANCH: deploy

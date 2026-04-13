@@ -9,10 +9,11 @@
     "server": "hexo server"
   },
   "hexo": {
-    "version": "5.4.2"
+    "version": "7.3.0"
   },
   "dependencies": {
-    "hexo": "^5.0.0",
+    "@shikijs/transformers": "^4.0.2",
+    "hexo": "^7.3.0",
     "hexo-deployer-git": "^4.0.0",
     "hexo-generator-archive": "^1.0.0",
     "hexo-generator-category": "^1.0.0",
@@ -25,6 +26,8 @@
     "hexo-renderer-pug": "^3.0.0",
     "hexo-renderer-stylus": "^2.0.1",
     "hexo-server": "^2.0.0",
-    "hexo-tag-aplayer": "^3.0.4"
+    "hexo-tag-aplayer": "^3.0.4",
+    "hexo-util": "^4.0.0",
+    "shiki": "^4.0.2"
   }
 }
