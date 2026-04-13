@@ -19,6 +19,9 @@ mathjax: true
 
 ---
 
+![CLIP 对比式预训练与零样本推理示意图（摘自 Radford et al., arXiv:2103.00020 图 1）](/chengYi-xun/img/clip_arch.png)
+
+
 ## 0. 零样本分类：一个不可能的任务？
 
 假设你训练了一个图像分类器，类别是 ImageNet 的 1000 类。现在来了一张**鸭嘴兽**的图片——这个类别不在训练集中。传统分类器只能把它归入某个已知类别（也许是"水獭"），因为它的输出层只有 1000 个 logit。
@@ -51,6 +54,7 @@ $$
 CLIP 论文尝试了两种架构：
 
 - **ResNet 系列**（ResNet-50, RN50x4, RN50x16, RN50x64）：使用全局平均池化后接线性投影
+
 - **ViT 系列**（ViT-B/32, ViT-B/16, ViT-L/14）：使用 [CLS] token 的输出接线性投影
 
 以 ViT-B/16 为例，对 224×224 的图像：
@@ -213,7 +217,9 @@ $$
 | 最优几何 | 严格 ETF | ETF → Antipodal（依赖 $\tau$） |
 
 > **定理（Sigmoid Loss 的最优几何, Lee et al., AISTATS 2024）**：Sigmoid loss 的最优嵌入几何取决于温度 $\tau$。存在临界温度 $\tau^*$：
+>
 > - 当 $\tau > \tau^*$ 时，最优嵌入为**单纯形 ETF**（与 InfoNCE 相同）
+>
 > - 当 $\tau < \tau^*$ 时，最优嵌入向**对跖结构**（antipodal）过渡：匹配对的余弦相似度趋近 +1，非匹配对趋近 -1
 >
 > 这通过 Constant Embedding Model (CCEM) 框架证明，临界温度由类别数 $N$ 和正负样本比例共同决定。
@@ -261,13 +267,13 @@ $$
 类别描述的措辞（prompt）对零样本性能影响很大。CLIP 论文发现使用 prompt ensemble 效果更好：
 
 ```python
+# 论文共使用 80 个手工设计的上下文模板（此处仅示意）。
 templates = [
     "a photo of a {}.",
     "a blurry photo of a {}.",
     "a black and white photo of a {}.",
     "a low contrast photo of a {}.",
     "a sculpture of a {}.",
-    # ... 80 个模板
 ]
 ```
 
@@ -277,7 +283,7 @@ $$
 \hat{\mathbf{t}}_c = \frac{1}{|\mathcal{T}|} \sum_{\text{template} \in \mathcal{T}} f_{\theta_t}(\text{template}(\text{class}_c))
 $$
 
-再归一化。这种 ensemble 将 ImageNet 零样本精度从 73.2% 提升到 76.2%。
+再归一化。Radford et al. (2021) 在 ImageNet 上对 **80** 个上下文 prompt 的嵌入做平均（embedding-space ensemble），相较**单一默认 prompt** 可再提升约 **3.5%**；最佳配置在论文表 1 中达到 **76.2%** 的零样本精度。
 
 ---
 
@@ -293,46 +299,75 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
 class CLIPModel(nn.Module):
+    """Minimal CLIP-style dual encoder with a learnable logit scale."""
+
     def __init__(self, vision_encoder, text_encoder, embed_dim):
         super().__init__()
         self.visual = vision_encoder
         self.text = text_encoder
-
-        # 可学习的温度参数（以 log 形式）
+        # Learnable temperature in log-space (OpenCLIP-style init).
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
     def encode_image(self, image):
-        features = self.visual(image)        # [B, d_v]
+        """Encode images to L2-normalized embeddings.
+
+        Args:
+            image: Float tensor of shape ``(B, C, H, W)``.
+
+        Returns:
+            Tensor of shape ``(B, d)``, L2-normalized along the last dim.
+        """
+        features = self.visual(image)  # (B, d_v)
         features = F.normalize(features, dim=-1)
         return features
 
     def encode_text(self, text):
-        features = self.text(text)           # [B, d_t]
+        """Encode text token ids to L2-normalized embeddings.
+
+        Args:
+            text: Long tensor of shape ``(B, L)`` (token ids).
+
+        Returns:
+            Tensor of shape ``(B, d)``, L2-normalized along the last dim.
+        """
+        features = self.text(text)  # (B, d_t)
         features = F.normalize(features, dim=-1)
         return features
 
     def forward(self, image, text):
-        v = self.encode_image(image)         # [B, d]
-        t = self.encode_text(text)           # [B, d]
+        """Pairwise scaled cosine logits between batch image and text rows.
 
-        # 缩放后的相似度矩阵
+        Args:
+            image: Float tensor ``(B, C, H, W)``.
+            text: Long tensor ``(B, L)``.
+
+        Returns:
+            Logits of shape ``(B, B)`` where ``[i, j]`` scores image i vs text j.
+        """
+        v = self.encode_image(image)  # (B, d)
+        t = self.encode_text(text)  # (B, d)
         logit_scale = self.logit_scale.exp()
-        logits = logit_scale * (v @ t.T)     # [B, B]
-
+        logits = logit_scale * (v @ t.T)  # (B, B)
         return logits
 
 
 def clip_loss(logits):
-    """对称 InfoNCE loss"""
+    """Symmetric InfoNCE (image-to-text + text-to-image).
+
+    Args:
+        logits: Square tensor ``(N, N)`` of pairwise similarity scores.
+
+    Returns:
+        Scalar mean of the two cross-entropy terms.
+    """
     N = logits.shape[0]
     labels = torch.arange(N, device=logits.device)
-
-    # 图像→文本：每行是一个 N 分类
+    # Each row: classify which text matches this image (N-way).
     loss_i2t = F.cross_entropy(logits, labels)
-    # 文本→图像：每列是一个 N 分类
+    # Each column: classify which image matches this text (N-way).
     loss_t2i = F.cross_entropy(logits.T, labels)
-
     return (loss_i2t + loss_t2i) / 2
 ```
 
@@ -340,15 +375,20 @@ def clip_loss(logits):
 
 ```python
 def siglip_loss(logits, temperature=1.0, bias=0.0):
-    """SigLIP 的 sigmoid loss"""
+    """Pairwise sigmoid (SigLIP-style) loss over a square logits grid.
+
+    Args:
+        logits: Tensor ``(N, N)`` of unscaled similarity scores.
+        temperature: Positive scalar temperature.
+        bias: Optional scalar bias inside the sigmoid.
+
+    Returns:
+        Scalar mean loss over all ``N * N`` pairs.
+    """
     N = logits.shape[0]
-
-    # 标签矩阵：对角线为 +1，其余为 -1
-    labels = 2 * torch.eye(N, device=logits.device) - 1  # [N, N]
-
-    # 每对独立的二元分类
+    # +1 on diagonal (matched pairs), -1 off-diagonal (negatives).
+    labels = 2 * torch.eye(N, device=logits.device) - 1  # (N, N)
     loss = -F.logsigmoid(labels * (logits / temperature - bias))
-
     return loss.mean()
 ```
 
@@ -357,30 +397,33 @@ def siglip_loss(logits, temperature=1.0, bias=0.0):
 ```python
 @torch.no_grad()
 def zero_shot_classify(model, image, class_names, templates):
-    """CLIP 零样本分类"""
-    # 1. 编码所有类别的文本描述
+    """Zero-shot classify one image against templated class prompts.
+
+    Args:
+        model: Object with ``encode_image``, ``encode_text``, ``logit_scale``.
+        image: Float tensor ``(1, C, H, W)`` after preprocessing.
+        class_names: Length-``C`` list of class name strings.
+        templates: List of format strings, each with one ``{}`` slot.
+
+    Returns:
+        Tuple ``(pred, probs)`` where ``pred`` is ``(1,)`` class indices and
+        ``probs`` is ``(1, C)`` softmax probabilities.
+    """
     text_embeddings = []
     for class_name in class_names:
         texts = [template.format(class_name) for template in templates]
-        # tokenize and encode...假设 encode_text 接受字符串列表
-        t = model.encode_text(texts)     # [n_templates, d]
-        t = t.mean(dim=0)               # 模板平均 [d]
+        # Pseudocode: replace with tokenizer + ``encode_text`` on ids.
+        t = model.encode_text(texts)  # (n_templates, d)
+        t = t.mean(dim=0)  # (d,)
         t = F.normalize(t, dim=-1)
         text_embeddings.append(t)
 
-    text_embeddings = torch.stack(text_embeddings)  # [C, d]
-
-    # 2. 编码图像
-    v = model.encode_image(image)                    # [1, d]
-
-    # 3. 计算相似度
+    text_embeddings = torch.stack(text_embeddings)  # (C, d)
+    v = model.encode_image(image)  # (1, d)
     logit_scale = model.logit_scale.exp()
-    logits = logit_scale * (v @ text_embeddings.T)   # [1, C]
-
-    # 4. 预测
+    logits = logit_scale * (v @ text_embeddings.T)  # (1, C)
     probs = logits.softmax(dim=-1)
     pred = probs.argmax(dim=-1)
-
     return pred, probs
 ```
 
@@ -388,28 +431,25 @@ def zero_shot_classify(model, image, class_names, templates):
 
 ```python
 import open_clip
+import torch.nn.functional as F
 from PIL import Image
 
-# 加载预训练模型
 model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
-    'ViT-B-16', pretrained='laion2b_s34b_b88k'
+    "ViT-B-16", pretrained="laion2b_s34b_b88k"
 )
-tokenizer = open_clip.get_tokenizer('ViT-B-16')
+tokenizer = open_clip.get_tokenizer("ViT-B-16")
 
-# 编码图像
 image = preprocess_val(Image.open("platypus.jpg")).unsqueeze(0)
 image_features = model.encode_image(image)
-image_features = F.normalize(image_features, dim=-1)
+image_features = F.normalize(image_features, dim=-1)  # (1, d)
 
-# 编码文本
 texts = tokenizer(["a platypus", "an otter", "a beaver", "a duck"])
 text_features = model.encode_text(texts)
-text_features = F.normalize(text_features, dim=-1)
+text_features = F.normalize(text_features, dim=-1)  # (4, d)
 
-# 计算相似度
 similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 print(f"相似度: {similarity}")
-# 输出: tensor([[0.85, 0.08, 0.04, 0.03]])  -> 预测为 platypus
+# 例: tensor([[0.85, 0.08, 0.04, 0.03]]) -> 预测为 platypus
 ```
 
 ---
@@ -430,8 +470,11 @@ print(f"相似度: {similarity}")
 ### 7.2 局限性
 
 1. **细粒度理解不足**：CLIP 只做全局对比，无法理解"红色车的左后轮"这种细粒度描述
+
 2. **组合推理差**：对"一只猫骑在狗背上"这种组合性描述的理解力有限
+
 3. **计数和空间关系**：CLIP 难以区分"两只猫"和"三只猫"
+
 4. **单向信息流**：图像和文本编码器完全独立，无法做到"根据问题聚焦图像的特定区域"
 
 这些局限性本质上源于**晚期融合**的架构——两个编码器在处理过程中无法互相参考。
@@ -459,7 +502,11 @@ print(f"相似度: {similarity}")
 **参考文献**
 
 1. Radford, A., et al. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021.
+
 2. Oord, A. v. d., Li, Y., & Vinyals, O. (2018). *Representation Learning with Contrastive Predictive Coding*. arXiv:1807.03748.
+
 3. Zhai, X., et al. (2023). *Sigmoid Loss for Language Image Pre-Training*. ICCV 2023.
+
 4. Graf, F., et al. (2021). *Dissecting Supervised Contrastive Learning*. ICML 2021.
+
 5. Lee, J., et al. (2024). *Analysis of Using Sigmoid Loss for Contrastive Learning*. AISTATS 2024.

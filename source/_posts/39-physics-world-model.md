@@ -14,9 +14,13 @@ mathjax: true
 ---
 
 > **核心论文**：
+>
 > - PhysDreamer: arXiv:2404.13026 (ECCV 2024)
+>
 > - PhysGen: arXiv:2409.18964 (ECCV 2024)
+>
 > - NewtonGen: arXiv:2509.21309 (2025)
+>
 > - NewtonRewards: arXiv:2512.00425 (2025)
 >
 > **代码**：[stevenlsw/physgen](https://github.com/stevenlsw/physgen) · [pandayuanyu/NewtonGen](https://github.com/pandayuanyu/NewtonGen)
@@ -38,9 +42,10 @@ mathjax: true
 
 ### 1.1 核心思想
 
-PhysDreamer（MIT, 2024）将问题分为两步：
+PhysDreamer（MIT 等，2024）将问题分为两步：
 
 1. **从视频模型中"蒸馏"出物理属性**（如材质的弹性模量）
+
 2. **用显式物理仿真器驱动运动**（Material Point Method）
 
 这是"数据驱动的物理参数估计 + 基于物理的仿真"的混合方案。
@@ -107,8 +112,11 @@ PhysDreamer 能让静态 3D 物体在外力作用下产生**物理合理**的形
 PhysGen（UIUC, 2024）走了一条不同的路——**先仿真后生成**：
 
 ```
-图像理解 → 物理参数提取 → 刚体仿真 → 视频扩散细化
+图像理解 → 物理参数提取 → 刚体仿真 →
+视频扩散细化
 ```
+
+![PhysGen 方法总览（论文 Fig. 2，arXiv:2409.18964）](/img/physgen_pipeline.png)
 
 ### 2.2 三阶段流程
 
@@ -229,7 +237,9 @@ $$
 ### 4.3 后训练流程
 
 1. 用已有视频模型生成 $N$ 个候选视频
+
 2. 计算每个视频的物理奖励
+
 3. 用 GRPO/DPO 等方法优化模型偏好
 
 ### 4.4 NewtonBench-60K
@@ -313,6 +323,9 @@ $$
 **参考文献**
 
 1. Zhang, T., et al. (2024). *PhysDreamer: Physics-Based Interaction with 3D Objects via Video Generation*. ECCV 2024.
+
 2. Liu, S., et al. (2024). *PhysGen: Rigid-Body Physics-Grounded Image-to-Video Generation*. ECCV 2024.
+
 3. Pan, Y., et al. (2025). *NewtonGen: Physics-Consistent and Controllable Text-to-Video Generation via Neural Newtonian Dynamics*. arXiv:2509.21309.
+
 4. Duan, H., et al. (2025). *What about gravity in video generation? Post-Training Newton's Laws with Verifiable Rewards*. arXiv:2512.00425.

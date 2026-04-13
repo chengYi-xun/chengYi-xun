@@ -156,23 +156,36 @@ $$
 流程：
 
 1. **数据收集**：用随机策略与真实环境交互，收集 $(o_t, a_t, o_{t+1})$ 序列
+
 2. **训练 V 模型**：学习将 $o_t$ 压缩为 $z_t$
+
 3. **训练 M 模型**：学习在潜空间中预测 $z_{t+1}$
+
 4. **在梦境中训练 C**：不再与真实环境交互，完全用 M 模型生成未来轨迹，在想象中优化控制器
 
 ```python
 import torch
 import torch.nn as nn
 
+
 class VAE(nn.Module):
-    """V 模型：将观测压缩为潜变量"""
+    """V 模型：将观测压缩为潜变量。
+
+    Args:
+        latent_dim: 潜变量维度（标量，默认 32）。
+    """
+
     def __init__(self, latent_dim=32):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 32, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 128, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(128, 256, 4, stride=2), nn.ReLU(),
+            nn.Conv2d(3, 32, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 128, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(128, 256, 4, stride=2),
+            nn.ReLU(),
             nn.Flatten(),
         )
         self.fc_mu = nn.Linear(1024, latent_dim)
@@ -180,31 +193,70 @@ class VAE(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, 1024),
             nn.Unflatten(1, (256, 2, 2)),
-            nn.ConvTranspose2d(256, 128, 4, stride=2), nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, stride=2), nn.ReLU(),
-            nn.ConvTranspose2d(64, 32, 5, stride=2), nn.ReLU(),
-            nn.ConvTranspose2d(32, 3, 6, stride=2), nn.Sigmoid(),
+            nn.ConvTranspose2d(256, 128, 4, stride=2),
+            nn.ReLU(),
+            nn.ConvTranspose2d(128, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, 32, 5, stride=2),
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, 3, 6, stride=2),
+            nn.Sigmoid(),
         )
 
     def encode(self, x):
-        h = self.encoder(x)
+        """将图像编码为高斯参数。
+
+        Args:
+            x: 输入帧，形状 ``(B, 3, H, W)``。
+
+        Returns:
+            ``mu``, ``logvar``，各为 ``(B, latent_dim)``。
+        """
+        h = self.encoder(x)  # (B, 1024)
         return self.fc_mu(h), self.fc_logvar(h)
 
     def reparameterize(self, mu, logvar):
+        """重参数采样 z = mu + std * eps。
+
+        Args:
+            mu: 均值，``(B, latent_dim)``。
+            logvar: 对数方差，``(B, latent_dim)``。
+
+        Returns:
+            采样潜变量 ``z``，``(B, latent_dim)``。
+        """
         std = torch.exp(0.5 * logvar)
-        return mu + std * torch.randn_like(std)
+        eps = torch.randn_like(std)
+        return mu + std * eps
 
     def forward(self, x):
+        """重建输入并返回 VAE 参数。
+
+        Args:
+            x: 输入帧，``(B, 3, H, W)``。
+
+        Returns:
+            ``(recon, mu, logvar)``，``recon`` 与 ``x`` 同形。
+        """
         mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
+        z = self.reparameterize(mu, logvar)  # (B, latent_dim)
         return self.decoder(z), mu, logvar
 
 
 class MDNRNN(nn.Module):
-    """M 模型：在潜空间中预测未来"""
+    """M 模型：在潜空间中用 MDN 预测下一步潜变量。
+
+    Args:
+        latent_dim: 潜变量维度。
+        action_dim: 动作维度。
+        hidden_dim: LSTM 隐状态维度。
+        n_gaussians: 高斯混合成分数 K。
+    """
+
     def __init__(self, latent_dim=32, action_dim=3, hidden_dim=256, n_gaussians=5):
         super().__init__()
-        self.lstm = nn.LSTM(latent_dim + action_dim, hidden_dim, batch_first=True)
+        in_dim = latent_dim + action_dim
+        self.lstm = nn.LSTM(in_dim, hidden_dim, batch_first=True)
         self.fc_pi = nn.Linear(hidden_dim, n_gaussians * latent_dim)
         self.fc_mu = nn.Linear(hidden_dim, n_gaussians * latent_dim)
         self.fc_sigma = nn.Linear(hidden_dim, n_gaussians * latent_dim)
@@ -212,46 +264,89 @@ class MDNRNN(nn.Module):
         self.latent_dim = latent_dim
 
     def forward(self, z, a, h=None):
-        x = torch.cat([z, a], dim=-1)
-        out, h_new = self.lstm(x, h)
-        pi = torch.softmax(self.fc_pi(out).view(-1, self.n_gaussians, self.latent_dim), dim=1)
+        """单步或序列前向：输出 MDN 参数与新的 LSTM 状态。
+
+        Args:
+            z: 潜变量，``(B, L, latent_dim)``。
+            a: 动作，``(B, L, action_dim)``，与 ``z`` 时间维对齐。
+            h: 可选的 ``(h_n, c_n)`` LSTM 状态元组。
+
+        Returns:
+            ``(pi, mu, sigma, h_new)``；``pi, mu, sigma`` 为
+            ``(..., K, latent_dim)``，``h_new`` 为 LSTM 输出状态。
+        """
+        x = torch.cat([z, a], dim=-1)  # (B, L, latent_dim + action_dim)
+        out, h_new = self.lstm(x, h)  # (B, L, hidden_dim)
+        pi = torch.softmax(
+            self.fc_pi(out).view(-1, self.n_gaussians, self.latent_dim),
+            dim=1,
+        )
         mu = self.fc_mu(out).view(-1, self.n_gaussians, self.latent_dim)
-        sigma = torch.exp(self.fc_sigma(out).view(-1, self.n_gaussians, self.latent_dim))
+        sigma = torch.exp(
+            self.fc_sigma(out).view(-1, self.n_gaussians, self.latent_dim)
+        )
         return pi, mu, sigma, h_new
 
 
 class Controller(nn.Module):
-    """C 模型：极简线性策略"""
+    """C 模型：极简线性策略 a = tanh(W [z; h] + b)。
+
+    Args:
+        latent_dim: 潜变量维度。
+        hidden_dim: RNN 隐状态维度。
+        action_dim: 动作维度。
+    """
+
     def __init__(self, latent_dim=32, hidden_dim=256, action_dim=3):
         super().__init__()
         self.fc = nn.Linear(latent_dim + hidden_dim, action_dim)
 
     def forward(self, z, h):
-        return torch.tanh(self.fc(torch.cat([z, h], dim=-1)))
+        """线性映射后经 tanh 限幅。
+
+        Args:
+            z: ``(B, latent_dim)`` 或与 ``h`` 对齐的批次维。
+            h: ``(B, hidden_dim)``。
+
+        Returns:
+            动作张量，``(B, action_dim)``。
+        """
+        zh = torch.cat([z, h], dim=-1)
+        return torch.tanh(self.fc(zh))
 ```
 
 ### 2.5 "在梦境中训练"的伪代码
 
 ```python
 def train_in_dream(controller, vae, mdnrnn, n_episodes=1000):
-    """完全在世界模型的想象中训练控制器"""
+    """在世界模型生成的轨迹上训练控制器（示意伪代码）。
+
+    Args:
+        controller: 策略模块，输入 ``(z_t, h_t)``，输出动作。
+        vae: V 模型，用于编码初始观测。
+        mdnrnn: M 模型（MDN-RNN），用于想象潜空间转移。
+        n_episodes: 外层 CMA-ES 迭代轮数。
+
+    Returns:
+        None；原地更新 ``controller`` 参数。
+    """
     for episode in range(n_episodes):
-        # 初始化：从训练集中采样一个初始观测
+        # 从训练集中采样一个初始观测
         o_0 = sample_initial_observation()
         z_t = vae.encode(o_0)
         h_t = mdnrnn.initial_hidden()
-        total_reward = 0
+        total_reward = 0.0
 
         for t in range(max_steps):
             # 控制器决定动作
             a_t = controller(z_t, h_t)
 
-            # 世界模型"想象"下一步（不与真实环境交互）
+            # 世界模型想象下一步；不与真实环境交互
             pi, mu, sigma, h_new = mdnrnn(z_t, a_t, h_t)
             z_next = sample_from_mdn(pi, mu, sigma)
             r_t = mdnrnn.predict_reward(h_new)
 
-            total_reward += r_t
+            total_reward = total_reward + r_t
             z_t, h_t = z_next, h_new
 
         # 用进化策略更新控制器参数
@@ -260,11 +355,15 @@ def train_in_dream(controller, vae, mdnrnn, n_episodes=1000):
 
 ### 2.6 实验结果
 
-| 环境 | 真实环境训练 | 梦境训练 |
-|------|-----------|---------|
-| CarRacing-v0 | 906 ± 21 | 868 ± 74 |
+Ha & Schmidhuber (2018) 在 CarRacing-v0 上的主要定量结果见论文 Table 1；下表为原文汇报的**真实环境**评估（100 次随机 rollout 的均值 ± 标准差）：
 
-梦境训练的分数接近真实训练——说明世界模型确实学到了环境的关键动力学。但方差更大，因为梦境中的小误差会在长时间 rollout 中累积。
+| 方法 | CarRacing-v0 |
+|------|--------------|
+| V 模型（控制器仅见 $z_t$） | 632 ± 251 |
+| V 模型 + 控制器隐层 | 788 ± 141 |
+| **完整世界模型 V+M+C**（控制器同时见 $z_t$ 与 $h_t$） | **906 ± 21** |
+
+完整配置相对仅用 V 表示的情形提升明显，说明 MDN-RNN 给出的隐状态 $h_t$ 对控制至关重要。论文 §3.4 还给出了在 MDN-RNN 生成的幻觉轨迹中驾驶的可视化（Figure 13）；而定量对比以 Table 1 为准。
 
 ---
 
@@ -361,6 +460,7 @@ DayDreamer (2022)                        │
 这五条路线之间最根本的分歧在于一个问题：**世界模型是否需要"看得见"？**
 
 - **生成派**（Sora, Cosmos, 视频生成）：世界模型应该能生成逼真的未来视频/图像，因为视觉细节包含重要信息
+
 - **预测派**（JEPA, Dreamer）：世界模型只需预测未来的**抽象表征**，无需重建每个像素——就像人闭眼也能踢球
 
 LeCun 在 2022 年的白皮书中明确站在预测派：
@@ -425,5 +525,7 @@ $$
 **参考文献**
 
 1. Ha, D. & Schmidhuber, J. (2018). *World Models*. arXiv:1803.10122.
+
 2. Craik, K. (1943). *The Nature of Explanation*. Cambridge University Press.
+
 3. Shannon, C. E. (1959). *Coding Theorems for a Discrete Source with a Fidelity Criterion*. IRE National Convention Record.

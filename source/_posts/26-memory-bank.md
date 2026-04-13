@@ -12,7 +12,7 @@ tags:
  - AI Companion
 ---
 
-> 论文：[MemoryBank: Enhancing Large Language Models with Long-Term Memory](https://arxiv.org/abs/2305.10250)（2023.05, Sun Yat-Sen University）
+> 论文：[MemoryBank: Enhancing Large Language Models with Long-Term Memory](https://arxiv.org/abs/2305.10250)（arXiv 2023.05；作者单位含中山大学、哈尔滨工业大学、KTH 等）
 >
 > 代码：[github.com/zhongwanjun/MemoryBank-SiliconFriend](https://github.com/zhongwanjun/MemoryBank-SiliconFriend)
 
@@ -30,7 +30,9 @@ tags:
 一个**没有长期记忆**的 ChatGPT，在第 10 天面对这个问题时：
 
 - 不记得你第 1 天的分手经历（无法给出有温度的回复）
+
 - 不记得你第 3 天才开始学 Python（无法评估你的技术水平）
+
 - 不知道你读了哪本书、进度如何（无法给出针对性建议）
 
 它只能给出一个**通用的、模板化的**回答："这取决于你的兴趣和背景……"
@@ -50,6 +52,8 @@ MemoryBank 的架构围绕三个核心组件展开：
 $$
 \text{MemoryBank} = \underbrace{\text{Memory Storage}}_{\text{记什么}} + \underbrace{\text{Memory Retrieval}}_{\text{怎么找}} + \underbrace{\text{Memory Updating}}_{\text{怎么忘}}
 $$
+
+![MemoryBank：记忆存储、检索与更新框架（图源：论文配套仓库 `resources/framework.png`）](/chengYi-xun/img/memory_bank_arch.png)
 
 ## 支柱一：Memory Storage（记忆仓库）
 
@@ -71,13 +75,18 @@ $$
     "name": "Emily",
     "history": {
       "2023-04-27": [
-        {"query": "Hello, my name is Emily.", "response": "Hello, Emily. I'm your AI companion."},
+        {
+          "query": "Hello, my name is Emily.",
+          "response": "Hello, Emily. I'm your AI companion."
+        },
         {"query": "I want to learn painting.", "response": "That's great! ..."}
       ],
       "2023-04-28": [...]
     },
     "summary": {
-      "2023-04-27": {"content": "Emily introduced herself and discussed..."},
+      "2023-04-27": {
+        "content": "Emily introduced herself and discussed..."
+      },
       "2023-04-28": {"content": "..."}
     },
     "personality": {
@@ -107,7 +116,9 @@ for date, summary in daily_summaries:
 overall_summary = llm_client.generate_text_simple(prompt)
 
 # 用户画像
-prompt = f"请根据以下的对话推测总结{user_name}的性格特点和心情，并制定回复策略。"
+prompt = (
+    f"请根据以下的对话推测总结{user_name}的性格特点和心情，并制定回复策略。"
+)
 daily_personality = llm_client.generate_text_simple(prompt)
 
 # 全局画像
@@ -126,7 +137,9 @@ overall_personality = llm_client.generate_text_simple(prompt)
 当用户发送新消息时，如何从海量历史对话中找到**相关记忆**？MemoryBank 使用的是 **Dense Passage Retrieval**（稠密段落检索）方法：
 
 1. **离线编码**：每段对话和事件摘要都被视为一个记忆片段 $m$，由编码器 $E(\cdot)$ 编码为向量 $h_m = E(m)$
+
 2. **索引**：所有 $h_m$ 存入 FAISS 向量索引中
+
 3. **在线检索**：当前对话上下文 $c$ 编码为 $h_c = E(c)$，在索引中搜索最相似的记忆
 
 $$
@@ -141,21 +154,40 @@ $$
 # local_doc_qa.py — 基于 LangChain + FAISS 的检索
 class LocalMemoryRetrieval:
     def init_cfg(self, embedding_model, embedding_device, top_k, language):
+        """Configure embedding model and retrieval depth.
+
+        Args:
+            embedding_model: Name key in ``embedding_model_dict``.
+            embedding_device: Device string for HuggingFace weights.
+            top_k: Neighbor count for similarity search.
+            language: Corpus / UI language selector.
+        """
         self.embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model_dict[embedding_model],
-            model_kwargs={'device': embedding_device}
+            model_kwargs={'device': embedding_device},
         )
-        self.top_k = top_k
+        self.top_k = top_k  # e.g. 6 in reference config
 
     def init_memory_vector_store(self, filepath, vs_path, user_name, cur_date):
+        """Load JSON memories, embed, build FAISS, and persist to ``vs_path``."""
         docs = load_memory_file(filepath, user_name, language)
         vector_store = FAISS.from_documents(docs, self.embeddings)
         vector_store.save_local(vs_path)
 
     def search_memory(self, query, vector_store):
+        """Dense retrieval of top-k memories for the current query text.
+
+        Args:
+            query: User message string.
+            vector_store: Loaded FAISS store for this user.
+
+        Returns:
+            ``(date_docs, dates)`` after grouping by ``metadata['source']``.
+        """
         related_docs_with_score = vector_store.similarity_search_with_score(
-            query, k=self.top_k  # 默认 top_k = 6
-        )
+            query,
+            k=self.top_k,
+        )  # list len k; scores (k,) aligned with docs
         # 按日期分组，返回检索到的记忆片段和日期
         related_docs = sorted(related_docs, key=lambda x: x.metadata["source"])
         return date_docs, dates
@@ -169,15 +201,23 @@ class LocalMemoryRetrieval:
 
 ```python
 def update_memory_when_searched(self, recalled_memos, user, cur_date):
+    """Bump strength and refresh last recall for memories used in a turn.
+
+    Args:
+        recalled_memos: LangChain documents returned by the retriever.
+        user: Key into ``self.memory_bank`` for the active profile.
+        cur_date: Session date string ``YYYY-MM-DD``.
+    """
     for recalled in recalled_memos:
         recalled_id = recalled.metadata['memory_id']
         recalled_date = recalled_id.split('_')[1]
-        for i, memory in enumerate(self.memory_bank[user]['history'][recalled_date]):
+        hist = self.memory_bank[user]['history'][recalled_date]
+        for i, memory in enumerate(hist):
             if memory['memory_id'] == recalled_id:
                 # 记忆强度 +1，遗忘速率变慢
-                self.memory_bank[user]['history'][recalled_date][i]['memory_strength'] += 1
+                hist[i]['memory_strength'] += 1
                 # 重置上次回忆日期
-                self.memory_bank[user]['history'][recalled_date][i]['last_recall_date'] = cur_date
+                hist[i]['last_recall_date'] = cur_date
                 break
 ```
 
@@ -198,7 +238,9 @@ $$
 其中：
 
 - $R \in [0, 1]$：**记忆保持率**（retention），即还能记住多少
+
 - $t$：距离上次学习/回忆经过的**时间**
+
 - $S$：**记忆强度**（strength），取决于学习深度和复习次数
 
 **用数字理解**：假设初始记忆强度 $S = 1$（天）：
@@ -215,7 +257,9 @@ $$
 MemoryBank 将 $S$ 建模为**离散整数**：
 
 1. **初始化**：每个记忆片段首次出现时，$S = 1$
+
 2. **衰减**：随着时间 $t$ 增长，$R = e^{-t/S}$ 下降
+
 3. **强化**：当记忆在对话中被**回忆**（即被检索到并使用），则 $S \leftarrow S + 1$，同时 $t$ 重置为 $0$
 
 用表格演示一个记忆片段 "用户推荐了一本书" 的命运：
@@ -236,6 +280,15 @@ MemoryBank 将 $S$ 建模为**离散整数**：
 
 ```python
 def forgetting_curve(t, S):
+    """Reference implementation; see operator-precedence note in article.
+
+    Args:
+        t: Days since last recall.
+        S: Discrete strength (>= 1).
+
+    Returns:
+        Scalar retention / keep probability in ``(0, 1]``.
+    """
     return math.exp(-t / 5*S)
 ```
 
@@ -245,6 +298,15 @@ def forgetting_curve(t, S):
 
 ```python
 def initial_load_forget_and_save(self, name, now_date):
+    """Probabilistically drop stale memories, persist JSON, return kept docs.
+
+    Args:
+        name: Active user id (unused in excerpt; kept for API symmetry).
+        now_date: Current calendar date for computing intervals.
+
+    Returns:
+        List of ``Document`` objects that survived forgetting.
+    """
     docs = []
     for user_name, user_memory in memories.items():
         for date, content in user_memory['history'].items():
@@ -252,22 +314,27 @@ def initial_load_forget_and_save(self, name, now_date):
             for i, dialog in enumerate(content):
                 memory_strength = dialog.get('memory_strength', 1)
                 last_recall_date = dialog.get('last_recall_date', date)
-                
+
                 # 计算距上次回忆的天数
                 days_diff = self._get_date_difference(last_recall_date, now_date)
                 # 计算记忆保持率
-                retention_probability = forgetting_curve(days_diff, memory_strength)
-                
+                retention_probability = forgetting_curve(
+                    days_diff,
+                    memory_strength,
+                )  # scalar in (0, 1]
+
                 # 掷骰子：随机数 > 保持率 → 遗忘
                 if random.random() > retention_probability:
                     forget_ids.append(i)
                 else:
-                    docs.append(Document(page_content=..., metadata=...))
-            
+                    docs.append(
+                        Document(page_content=..., metadata=...),
+                    )
+
             # 从记忆仓库中移除被遗忘的记忆
             for idd in sorted(forget_ids, reverse=True):
                 self.memory_bank[user_name]['history'][date].pop(idd)
-    
+
     self.write_memories(self.filepath)
     return docs
 ```
@@ -325,24 +392,43 @@ meta_prompt = """
 **Prompt 组装的完整流程**：
 
 ```python
-def build_prompt_with_search_memory(history, text, user_memory,
-                                     user_name, user_memory_index, ...):
+def build_prompt_with_search_memory(
+    history,
+    text,
+    user_memory,
+    user_name,
+    user_memory_index,
+    ...,
+):
+    """Fill the meta template with retrieval results and recent turns.
+
+    Args:
+        history: Chat turns ``[{query, response}, ...]`` excluding ``text``.
+        text: Latest user message string.
+        user_memory: Parsed JSON root for ``user_name``.
+        user_name: Display name for template placeholders.
+        user_memory_index: Vector store / retriever bound to this user.
+
+    Returns:
+        A single prompt string for the downstream LLM.
+    """
     # 1. 用当前消息检索相关记忆
     related_memos, memo_dates = local_memory_qa.search_memory(
-        text, user_memory_index
-    )
+        text,
+        user_memory_index,
+    )  # related_memos: list[str], len <= top_k
     related_memory_content = '\n'.join(related_memos)
-    
+
     # 2. 获取全局用户画像
     personality = user_memory.get('overall_personality', '')
-    
+
     # 3. 拼接对话历史
     history_text = ''
     for dialog in history:
         history_text += f"\n [|用户|]: {dialog['query']}"
         history_text += f"\n [|AI伴侣|]: {dialog['response']}"
     history_text += f"\n [|用户|]: {text} \n [|AI伴侣|]: "
-    
+
     # 4. 填充 Meta Prompt 模板
     prompt = meta_prompt.format(
         user_name=user_name,
@@ -350,7 +436,7 @@ def build_prompt_with_search_memory(history, text, user_memory,
         personality=personality,
         boot_actual_name=boot_actual_name,
         history_text=history_text,
-        memo_dates=memo_dates
+        memo_dates=memo_dates,
     )
     return prompt
 ```
@@ -420,7 +506,9 @@ ChatGPT 使用 LlamaIndex 构建索引（借助 GPT-3.5 的嵌入能力），开
 用户 Linda 在第 1 天和 SiliconFriend 讨论了 Python 学习和快速排序。几天后问：
 
 - "你之前推荐了什么书？" → 正确回忆：《Automate the Boring Stuff with Python》
+
 - "我之前让你写什么代码？" → 正确回忆：快速排序
+
 - "我们一起写过堆排序吗？" → 正确否认：没有
 
 **3. 个性化交互**
@@ -448,7 +536,9 @@ ChatGPT 使用 LlamaIndex 构建索引（借助 GPT-3.5 的嵌入能力），开
 **关键发现**：
 
 1. **MemoryBank 对所有 LLM 都有效**：三个后端的记忆检索准确率都超过了 70%
+
 2. **基座模型能力决定上限**：ChatGPT 在回复正确性和连贯性上远超开源模型，说明 MemoryBank 是"锦上添花"而非"雪中送炭"——基座能力越强，记忆增强的效果越好
+
 3. **语言差异**：ChatGLM 和 ChatGPT 在英文上表现更好，BELLE 在中文上更优
 
 ---
@@ -459,6 +549,15 @@ ChatGPT 使用 LlamaIndex 构建索引（借助 GPT-3.5 的嵌入能力），开
 
 ```python
 def forgetting_curve(t, S):
+    """Same helper as earlier; duplicated here for the bug discussion.
+
+    Args:
+        t: Days since last recall.
+        S: Discrete strength (>= 1).
+
+    Returns:
+        Scalar in ``(0, 1]`` (see precedence note in surrounding text).
+    """
     return math.exp(-t / 5*S)
 ```
 
@@ -531,6 +630,9 @@ $$
 > 参考资料：
 >
 > 1. [MemoryBank: Enhancing Large Language Models with Long-Term Memory](https://arxiv.org/abs/2305.10250)
+>
 > 2. [Ebbinghaus, H. Memory: A Contribution to Experimental Psychology, 1885/1964](https://en.wikipedia.org/wiki/Forgetting_curve)
+>
 > 3. [Dense Passage Retrieval (DPR)](https://arxiv.org/abs/2004.04906)
+>
 > 4. [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)

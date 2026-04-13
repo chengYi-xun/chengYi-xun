@@ -52,6 +52,7 @@ mathjax: true
 关键观察：不同模态经过各自的编码器后，都变成了**序列化的向量表示**。模态之间的差异体现在两个维度上：
 
 1. **序列长度不同**：$N_v \neq N_t$（ViT-B/16 对 224×224 图片产生 196 个 patch token，而一段文字可能只有 20 个 token）
+
 2. **特征维度不同**：$d_v \neq d_t$（ViT-B 的 $d_v = 768$，而某些文本编码器 $d_t = 512$）
 
 **多模态融合的目标**：将来自不同模态的表示整合为统一的联合表示，使下游任务（分类、检索、生成）能够同时利用多个模态的信息。
@@ -67,6 +68,8 @@ $$
 ---
 
 ## 2. 三级融合框架
+
+![早期 / 中期 / 晚期融合：按流水线阶段划分的常见分类示意](/chengYi-xun/img/multimodal_fusion.png)
 
 按照融合发生的时机，可以将多模态融合分为三个层级。用一个直观的类比：
 
@@ -134,8 +137,15 @@ import torch.nn as nn
 import torch.fft
 
 class EarlyFusionConcat(nn.Module):
-    """最简单的早期融合：拼接 + MLP"""
+    """Concatenate vision and text vectors, then MLP (early fusion)."""
+
     def __init__(self, d_v, d_t, d_out):
+        """
+        Args:
+            d_v: Vision feature dim.
+            d_t: Text feature dim.
+            d_out: Output dim after MLP.
+        """
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(d_v + d_t, 512),
@@ -144,35 +154,59 @@ class EarlyFusionConcat(nn.Module):
         )
 
     def forward(self, v, t):
-        # v: [B, d_v], t: [B, d_t]
-        z = torch.cat([v, t], dim=-1)  # [B, d_v + d_t]
+        """
+        Args:
+            v: Vision features, shape (B, d_v).
+            t: Text features, shape (B, d_t).
+
+        Returns:
+            Fused logits/embeddings of shape (B, d_out).
+        """
+        z = torch.cat([v, t], dim=-1)  # (B, d_v + d_t)
         return self.mlp(z)
 
 
 class BilinearPooling(nn.Module):
-    """全双线性池化（用于小维度场景）"""
+    """Full bilinear map (only for modest d_v, d_t)."""
+
     def __init__(self, d_v, d_t, d_out):
         super().__init__()
         self.bilinear = nn.Bilinear(d_v, d_t, d_out)
 
     def forward(self, v, t):
-        # v: [B, d_v], t: [B, d_t]
-        return self.bilinear(v, t)  # [B, d_out]
+        """
+        Args:
+            v: (B, d_v).
+            t: (B, d_t).
+
+        Returns:
+            Tensor of shape (B, d_out).
+        """
+        return self.bilinear(v, t)
 
 
 class CompactBilinearPooling(nn.Module):
-    """紧凑双线性池化（Count Sketch + FFT）"""
+    """Compact bilinear pooling via Count Sketch + FFT."""
+
     def __init__(self, d_v, d_t, d_out):
         super().__init__()
         self.d_out = d_out
-        # 为每个模态生成随机 hash 和 sign
-        self.register_buffer('h_v', torch.randint(0, d_out, (d_v,)))
-        self.register_buffer('s_v', 2 * torch.randint(0, 2, (d_v,)).float() - 1)
-        self.register_buffer('h_t', torch.randint(0, d_out, (d_t,)))
-        self.register_buffer('s_t', 2 * torch.randint(0, 2, (d_t,)).float() - 1)
+        # 随机 Count Sketch 的哈希桶与符号（各模态一套）
+        self.register_buffer("h_v", torch.randint(0, d_out, (d_v,)))
+        self.register_buffer("s_v", 2 * torch.randint(0, 2, (d_v,)).float() - 1)
+        self.register_buffer("h_t", torch.randint(0, d_out, (d_t,)))
+        self.register_buffer("s_t", 2 * torch.randint(0, 2, (d_t,)).float() - 1)
 
     def count_sketch(self, x, h, s):
-        # x: [B, d], h: [d], s: [d]
+        """
+        Args:
+            x: (B, d).
+            h: Bucket ids, shape (d,).
+            s: Random signs in {-1, +1}, shape (d,).
+
+        Returns:
+            Sketch tensor of shape (B, d_out).
+        """
         B, d = x.shape
         sketch = torch.zeros(B, self.d_out, device=x.device)
         signed_x = x * s.unsqueeze(0)
@@ -180,14 +214,21 @@ class CompactBilinearPooling(nn.Module):
         return sketch
 
     def forward(self, v, t):
-        # Count Sketch 投影
+        """
+        Args:
+            v: (B, d_v).
+            t: (B, d_t).
+
+        Returns:
+            Real-valued sketch product, shape (B, d_out).
+        """
         sketch_v = self.count_sketch(v, self.h_v, self.s_v)
         sketch_t = self.count_sketch(t, self.h_t, self.s_t)
-        # FFT 域逐元素相乘 = 时域卷积 ≈ 外积的 sketch
+        # 频域相乘对应时域卷积，近似外积的 Count Sketch
         fft_v = torch.fft.fft(sketch_v, dim=-1)
         fft_t = torch.fft.fft(sketch_t, dim=-1)
         z = torch.fft.ifft(fft_v * fft_t, dim=-1).real
-        return z  # [B, d_out]
+        return z  # (B, d_out)
 ```
 
 用前面的例子验证：
@@ -197,19 +238,21 @@ class CompactBilinearPooling(nn.Module):
 B = 5
 d_v, d_t = 768, 512
 
-v = torch.randn(B, d_v)  # 视觉特征
-t = torch.randn(B, d_t)  # 文本特征
+v = torch.randn(B, d_v)  # (B, d_v) 视觉特征
+t = torch.randn(B, d_t)  # (B, d_t) 文本特征
 
 model_concat = EarlyFusionConcat(d_v, d_t, d_out=128)
 model_bilinear = BilinearPooling(d_v, d_t, d_out=128)
 model_compact = CompactBilinearPooling(d_v, d_t, d_out=8192)
 
-z1 = model_concat(v, t)    # [5, 128]
-z2 = model_bilinear(v, t)  # [5, 128]
-z3 = model_compact(v, t)   # [5, 8192]
+z1 = model_concat(v, t)  # (B, 128)
+z2 = model_bilinear(v, t)  # (B, 128)
+z3 = model_compact(v, t)  # (B, 8192)
 
-print(f"拼接融合: {z1.shape}, 参数量: {sum(p.numel() for p in model_concat.parameters()):,}")
-print(f"双线性融合: {z2.shape}, 参数量: {sum(p.numel() for p in model_bilinear.parameters()):,}")
+n_concat = sum(p.numel() for p in model_concat.parameters())
+n_bilin = sum(p.numel() for p in model_bilinear.parameters())
+print(f"拼接融合: {z1.shape}, 参数量: {n_concat:,}")
+print(f"双线性融合: {z2.shape}, 参数量: {n_bilin:,}")
 print(f"紧凑双线性: {z3.shape}, 参数量: 0 (无可学习参数)")
 ```
 
@@ -238,36 +281,50 @@ $$
 **优点**：
 
 - 各模态编码器可以独立预训练
+
 - 推理时可以单模态部署（图像检索只需图像编码器）
+
 - 计算效率高——编码后只需一次点积
 
 **缺点**：
 
 - 模态之间的交互仅限于最终的相似度计算
+
 - 无法捕获细粒度的跨模态对应关系（如"红色"对应图片中车的颜色）
 
 **PyTorch 实现**：
 
 ```python
 class LateFusion(nn.Module):
-    """晚期融合：独立编码 + 余弦相似度"""
+    """Late fusion: separate linear heads + cosine similarity matrix."""
+
     def __init__(self, d_v, d_t, d_shared):
         super().__init__()
         self.proj_v = nn.Linear(d_v, d_shared)
         self.proj_t = nn.Linear(d_t, d_shared)
 
     def encode_image(self, v):
+        """Args: v (B, d_v). Returns: L2-normalized (B, d_shared)."""
         z = self.proj_v(v)
         return z / z.norm(dim=-1, keepdim=True)
 
     def encode_text(self, t):
+        """Args: t (B, d_t). Returns: L2-normalized (B, d_shared)."""
         z = self.proj_t(t)
         return z / z.norm(dim=-1, keepdim=True)
 
     def forward(self, v, t):
-        v_emb = self.encode_image(v)   # [B, d_shared]
-        t_emb = self.encode_text(t)    # [B, d_shared]
-        sim = v_emb @ t_emb.T         # [B, B] 相似度矩阵
+        """
+        Args:
+            v: Image-side batch, shape (B, d_v).
+            t: Text-side batch, shape (B, d_t).
+
+        Returns:
+            Pairwise cosine similarity matrix, shape (B, B).
+        """
+        v_emb = self.encode_image(v)  # (B, d_shared)
+        t_emb = self.encode_text(t)  # (B, d_shared)
+        sim = v_emb @ t_emb.T  # (B, B)
         return sim
 ```
 
@@ -341,7 +398,8 @@ $$
 
 ```python
 class CrossAttention(nn.Module):
-    """交叉注意力模块"""
+    """Scaled dot-product cross-attention (one stream queries another)."""
+
     def __init__(self, d_model, n_heads):
         super().__init__()
         self.n_heads = n_heads
@@ -354,8 +412,12 @@ class CrossAttention(nn.Module):
 
     def forward(self, query, context):
         """
-        query:   [B, N_q, d_model]  — 发出"问题"的模态
-        context: [B, N_c, d_model]  — 提供"答案"的模态
+        Args:
+            query: Query modality tokens, shape (B, N_q, d_model).
+            context: Key/Value modality tokens, shape (B, N_c, d_model).
+
+        Returns:
+            Updated queries, shape (B, N_q, d_model).
         """
         B, N_q, _ = query.shape
         _, N_c, _ = context.shape
@@ -364,8 +426,9 @@ class CrossAttention(nn.Module):
         K = self.W_k(context).view(B, N_c, self.n_heads, self.d_k).transpose(1, 2)
         V = self.W_v(context).view(B, N_c, self.n_heads, self.d_k).transpose(1, 2)
 
-        # Q: [B, H, N_q, d_k], K: [B, H, N_c, d_k]
-        attn = (Q @ K.transpose(-2, -1)) / (self.d_k ** 0.5)  # [B, H, N_q, N_c]
+        # Q, K, V: (B, H, N_*, d_k)
+        scale = self.d_k ** 0.5
+        attn = (Q @ K.transpose(-2, -1)) / scale  # (B, H, N_q, N_c)
         attn = attn.softmax(dim=-1)
 
         out = (attn @ V).transpose(1, 2).reshape(B, N_q, -1)
@@ -373,25 +436,38 @@ class CrossAttention(nn.Module):
 
 
 class MidFusionBlock(nn.Module):
-    """中期融合块：双向交叉注意力 + FFN"""
+    """One mid-fusion layer: bidirectional cross-attn + modality FFNs."""
+
     def __init__(self, d_model, n_heads):
         super().__init__()
         self.cross_attn_v2t = CrossAttention(d_model, n_heads)
         self.cross_attn_t2v = CrossAttention(d_model, n_heads)
         self.norm_v = nn.LayerNorm(d_model)
         self.norm_t = nn.LayerNorm(d_model)
+        hid = d_model * 4
         self.ffn_v = nn.Sequential(
-            nn.Linear(d_model, d_model * 4), nn.GELU(), nn.Linear(d_model * 4, d_model)
+            nn.Linear(d_model, hid),
+            nn.GELU(),
+            nn.Linear(hid, d_model),
         )
         self.ffn_t = nn.Sequential(
-            nn.Linear(d_model, d_model * 4), nn.GELU(), nn.Linear(d_model * 4, d_model)
+            nn.Linear(d_model, hid),
+            nn.GELU(),
+            nn.Linear(hid, d_model),
         )
 
     def forward(self, v, t):
-        # 双向交叉注意力
-        v = v + self.cross_attn_v2t(self.norm_v(v), t)  # 视觉查询文本
-        t = t + self.cross_attn_t2v(self.norm_t(t), v)  # 文本查询视觉
-        # FFN
+        """
+        Args:
+            v: Vision tokens, shape (B, N_v, d_model).
+            t: Text tokens, shape (B, N_t, d_model).
+
+        Returns:
+            Tuple (v, t) with same shapes after fusion block.
+        """
+        # 视觉查询文本；再文本查询视觉
+        v = v + self.cross_attn_v2t(self.norm_v(v), t)
+        t = t + self.cross_attn_t2v(self.norm_t(t), v)
         v = v + self.ffn_v(self.norm_v(v))
         t = t + self.ffn_t(self.norm_t(t))
         return v, t
@@ -411,26 +487,26 @@ import torch.nn.functional as F
 B = 5
 d_v, d_t, d = 768, 512, 256
 
-v_feats = torch.randn(B, d_v)  # 假设已经过图像编码器
-t_feats = torch.randn(B, d_t)  # 假设已经过文本编码器
+v_feats = torch.randn(B, d_v)  # (B, d_v) 已由图像编码器得到
+t_feats = torch.randn(B, d_t)  # (B, d_t) 已由文本编码器得到
 
-# --- 早期融合：拼接 ---
+# --- 早期融合：拼接 + 线性头 ---
 early_proj = torch.nn.Linear(d_v + d_t, d)
-z_early = early_proj(torch.cat([v_feats, t_feats], dim=-1))  # [5, 256]
+cat = torch.cat([v_feats, t_feats], dim=-1)  # (B, d_v + d_t)
+z_early = early_proj(cat)  # (B, d)
 
 # --- 晚期融合：独立投影 + 余弦相似度 ---
 proj_v = torch.nn.Linear(d_v, d)
 proj_t = torch.nn.Linear(d_t, d)
 v_emb = F.normalize(proj_v(v_feats), dim=-1)
 t_emb = F.normalize(proj_t(t_feats), dim=-1)
-sim_late = v_emb @ t_emb.T  # [5, 5] 相似度矩阵
+sim_late = v_emb @ t_emb.T  # (B, B)
 
-# --- 中期融合：交叉注意力 ---
-# 需要序列化特征 -> 升维为 [B, 1, d] 只是示意
-v_seq = proj_v(v_feats).unsqueeze(1)  # [5, 1, 256]
-t_seq = proj_t(t_feats).unsqueeze(1)  # [5, 1, 256]
+# --- 中期融合：交叉注意力（此处用单 token 作极简示意） ---
+v_seq = proj_v(v_feats).unsqueeze(1)  # (B, 1, d)
+t_seq = proj_t(t_feats).unsqueeze(1)  # (B, 1, d)
 cross_attn = CrossAttention(d_model=d, n_heads=4)
-v_fused = v_seq + cross_attn(v_seq, t_seq)  # [5, 1, 256]
+v_fused = v_seq + cross_attn(v_seq, t_seq)  # (B, 1, d)
 
 print(f"早期融合输出: {z_early.shape}")
 print(f"晚期融合相似度矩阵:\n{sim_late}")
@@ -450,7 +526,9 @@ print(f"中期融合输出: {v_fused.shape}")
 **关键洞察**：没有"最好的"融合策略，选择取决于任务需求。
 
 - **检索任务**（需要在百万数据库中快速搜索）→ 晚期融合（可预计算嵌入，线下建索引）
+
 - **VQA 任务**（需要理解"图片左边的红色物体是什么"）→ 中期融合（需要 token 级交互）
+
 - **简单分类任务**（已知模态组合固定）→ 早期融合（参数量最少）
 
 ---
@@ -490,6 +568,7 @@ print(f"中期融合输出: {v_fused.shape}")
 MMDiT 的融合策略结合了双流和单流设计：
 
 - **Double Stream**（SD3 / Flux 前 19 层）：文本和图像各自拥有独立的 QKV 投影和 MLP，但在注意力计算时**拼接 KV 做 Joint Attention**——让文本 token 能关注图像 token，反之亦然
+
 - **Single Stream**（Flux 后 38 层）：文本和图像完全合并为一个序列，共享所有参数
 
 这种"先分后合"的混合设计，正是中期融合在生成式 AI 中的典型落地形式：网络前期保留模态特性（各自的 MLP 处理不同的特征分布），后期充分融合（共享参数减少冗余）。
@@ -529,7 +608,9 @@ $$
 由于加了常数 1，$\mathbf{Z}$ 实际上包含：
 
 - **一阶项**：$v_i, a_j, t_k$（当其他两个取到常数 1 时）
+
 - **二阶项**：$v_i a_j, v_i t_k, a_j t_k$
+
 - **三阶项**：$v_i a_j t_k$
 
 > **命题（TFN 的完备性）**：张量融合 $\mathbf{Z} = \tilde{\mathbf{v}} \otimes \tilde{\mathbf{a}} \otimes \tilde{\mathbf{t}}$ 包含了三个模态之间**所有**一阶、二阶和三阶多项式交互项。
@@ -540,33 +621,46 @@ $$
 
 ```python
 class TensorFusionNetwork(nn.Module):
-    """三模态张量融合"""
+    """TFN-style three-way outer product with bias channels, then linear."""
+
     def __init__(self, d_v, d_a, d_t, d_out):
         super().__init__()
         fusion_dim = (d_v + 1) * (d_a + 1) * (d_t + 1)
         self.fc = nn.Linear(fusion_dim, d_out)
 
     def forward(self, v, a, t):
-        B = v.shape[0]
-        # 增加常数维度
-        ones = torch.ones(B, 1, device=v.device)
-        v_aug = torch.cat([v, ones], dim=-1)  # [B, d_v+1]
-        a_aug = torch.cat([a, ones], dim=-1)  # [B, d_a+1]
-        t_aug = torch.cat([t, ones], dim=-1)  # [B, d_t+1]
+        """
+        Args:
+            v: Vision features, shape (B, d_v).
+            a: Audio features, shape (B, d_a).
+            t: Text features, shape (B, d_t).
 
-        # 三阶外积（通过两次 einsum 实现）
-        va = torch.einsum('bi,bj->bij', v_aug, a_aug)       # [B, d_v+1, d_a+1]
-        vat = torch.einsum('bij,bk->bijk', va, t_aug)       # [B, d_v+1, d_a+1, d_t+1]
-        z = vat.reshape(B, -1)                                # [B, (d_v+1)(d_a+1)(d_t+1)]
+        Returns:
+            Logits of shape (B, d_out).
+        """
+        B = v.shape[0]
+        ones = torch.ones(B, 1, device=v.device)
+        v_aug = torch.cat([v, ones], dim=-1)  # (B, d_v + 1)
+        a_aug = torch.cat([a, ones], dim=-1)  # (B, d_a + 1)
+        t_aug = torch.cat([t, ones], dim=-1)  # (B, d_t + 1)
+
+        # 三阶外积：先 v⊗a，再与 t 做 einsum
+        va = torch.einsum("bi,bj->bij", v_aug, a_aug)  # (B, d_v+1, d_a+1)
+        vat = torch.einsum("bij,bk->bijk", va, t_aug)  # (B, d_v+1, d_a+1, d_t+1)
+        z = vat.reshape(B, -1)
 
         return self.fc(z)
 
-# 示例
-d_v, d_a, d_t = 32, 16, 64  # 小维度示意
+
+# 小维度示例
+d_v, d_a, d_t = 32, 16, 64
 model = TensorFusionNetwork(d_v, d_a, d_t, d_out=2)
-v, a, t = torch.randn(4, d_v), torch.randn(4, d_a), torch.randn(4, d_t)
-logits = model(v, a, t)  # [4, 2]
-print(f"融合维度: {(d_v+1)*(d_a+1)*(d_t+1)} = {33*17*65}")
+v = torch.randn(4, d_v)
+a = torch.randn(4, d_a)
+t = torch.randn(4, d_t)
+logits = model(v, a, t)  # (4, 2)
+fd = (d_v + 1) * (d_a + 1) * (d_t + 1)
+print(f"融合维度: {fd} = {33 * 17 * 65}")
 ```
 
 注意当 $d_v = d_a = d_t = 768$ 时，融合维度为 $(769)^3 \approx 4.5 \times 10^8$——完全不可行。这就是为什么实际应用中需要低秩近似（Low-Rank Tensor Fusion, LMF）或直接转向注意力机制。
@@ -595,7 +689,11 @@ print(f"融合维度: {(d_v+1)*(d_a+1)*(d_t+1)} = {33*17*65}")
 **参考文献**
 
 1. Tenenbaum, J. B., & Freeman, W. T. (2000). *Separating style and content with bilinear models*. Neural Computation.
+
 2. Gao, Y., et al. (2016). *Compact Bilinear Pooling*. CVPR 2016.
+
 3. Zadeh, A., et al. (2017). *Tensor Fusion Network for Multimodal Sentiment Analysis*. EMNLP 2017.
+
 4. Lu, J., et al. (2019). *ViLBERT: Pretraining Task-Agnostic Visiolinguistic Representations*. NeurIPS 2019.
+
 5. Akyürek, E., et al. (2025). *Multi-layer Cross-Attention is Provably Optimal for Multi-modal In-context Learning*. arXiv:2602.04872.

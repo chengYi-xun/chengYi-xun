@@ -7,15 +7,18 @@ categories:
  - Notes
 tags:
  - Deep learning
+
  - 3D Vision
+
  - Transformer
+
  - Multi-modal Fusion
 series: Multi-modal Fusion
 ---
 
 > CVPR 2025 Best Paper Award
 >
-> 论文：[VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2412.11015)（Oxford VGG + Meta AI）
+> 论文：[VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2503.11651)（Oxford VGG + Meta AI）
 >
 > 代码：[github.com/facebookresearch/vggt](https://github.com/facebookresearch/vggt)
 
@@ -48,6 +51,8 @@ $$
 
 VGGT 的核心思想极其简洁：**不设计专门的 3D 归纳偏置，让一个大 Transformer 从数据中学习 3D 几何**。
 
+![VGGT 方法概览（摘自 Wang et al., arXiv:2503.11651 首页图）](/chengYi-xun/img/vggt_arch.png)
+
 ## Token 构成
 
 每帧图像 $I_i$ 经过冻结的 DINOv2 编码为 $K$ 个 patch tokens $t_i^I \in \mathbb{R}^{K \times C}$。然后为每帧添加两种特殊 Token：
@@ -63,15 +68,21 @@ VGGT 的核心思想极其简洁：**不设计专门的 3D 归纳偏置，让一
 代码中的实现（`aggregator.py`）：
 
 ```python
-# 特殊 Token 定义：第一帧和其他帧使用不同的可学习参数
+# 第一帧与后续帧各用一套可学习 camera / register；
+# 张量中有一维大小为 2，对应参考帧与其余帧
 self.camera_token = nn.Parameter(torch.randn(1, 2, 1, embed_dim))
-self.register_token = nn.Parameter(torch.randn(1, 2, num_register_tokens, embed_dim))
+self.register_token = nn.Parameter(
+    torch.randn(1, 2, num_register_tokens, embed_dim)
+)
+# 1 个 camera + num_register 个 register 之后才是 patch
 self.patch_start_idx = 1 + num_register_tokens  # = 5
 
-# 前向传播
-camera_token = slice_expand_and_flatten(self.camera_token, B, S)
+camera_token = slice_expand_and_flatten(self.camera_token, B, S)  # (B*S,1,C)
 register_token = slice_expand_and_flatten(self.register_token, B, S)
-tokens = torch.cat([camera_token, register_token, patch_tokens], dim=1)
+# register: (B*S, R, C)；patch: (B*S, K, C)，R/K 见上文
+tokens = torch.cat(
+    [camera_token, register_token, patch_tokens], dim=1
+)  # (B*S, 1+R+K, C)
 ```
 
 **第一帧 vs. 其他帧**：camera_token 和 register_token 的 shape 中有一个维度为 2，分别对应第一帧（参考帧）和其他帧。这允许模型区分参考坐标系——所有 3D 预测都在第一帧相机的坐标系下表达。
@@ -101,12 +112,18 @@ $$
 两者交替执行：
 
 ```python
-for _ in range(self.aa_block_num):  # 24 次
-    for attn_type in self.aa_order:  # ["frame", "global"]
+# Alternating Attention：通常重复 aa_block_num 次（如 24），
+# 每轮按 aa_order 在 frame / global 间切换
+for _ in range(self.aa_block_num):
+    for attn_type in self.aa_order:  # e.g. ["frame", "global"]
         if attn_type == "frame":
-            tokens = self._process_frame_attention(tokens, B, S, P, C, ...)
+            tokens = self._process_frame_attention(
+                tokens, B, S, P, C, ...
+            )  # (B, S, T, C)
         elif attn_type == "global":
-            tokens = self._process_global_attention(tokens, B, S, P, C, ...)
+            tokens = self._process_global_attention(
+                tokens, B, S, P, C, ...
+            )  # (B, S, T, C)
 ```
 
 **为什么不只用全局注意力？** 消融实验（论文 Table 5）显示：
@@ -130,7 +147,19 @@ Camera Head 从 camera token $\hat{t}_i^g$ 预测 $g_i = [q_i, t_i, f_i]$（四�
 ```python
 class CameraHead(nn.Module):
     def trunk_fn(self, pose_tokens, num_iterations=4):
+        """迭代精炼相机位姿编码。
+
+        行为与仓库 `camera_head.py` 中实现一致（示意摘录）。
+
+        Args:
+            pose_tokens: backbone 输出的 camera token，形状约 (B, T, C)。
+            num_iterations: 迭代次数，常见为 4。
+
+        Returns:
+            list[torch.Tensor]: 每步经 `activate_pose` 后的位姿编码。
+        """
         pred_pose_enc = None
+        pred_pose_enc_list = []
         for _ in range(num_iterations):
             if pred_pose_enc is None:
                 module_input = self.embed_pose(self.empty_pose_tokens)
@@ -138,17 +167,23 @@ class CameraHead(nn.Module):
                 pred_pose_enc = pred_pose_enc.detach()
                 module_input = self.embed_pose(pred_pose_enc)
 
-            # AdaLN 调制
-            shift, scale, gate = self.poseLN_modulation(module_input).chunk(3, dim=-1)
-            modulated = gate * modulate(self.adaln_norm(pose_tokens), shift, scale)
+            # 用上一步位姿生成 AdaLN 的 shift / scale / gate
+            shift, scale, gate = self.poseLN_modulation(
+                module_input
+            ).chunk(3, dim=-1)
+            modulated = gate * modulate(
+                self.adaln_norm(pose_tokens), shift, scale
+            )
             modulated = modulated + pose_tokens
 
-            # 4 层 Transformer + MLP 预测增量
+            # 小型 trunk（若干层 Transformer）+ MLP 预测位姿增量
             modulated = self.trunk(modulated)
             delta = self.pose_branch(self.trunk_norm(modulated))
-            pred_pose_enc = delta if pred_pose_enc is None else pred_pose_enc + delta
+            pred_pose_enc = (
+                delta if pred_pose_enc is None else pred_pose_enc + delta
+            )
 
-            # 激活函数：四元数归一化、FOV 取正
+            # 四元数归一化、FOV 取正等
             activated = activate_pose(pred_pose_enc, ...)
             pred_pose_enc_list.append(activated)
         return pred_pose_enc_list
@@ -157,7 +192,9 @@ class CameraHead(nn.Module):
 **关键设计**：
 
 - 每次迭代预测的是**增量** $\Delta g$，逐步精炼
+
 - `detach()` 阻断梯度回传到上一次迭代，避免计算图爆炸
+
 - 使用 **AdaLN**（Adaptive Layer Normalization，与 DiT 中的设计相同）将上一步预测作为条件注入
 
 ## 2. DPT Head：密集预测
@@ -241,8 +278,12 @@ VGGT 展示了"暴力"方法（更大的模型、更多的数据）在 3D 视觉
 
 > 参考资料：
 >
-> 1. [VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2412.11015)（CVPR 2025 Best Paper）
+> 1. [VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2503.11651)（CVPR 2025 Best Paper）
+>
 > 2. [Vision Transformers Need Registers](https://arxiv.org/abs/2309.16588)（Darcet et al., 2023）
+>
 > 3. [DUSt3R: Geometric 3D Vision Made Easy](https://arxiv.org/abs/2312.14132)
+>
 > 4. [CoTracker: It is Better to Track Together](https://arxiv.org/abs/2307.07635)
+>
 > 5. [DPT: Vision Transformers for Dense Prediction](https://arxiv.org/abs/2103.13413)
