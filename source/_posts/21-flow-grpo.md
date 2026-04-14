@@ -91,7 +91,13 @@ $$
 x_{t - \Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c)
 $$
 
-**如何从这个过程中提取对数概率？** 关键观察：如果我们在每一步都加入微小的高斯扰动（将 ODE 变成 SDE），那么转移概率就有了明确的定义：
+**如何从这个过程中提取对数概率？** 关键观察：确定性 ODE 没有概率可言，但如果我们在每一步都加入微小的高斯扰动（将 ODE 变成 SDE），转移就变成了一个随机过程：
+
+$$
+x_{t-\Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c) + \sigma_t \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
+$$
+
+由于 $\epsilon$ 是标准高斯噪声，$x_{t-\Delta t}$ 的条件分布自然就是以 ODE 预测值为均值、以 $\sigma_t^2 I$ 为协方差的高斯分布：
 
 $$
 p_\theta(x_{t-\Delta t} | x_t, c) = \mathcal{N}\left(x_{t-\Delta t}; \; x_t - \Delta t \cdot v_\theta(x_t, t, c), \; \sigma_t^2 I\right)
@@ -102,6 +108,15 @@ $$
 $$
 \log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\| x_{t-\Delta t} - (x_t - \Delta t \cdot v_\theta(x_t, t, c)) \|^2}{2\sigma_t^2} + \text{const}
 $$
+
+**公式拆解**：这个结果直接来自多维高斯分布的概率密度取对数。对于 $\mathcal{N}(x;\mu, \sigma_t^2 I)$，密度函数为 $p(x) = (2\pi\sigma_t^2)^{-d/2}\exp\!\bigl(-\frac{\|x-\mu\|^2}{2\sigma_t^2}\bigr)$，取对数后展开：
+
+$$
+\log p(x) = -\frac{\|x - \mu\|^2}{2\sigma_t^2} \underbrace{- \frac{d}{2}\log(2\pi) - \frac{d}{2}\log \sigma_t^2}_{\text{const}}
+$$
+
+- **分母 $2\sigma_t^2$**：是高斯密度函数中 $-\frac{1}{2}$ 系数与协方差逆 $\Sigma^{-1}=\frac{1}{\sigma_t^2}I$ 相乘的结果。
+- **const 项**：包含归一化常数 $-\frac{d}{2}\log(2\pi)$ 和行列式项 $-\frac{d}{2}\log\sigma_t^2$，它们都不含模型参数 $\theta$。在 GRPO 训练中，无论是对 $\theta$ 求梯度还是计算重要性采样比 $\exp(\log\pi_\theta - \log\pi_\text{old})$，这些常数项要么导数为零、要么做差时对消，因此可以安全省略。
 
 **直觉理解**：模型预测的"涂抹方向"是 $v_\theta$，实际走的方向可能略有偏差。偏差越小（$\|x_{t-\Delta t} - \hat{x}_{t-\Delta t}\|^2$ 越小），对数概率越高——模型对自己的生成轨迹越"有信心"。
 
