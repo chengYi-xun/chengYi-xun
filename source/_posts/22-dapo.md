@@ -33,11 +33,17 @@ series: Diffusion Models theory
 
 **问题暴露了**：
 
-1. **题 A 和题 C 的 $\sigma_R = 0$**（所有回答的奖励完全相同），GRPO 的优势公式 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R}$ 中分母为零，梯度信号为零——这些样本完全浪费了！这不只是效率问题：大量的零梯度让有效 batch size 缩水，训练不稳定。
+1. **题 A 和题 C 的 $\sigma_R = 0$**（所有回答的奖励完全相同），GRPO 的优势公式 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \varepsilon}$ 中**分子 $r_i - \mu_R = 0$**（每个回答的奖励都等于组均值），因此所有优势 $\hat{A}_i = 0$，梯度信号为零。单个 Prompt 的优势为零本身是合理的（确实没有区分信号），但随着训练推进，模型逐渐"两极化"——简单题全对、困难题全错——导致一个 batch 中**大部分 Prompt 的 $\sigma_R = 0$**。有效参与梯度更新的样本越来越少，梯度估计方差增大，训练不稳定；同时大量生成的轨迹被浪费，计算效率极低。
 
-2. **熵崩溃（Entropy Collapse）**：PPO/GRPO 使用对称裁剪 $[1 - \varepsilon, 1 + \varepsilon]$。对于一个概率仅 $\pi_{\theta_{\text{old}}}(o_t | q) = 0.01$ 的低概率 Token，即使 GRPO 发现它出现在正确回答中应被鼓励，裁剪上界也只允许概率增长到 $0.01 \times (1 + 0.2) = 0.012$——几乎动不了。**探索性 Token 被压制**，模型越来越"保守"，策略熵持续下降，最终只会生成少数固定模式的回答。
+2. **熵崩溃（Entropy Collapse）**：回顾 PPO/GRPO 的裁剪目标函数：
 
-3. **长回答的奖励噪声**：数学推理题目的回答动辄数千 Token。如果模型生成超长但错误的回答（比如陷入循环推理），传统的 $+1/-1$ 奖励一视同仁，导致训练信号噪声极大。
+$$
+\mathcal{L}_{\text{clip}} = \min\!\Big(\underbrace{\frac{\pi_\theta(o_t|q)}{\pi_{\theta_{\text{old}}}(o_t|q)}}_{r_t(\theta)} \cdot \hat{A},\;\; \text{clip}\big(r_t(\theta),\; 1-\varepsilon,\; 1+\varepsilon\big) \cdot \hat{A}\Big)
+$$
+
+其中 $r_t(\theta) = \frac{\pi_\theta(o_t|q)}{\pi_{\theta_{\text{old}}}(o_t|q)}$ 是新旧策略的概率比。对称裁剪 $[1-\varepsilon,\; 1+\varepsilon]$ 限制了单步更新中 $r_t$ 的变化幅度。但这对低概率 Token 极其不利：概率仅 $\pi_{\theta_{\text{old}}}(o_t|q) = 0.01$ 的探索性 Token，即使 GRPO 发现它出现在正确回答中（$\hat{A} > 0$），裁剪上界也只允许 $r_t \leq 1.2$，即概率最多增长到 $0.01 \times 1.2 = 0.012$——几乎动不了。而高概率 Token（如 $\pi_{\text{old}} = 0.5$）同样的裁剪却允许概率增长到 $0.6$。**对称裁剪造成了实质上的不对称：低概率的探索性 Token 被压制**，模型越来越"保守"，策略熵持续下降，最终只会生成少数固定模式的回答。
+
+3. **长回答的奖励噪声**：数学推理的回答长度差异极大（50 Token 到 5000+ Token）。传统 $+1/-1$ 奖励只看最终答案是否正确，**不区分长短**——50 Token 的简洁解法和 5000 Token 的循环推理（碰巧答对）都得 $+1$。而 GRPO 使用**回答级归一化**：先对每个回答内部的 Token 损失求平均，再对 $G$ 个回答求平均——$\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$。这意味着每个回答不论长短权重都是 $\frac{1}{G}$，5000 Token 的回答中每个 Token 只分到 50 Token 回答的 $\frac{1}{100}$ 的梯度信号。当 batch 中混杂着大量超长低质回答时，有效的梯度信号被稀释，训练方向被噪声主导。
 
 用原始 GRPO 训练 Qwen2.5-32B，团队在 AIME 2024 上只拿到了 30 分——远低于 DeepSeek-R1-Zero 的 47 分。**DAPO 的四个技术正是为解决以上三个问题而生**。
 
@@ -63,18 +69,39 @@ $$
 
 **关键参数选择**：DAPO 论文中使用 $\varepsilon_{\text{low}} = 0.2$，$\varepsilon_{\text{high}} = 0.28$。
 
-**为什么这能防止熵崩溃？** 考虑策略梯度对一个 Token $o_t$ 的更新。当 $\hat{A}_t > 0$（这个 Token 出现在好的回答中），PPO 裁剪目标的有效梯度为：
+**为什么这能防止熵崩溃？** 用一个具体例子走一遍。假设 Token $o_t$（"换元法"的关键 Token）出现在一个正确回答中，优势 $\hat{A}_t > 0$，旧策略概率 $\pi_{\text{old}}(o_t) = 0.01$。
+
+PPO 裁剪目标的梯度行为取决于概率比 $r_t = \frac{\pi_\theta(o_t)}{\pi_\text{old}(o_t)}$：
 
 $$
 \nabla_\theta J \propto \begin{cases}
-\hat{A}_t \cdot \nabla_\theta \log \pi_\theta(o_t) & \text{if } r_t(\theta) < 1 + \varepsilon_{\text{high}} \\
-0 & \text{if } r_t(\theta) \geq 1 + \varepsilon_{\text{high}}
+\hat{A}_t \cdot \nabla_\theta \log \pi_\theta(o_t) & \text{if } r_t(\theta) < 1 + \varepsilon_{\text{high}} \quad \text{（未触顶：正常更新）} \\
+0 & \text{if } r_t(\theta) \geq 1 + \varepsilon_{\text{high}} \quad \text{（触顶：梯度被截断）}
 \end{cases}
 $$
 
-对于低概率的探索性 Token（$\pi_{\theta_{\text{old}}}(o_t)$ 很小），$r_t$ 达到上界 $1 + \varepsilon_{\text{high}}$ 时对应的新概率为 $\pi_{\theta_{\text{old}}}(o_t) \cdot (1 + \varepsilon_{\text{high}})$。提高 $\varepsilon_{\text{high}}$ 意味着这个"天花板"更高，梯度信号能持续更多步更新才被截断——低概率 Token 获得了更充分的增长机会。
+也就是说：只要 $r_t$ 没超过上界，梯度正常流过、概率继续涨；一旦 $r_t$ 触顶，梯度变成零，概率就涨不动了。裁剪上界就是给概率增长设了一个"天花板"。
 
-而对于 $\hat{A}_t < 0$（坏回答中的 Token），概率下降的底线仍然由 $\varepsilon_{\text{low}} = 0.2$ 控制——惩罚力度不变。这种**不对称设计的本质是：鼓励多探索、同等力度惩罚错误**。
+**天花板在哪里？** $r_t \leq 1 + \varepsilon_{\text{high}}$ 意味着 $\pi_\theta(o_t) \leq \pi_\text{old}(o_t) \times (1 + \varepsilon_{\text{high}})$：
+
+| 裁剪方式 | $\varepsilon_{\text{high}}$ | 天花板 $\pi_{\text{max}}$ | 含义 |
+|:---:|:---:|:---:|:---|
+| 对称裁剪（GRPO） | 0.2 | $0.01 \times 1.2 = 0.012$ | 概率最多涨 20%，从 1% 到 1.2% |
+| Clip-Higher（DAPO） | 0.28 | $0.01 \times 1.28 = 0.0128$ | 概率最多涨 28%，从 1% 到 1.28% |
+
+单步差距看起来不大，但 PPO 是多 epoch 迭代的——每轮的"终点"是下一轮的"起点"。经过 $n$ 轮更新后累积效果如下：
+
+| 更新轮次 | 对称裁剪 ($\times 1.2$) | Clip-Higher ($\times 1.28$) |
+|:---:|:---:|:---:|
+| 0（初始） | 0.010 | 0.010 |
+| 1 | 0.012 | 0.013 |
+| 5 | 0.025 | 0.034 |
+| 10 | 0.062 | 0.112 |
+| 15 | 0.154 | 0.365 |
+
+**10 轮后差距接近 2 倍，15 轮后差距超过 2 倍。** GRPO 的"换元法"Token 始终趴在低概率区域无法突围，而 DAPO 允许它逐步成长为一个有竞争力的选项。
+
+对于 $\hat{A}_t < 0$ 的情况（Token 出现在坏回答中，应该被抑制），裁剪下界仍由 $\varepsilon_{\text{low}} = 0.2$ 控制——惩罚力度不变。**不对称设计的本质是：给好的探索更多增长空间，对错误保持同等惩罚。**
 
 **直觉对比**：
 
@@ -186,7 +213,24 @@ r_{\text{original}} & \text{if } |o| \leq L_{\text{max}} - L_{\text{buffer}} \\
 \end{cases}
 $$
 
-其中 $L_{\text{buffer}}$ 是缓冲区长度（论文中设为 4096），$p$ 是每超出一个 Token 的惩罚系数（设为 1.0）。
+其中 $L_{\text{max}}$ 是模型最大允许生成长度（论文中设为 20480），$L_{\text{buffer}}$ 是惩罚生效的缓冲区长度（设为 4096），$p$ 是惩罚系数（设为 1.0）。两者的关系如下：
+
+```
+|<─────────────── L_max = 20480 ────────────────>|
+|<── 安全区 (16384) ──>|<── L_buffer (4096) ──>|
+                       ↑ L_thresh               ↑ 截断
+                  惩罚从这里开始            超过则被截断
+```
+
+**公式拆解**：设**超长阈值** $L_{\text{thresh}} = L_{\text{max}} - L_{\text{buffer}} = 16384$，当回答长度 $|o|$ 超过阈值时，惩罚值为：
+
+$$
+\text{penalty} = -\underbrace{\frac{|o| - L_{\text{thresh}}}{L_{\text{buffer}}}}_{\text{超出部分占缓冲区的比例}} \times p
+$$
+
+- 安全区（$|o| \leq 16384$）：奖励不变，模型可以自由发挥。
+- 缓冲区（$16384 < |o| \leq 20480$）：惩罚**线性增长**（从 0 到 $-p$），给模型一个渐进的"太长了，赶紧收尾"信号。
+- 最终取 $\min(r_{\text{original}},\, \text{penalty})$，确保超长回答的奖励**不会高于**惩罚值——即使答案正确，过长也会被惩罚。
 
 **用例子理解**（$L_{\text{max}} = 20480$，$L_{\text{buffer}} = 4096$）：
 
