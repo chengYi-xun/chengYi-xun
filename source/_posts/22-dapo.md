@@ -15,7 +15,7 @@ tags:
 series: Diffusion Models theory
 ---
 
-> 本文为 RL 系列的第六篇。在上几篇中我们推导了 GRPO 的核心思想并将其应用于图像生成。本文将介绍 GRPO 的工程增强版——DAPO（Decoupled Clip and Dynamic sAmpling Policy Optimization），它是字节跳动 Seed 团队与清华 AIR 联合提出的大规模 LLM 强化学习算法，用 Qwen2.5-32B 基座模型在 AIME 2024 上达到 50 分（超过 DeepSeek-R1-Zero 的 47 分），且训练步数减少 50%。
+> 本文为 RL 系列的第六篇。在上几篇中我们推导了 GRPO（组相对策略优化，Group Relative Policy Optimization）的核心思想并将其应用于图像生成。本文将介绍 GRPO 的工程增强版——**DAPO**（解耦裁剪与动态采样策略优化，**D**ecoupled clip and dyn**A**mic sam**P**ling policy **O**ptimization），它是字节跳动 Seed 团队与清华 AIR 联合提出的大规模 LLM 强化学习算法，用 Qwen2.5-32B 基座模型在 AIME 2024 上达到 50 分（超过 DeepSeek-R1-Zero 的 47 分），且训练步数减少 50%。
 >
 > 论文：[DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)（2025.03）
 
@@ -35,15 +35,17 @@ series: Diffusion Models theory
 
 1. **题 A 和题 C 的 $\sigma_R = 0$**（所有回答的奖励完全相同），GRPO 的优势公式 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \varepsilon}$ 中**分子 $r_i - \mu_R = 0$**（每个回答的奖励都等于组均值），因此所有优势 $\hat{A}_i = 0$，梯度信号为零。单个 Prompt 的优势为零本身是合理的（确实没有区分信号），但随着训练推进，模型逐渐"两极化"——简单题全对、困难题全错——导致一个 batch 中**大部分 Prompt 的 $\sigma_R = 0$**。有效参与梯度更新的样本越来越少，梯度估计方差增大，训练不稳定；同时大量生成的轨迹被浪费，计算效率极低。
 
-2. **熵崩溃（Entropy Collapse）**：回顾 PPO/GRPO 的裁剪目标函数：
+2. **熵崩溃（Entropy Collapse）**：在 [PPO 一文](/chengYi-xun/posts/18-trpo-ppo/)中，经典 PPO 的损失函数包含一个**熵奖励（Entropy Bonus）**项 $c_2 \cdot S[\pi_\theta](s_t)$，其中策略熵定义为：
 
-$$
-\mathcal{L}_{\text{clip}} = \min\!\Big(\underbrace{\frac{\pi_\theta(o_t|q)}{\pi_{\theta_{\text{old}}}(o_t|q)}}_{r_t(\theta)} \cdot \hat{A},\;\; \text{clip}\big(r_t(\theta),\; 1-\varepsilon,\; 1+\varepsilon\big) \cdot \hat{A}\Big)
-$$
+   $$S[\pi_\theta](s_t) = -\sum_{v=1}^{|V|} \pi_\theta(v \mid s_t) \log \pi_\theta(v \mid s_t)$$
 
-其中 $r_t(\theta) = \frac{\pi_\theta(o_t|q)}{\pi_{\theta_{\text{old}}}(o_t|q)}$ 是新旧策略的概率比。对称裁剪 $[1-\varepsilon,\; 1+\varepsilon]$ 限制了单步更新中 $r_t$ 的变化幅度。但这对低概率 Token 极其不利：概率仅 $\pi_{\theta_{\text{old}}}(o_t|q) = 0.01$ 的探索性 Token，即使 GRPO 发现它出现在正确回答中（$\hat{A} > 0$），裁剪上界也只允许 $r_t \leq 1.2$，即概率最多增长到 $0.01 \times 1.2 = 0.012$——几乎动不了。而高概率 Token（如 $\pi_{\text{old}} = 0.5$）同样的裁剪却允许概率增长到 $0.6$。**对称裁剪造成了实质上的不对称：低概率的探索性 Token 被压制**，模型越来越"保守"，策略熵持续下降，最终只会生成少数固定模式的回答。
+   $|V|$ 是词表大小，$\pi_\theta(v \mid s_t)$ 是策略在状态 $s_t$（当前已生成的上下文）下选择 token $v$ 的概率。熵衡量的是**每个生成位置上策略对整个词表的概率分布的不确定性**，取值范围 $[0,\;\log|V|]$——均匀分布时取上限 $\log|V|$，确定性策略时取下限 $0$（详细推导见 [PPO 一文](/chengYi-xun/posts/18-trpo-ppo/)中熵奖励部分）。PPO 以**负号**引入熵（$-c_2 \cdot S$），等价于鼓励策略保持高熵、避免坍缩到确定性策略。
 
-3. **长回答的奖励噪声**：数学推理的回答长度差异极大（50 Token 到 5000+ Token）。传统 $+1/-1$ 奖励只看最终答案是否正确，**不区分长短**——50 Token 的简洁解法和 5000 Token 的循环推理（碰巧答对）都得 $+1$。而 GRPO 使用**回答级归一化**：先对每个回答内部的 Token 损失求平均，再对 $G$ 个回答求平均——$\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$。这意味着每个回答不论长短权重都是 $\frac{1}{G}$，5000 Token 的回答中每个 Token 只分到 50 Token 回答的 $\frac{1}{100}$ 的梯度信号。当 batch 中混杂着大量超长低质回答时，有效的梯度信号被稀释，训练方向被噪声主导。
+   然而研究表明（Shen et al., [arXiv:2509.03493](https://arxiv.org/abs/2509.03493)），这种熵奖励在 LLM-RL 中**几乎无效**。直觉是：LLM 每一步的动作空间是整个词表（3~13 万 token），但在任何给定位置只有少数 token 语义相关。熵奖励的梯度 $\nabla_\theta S[\pi_\theta]$ 试图拉平**全词表**概率分布——它会同时推高成千上万个毫不相关的 token（如在英文语境下推高中文标点的概率），噪声梯度淹没了对少数有意义探索 token 的鼓励信号。
+
+   GRPO 因此未采用熵奖励，而**裁剪机制本身**才是导致熵崩溃的直接原因：对称裁剪 $[1-\varepsilon, 1+\varepsilon]$ 对低概率探索 Token 极不利——概率仅 0.01 的 Token 每步最多涨到 $0.01 \times 1.2 = 0.012$，几乎无法增长；高概率 Token（0.5）却可轻松涨到 $0.5 \times 1.2 = 0.6$。**对称裁剪系统性地压制低概率路径**，策略熵持续下降，最终模型只会生成少数固定模式的回答。
+
+3. **长回答的奖励噪声**：数学推理的回答长度差异极大（50 Token 到 5000+ Token）。传统 $+1/-1$ 奖励只看最终答案是否正确，**不区分长短**——50 Token 的简洁解法和 5000 Token 的循环推理（碰巧答对）都得 $+1$。而 GRPO 使用**序列级归一化**（Sequence-Level）：先对每个回答内部的 Token 损失求平均，再对 $G$ 个回答求平均——$\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$。这意味着每个回答不论长短权重都是 $\frac{1}{G}$，5000 Token 的回答中每个 Token 只分到 50 Token 回答的 $\frac{1}{100}$ 的梯度信号。当 batch 中混杂着大量超长低质回答时，有效的梯度信号被稀释，训练方向被噪声主导。
 
 用原始 GRPO 训练 Qwen2.5-32B，团队在 AIME 2024 上只拿到了 30 分——远低于 DeepSeek-R1-Zero 的 47 分。**DAPO 的四个技术正是为解决以上三个问题而生**。
 
@@ -109,10 +111,10 @@ $$
 |---|---|---|
 | 裁剪范围 | $[1-\varepsilon, 1+\varepsilon] = [0.8, 1.2]$ | $[1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}}] = [0.8, 1.28]$ |
 | 概率 0.01 的 Token 可涨到 | $0.012$ | $0.0128$ |
-| 经过 10 次更新后 | $0.012^{10} \approx 0.062$ | $0.0128^{10} \approx 0.112$ |
+| 经过 10 次更新后 | $0.01 \times 1.2^{10} \approx 0.062$ | $0.01 \times 1.28^{10} \approx 0.112$ |
 | 效果 | 探索被压制，熵崩溃 | 探索空间更大，策略保持多样性 |
 
-> **与 GRPO 中 KL 惩罚的关系**：GRPO 使用 $\beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ 来约束策略不偏离太远，但 KL 惩罚是**全局性**的——它惩罚所有概率变化，包括有益的探索。Clip-Higher 则是**局部性**的约束——只在比率超出范围时截断梯度，保留了范围内的自由度。DAPO 论文发现，Clip-Higher 足以替代 KL 惩罚的约束功能，同时避免了 KL 惩罚对探索的抑制，因此**完全移除了 KL 正则项和参考模型**。这进一步减少了一个大模型的显存占用。
+> **为什么 DAPO 能移除 KL 惩罚？** GRPO 中 KL 惩罚 $\beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ 的职责是**防止 reward hacking**——策略可能利用奖励模型的漏洞骗取高分，KL 约束使策略不至于偏离参考模型太远。但 KL 惩罚是**全局性**的：它惩罚所有概率变化，包括有益的探索，反而加剧了熵崩溃。Clip-Higher 是**局部性**的约束：只在概率比率超出裁剪范围时截断梯度，范围内的更新完全自由。DAPO 论文发现，裁剪机制本身已足够约束单步策略变化幅度，KL 惩罚的防护因此多余，移除它还能**省掉一个冻结参考模型的显存**。
 
 ---
 
@@ -135,10 +137,10 @@ $$
 **核心约束**：DAPO 同时要求每个保留的 Prompt 组中必须同时包含正确和错误的回答：
 
 $$
-0 < |\{o_i \mid \text{is\_correct}(a, o_i)\}| < G
+0 < \left\lvert\{o_i \mid \text{is}\_\text{correct}(a, o_i)\}\right\rvert < G
 $$
 
-这确保了每个 Prompt 都能提供"做对了的回答应该被鼓励、做错了的回答应该被抑制"的双向梯度信号。
+其中 $\text{is}\_\text{correct}(a, o_i)$ 是判定函数，表示"给定标准答案 $a$，第 $i$ 个回答 $o_i$ 是否正确"；$\left\lvert\{\cdot\}\right\rvert$ 表示集合的基数（元素个数）。整个不等式的含义是：$G$ 个采样回答中，正确回答的数量必须**严格大于 0 且严格小于 $G$**——即每组样本中必须同时存在正确和错误的回答。这确保了每个 Prompt 都能提供"做对了的回答应该被鼓励、做错了的回答应该被抑制"的双向梯度信号。
 
 **伪代码**：
 ```python
@@ -154,7 +156,7 @@ while len(cache) < target_batch_size:
     for prompt in prompts:
         # 对每题并行采样 G 条推理轨迹供组内对比
         responses = model.generate(prompt, num_return=G)
-        # 规则判题等得到回答级标量奖励，用于后续优势估计
+        # 规则判题等得到序列级标量奖励，用于后续优势估计
         rewards = judge(responses)
 
         # 仅保留组内奖励有差异的 Prompt（排除全对/全错，保证 GRPO 优势可分）
@@ -175,11 +177,11 @@ train_batch = cache[:target_batch_size]
 
 ## 技术三：Token-Level Policy Gradient Loss（Token 级损失）
 
-**问题复盘**：标准 GRPO 使用**回答级**（Sequence-Level）的损失归一化——每个回答的贡献权重相同，不论长短。但在数学推理场景中，不同回答的长度差异极大（短回答 50 Token，长回答 5000 Token）。如果按回答级归一化，一个 5000 Token 的长回答和一个 50 Token 的短回答对损失的贡献一样大，但长回答中每个 Token 分到的梯度只有短回答的 1/100。
+**问题复盘**：标准 GRPO 使用**序列级**（Sequence-Level）的损失归一化——每个回答的贡献权重相同，不论长短。但在数学推理场景中，不同回答的长度差异极大（短回答 50 Token，长回答 5000 Token）。如果按序列级归一化，一个 5000 Token 的长回答和一个 50 Token 的短回答对损失的贡献一样大，但长回答中每个 Token 分到的梯度只有短回答的 1/100。
 
 **用例子理解**：
 
-| 回答 | Token 数 | 正确性 | 回答级权重（GRPO） | Token 级权重（DAPO） |
+| 回答 | Token 数 | 正确性 | 序列级权重（GRPO） | Token 级权重（DAPO） |
 |:---:|:---:|:---:|:---:|:---:|
 | $o_1$（简洁解法） | 50 | 正确 | $\frac{1}{2}$ | $\frac{50}{5050} \approx 1\%$ |
 | $o_2$（长推导） | 5000 | 正确 | $\frac{1}{2}$ | $\frac{5000}{5050} \approx 99\%$ |
@@ -204,7 +206,7 @@ $$
 
 **问题复盘**：推理模型有时会陷入"循环推理"（重复验证或反复改写），生成远超必要长度的回答。在纯粹的 $+1/-1$ 二值奖励下，一个 500 Token 的正确解和一个 15000 Token 的正确解获得相同的 $+1$ 奖励——模型没有任何动力去简洁作答，甚至可能越来越啰嗦（因为长回答中"凑巧"碰到正确答案的概率更高）。
 
-**Overlong Reward Shaping 的解决方案**：对超过长度阈值 $L_{\text{max}}$ 的回答施加长度惩罚：
+**Overlong Reward Shaping 的解决方案**：对超过超长阈值 $L_{\text{thresh}} = L_{\text{max}} - L_{\text{buffer}}$ 的回答施加长度惩罚：
 
 $$
 r_{\text{shaped}} = \begin{cases}
@@ -213,23 +215,26 @@ r_{\text{original}} & \text{if } |o| \leq L_{\text{max}} - L_{\text{buffer}} \\
 \end{cases}
 $$
 
-其中 $L_{\text{max}}$ 是模型最大允许生成长度（论文中设为 20480），$L_{\text{buffer}}$ 是惩罚生效的缓冲区长度（设为 4096），$p$ 是惩罚系数（设为 1.0）。两者的关系如下：
+其中 $L_{\text{max}}$ 是模型最大允许生成长度（论文中设为 20480），$L_{\text{buffer}}$ 是惩罚生效的缓冲区长度（设为 4096），$p$ 是惩罚系数（设为 1.0）。设**超长阈值** $L_{\text{thresh}} = L_{\text{max}} - L_{\text{buffer}} = 16384$，整个长度空间被划分为三个区域：
 
-```
-|<─────────────── L_max = 20480 ────────────────>|
-|<── 安全区 (16384) ──>|<── L_buffer (4096) ──>|
-                       ↑ L_thresh               ↑ 截断
-                  惩罚从这里开始            超过则被截断
-```
+| 区域 | 回答长度 $\|o\|$ | 奖励处理 | 惩罚值 |
+|:---|:---:|:---|:---:|
+| **安全区** | $\leq 16384$ | 奖励不变，模型自由发挥 | $0$ |
+| **缓冲区** | $16384 \sim 20480$ | 惩罚随超出长度**线性增长** | $0 \to -p$ |
+| **截断** | $> 20480$ | 生成被强制终止 | — |
 
-**公式拆解**：设**超长阈值** $L_{\text{thresh}} = L_{\text{max}} - L_{\text{buffer}} = 16384$，当回答长度 $|o|$ 超过阈值时，惩罚值为：
+**公式拆解**：当回答长度 $|o|$ 超过阈值时，惩罚值为：
 
 $$
 \text{penalty} = -\underbrace{\frac{|o| - L_{\text{thresh}}}{L_{\text{buffer}}}}_{\text{超出部分占缓冲区的比例}} \times p
 $$
 
-- 安全区（$|o| \leq 16384$）：奖励不变，模型可以自由发挥。
-- 缓冲区（$16384 < |o| \leq 20480$）：惩罚**线性增长**（从 0 到 $-p$），给模型一个渐进的"太长了，赶紧收尾"信号。
+- **安全区**（$|o| \leq 16384$）：奖励不变，模型可以自由发挥。
+- **缓冲区**（$16384 < |o| \leq 20480$）：展开公式可以看到惩罚是 $|o|$ 的线性函数：
+
+$$\text{penalty} = -\frac{p}{L_{\text{buffer}}} \cdot |o| + \underbrace{\frac{L_{\text{thresh}} \cdot p}{L_{\text{buffer}}}}_{\text{常数（所有超参都是训练前确定的）}} = -\frac{1}{4096} \cdot |o| + 4$$
+
+斜率 $= -\frac{1}{4096}$ 恒定，即每多超出一个 Token，惩罚增加 $\frac{1}{4096} \approx 0.000244$。从 $|o| = 16384$ 时的 $0$ 增长到 $|o| = 20480$ 时的 $-1.0$。
 - 最终取 $\min(r_{\text{original}},\, \text{penalty})$，确保超长回答的奖励**不会高于**惩罚值——即使答案正确，过长也会被惩罚。
 
 **用例子理解**（$L_{\text{max}} = 20480$，$L_{\text{buffer}} = 4096$）：
@@ -256,10 +261,10 @@ $$
 $$
 
 $$
-\text{s.t.} \quad 0 < |\{o_i \mid \text{is\_correct}(a, o_i)\}| < G
+\text{s.t.} \quad 0 < \left\lvert\{o_i \mid \text{is}\_\text{correct}(a, o_i)\}\right\rvert < G
 $$
 
-其中优势函数仍然使用 GRPO 的组内相对计算：$\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$，不依赖 Critic 网络。
+约束条件要求每组 $G$ 个采样中正确回答数严格介于 $0$ 和 $G$ 之间（动态采样保证），使得组内标准化后的优势 $\hat{A}_i$ 同时包含正、负信号。优势函数仍然使用 GRPO 的组内相对计算：$\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$，不依赖 Critic 网络。
 
 ## DAPO 与 GRPO 的差异对比
 
@@ -267,11 +272,11 @@ $$
 |:---|:---:|:---:|
 | 裁剪方式 | 对称 $[1-\varepsilon, 1+\varepsilon]$ | **非对称** $[1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}}]$ |
 | 采样策略 | 固定 batch，包含零方差组 | **动态采样**，过滤零方差组 |
-| 损失归一化 | 回答级（每个回答等权） | **Token 级**（每个 Token 等权） |
+| 损失归一化 | 序列级（每个回答等权） | **Token 级**（每个 Token 等权） |
 | 长度控制 | 无 | **超长奖励惩罚** |
 | KL 正则 | $\beta \cdot \text{KL}(\pi_\theta \| \pi_{\text{ref}})$ | **移除 KL**（依赖裁剪约束策略） |
 
-注意 DAPO **移除了 KL 散度正则项**——通过 Clip-Higher 和动态采样的协同作用，策略已经被有效约束在合理范围内，不再需要显式的参考模型约束。
+DAPO **移除了 KL 散度正则项和参考模型**——原因见上文 Clip-Higher 部分的分析。
 
 ## 完整实现代码
 
@@ -279,42 +284,27 @@ $$
 
 **Step 1: 模型定义与超参数**
 
+DAPO 只需维护一个 Actor 模型。GRPO 额外需要一个冻结的 Reference Model 来计算 KL 惩罚；而 DAPO 的裁剪机制（Clip-Higher）已经足够约束策略更新幅度，KL 惩罚变得多余（原因详见上文 Clip-Higher 部分），移除它还能省出一个大模型的显存。
+
 ```python
-# PyTorch：前向、反向与分布式训练的基础
 import torch
-# 函数式 API，常用于 logits/损失中的激活与归一化
 import torch.nn.functional as F
-# 加载 HuggingFace 因果语言模型与分词器
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# 模型定义: DAPO 移除了 KL 惩罚，不需要参考模型!
-# 可训练策略 π_θ，用于 rollout 与重要性采样比率
+# DAPO 只需要 Actor，不需要参考模型（对比 GRPO: actor + ref_model）
 actor = AutoModelForCausalLM.from_pretrained("Qwen2.5-32B-SFT")
-# 对比: GRPO 需要 Actor + Reference; DAPO 只需要 Actor!
-# (但实际工程中通常仍保留 ref_model 用于监控 KL 漂移)
-
-# 与 Actor 词表对齐，编码 prompt/response
 tokenizer = AutoTokenizer.from_pretrained("Qwen2.5-32B-SFT")
-# 仅更新策略参数；RL 中常用较小 lr 抑制策略突变
 optimizer = torch.optim.AdamW(actor.parameters(), lr=1e-6)
 
-# DAPO 超参数（与论文/开源实现对应，控制裁剪、采样与长度塑形）
-# 每个 Prompt 的采样数 (DAPO 论文用 16)
-G = 16
-# 裁剪下界 (与标准 PPO 相同)
-eps_low = 0.2
-# 裁剪上界 (Clip-Higher: 比 PPO 的 0.2 更宽)
-eps_high = 0.28
-# 每批数据的更新轮数；多 epoch 提高旧轨迹利用率
-K_epochs = 2
-# 目标有效 Prompt 数；一步优化所依据的组内对比规模
-target_batch_size = 512
-# 动态采样的过采样倍率；越大越易凑满有效组，但 rollout 成本更高
-batch_multiplier = 3
-# 最大回答长度；与超长塑形阈值配合，限制生成上限
-max_len = 20480
-# 超长惩罚缓冲区；控制从“不罚”到“重罚”的过渡宽度
-buffer_len = 4096
+# ── DAPO 超参数 ──
+G = 16                  # 每个 Prompt 的采样数（GRPO 组大小）
+eps_low = 0.2           # 裁剪下界（与标准 PPO 相同）
+eps_high = 0.28         # 裁剪上界（Clip-Higher：比 PPO 更宽，促进探索）
+K_epochs = 2            # 每批数据的 PPO 更新轮数
+target_batch_size = 512 # 目标有效 Prompt 数
+batch_multiplier = 3    # 动态采样过采样倍率
+max_len = 20480         # 最大回答长度 L_max
+buffer_len = 4096       # 超长惩罚缓冲区 L_buffer
 ```
 
 **Step 2: 四大核心函数**
@@ -322,31 +312,24 @@ buffer_len = 4096
 ```python
 def overlong_reward_shaping(rewards, response_lengths, max_len=20480,
                              buffer_len=4096, penalty=1.0):
-    """技术四: 超长奖励塑形.
+    """技术四: 超长奖励塑形。超过 L_thresh 的回答线性惩罚。
 
     Args:
-        rewards: 原始奖励，形状 (N,).
-        response_lengths: 各回答长度，形状 (N,).
-        max_len: 最大长度阈值 L_max.
-        buffer_len: 缓冲区长度 L_buffer.
-        penalty: 每超出一个 Token 的惩罚系数 p.
-
+        rewards:          [N] 原始奖励（+1 正确 / -1 错误）
+        response_lengths: [N] 每条回答的 token 数
+        max_len:          生成截断长度 L_max（默认 20480）
+        buffer_len:       惩罚缓冲区长度 L_buffer（默认 4096）
+        penalty:          最大惩罚系数 p（默认 1.0）
     Returns:
-        shaped: 塑形后奖励，形状 (N,).
+        shaped: [N] 塑形后的奖励
     """
-    # 超过该长度开始线性惩罚，缓冲区内平滑过渡；对应论文中 L_max 与 buffer
-    threshold = max_len - buffer_len
-    # 不原地修改原始奖励，便于对比与调试
-    shaped = rewards.clone()  # (N,)
-    over_mask = response_lengths > threshold  # (N,)
-    # 超出阈值部分的 token 数
-    excess = (response_lengths[over_mask] - threshold).float()  # (num_over,)
-    # 在 buffer 上归一化的负向塑形项，抑制循环啰嗦
-    penalty_values = -(excess / buffer_len) * penalty
-    # 正确但过长时可能被压成负奖励
-    shaped[over_mask] = torch.min(rewards[over_mask], penalty_values)
-    # 返回进入组内标准化前的 shaped 奖励
-    return shaped
+    threshold = max_len - buffer_len                             # 超长阈值 L_thresh = 20480 - 4096 = 16384
+    shaped = rewards.clone()                                     # 拷贝原始奖励，避免就地修改
+    over_mask = response_lengths > threshold                     # 布尔掩码：哪些回答超过了阈值
+    excess = (response_lengths[over_mask] - threshold).float()   # 超出阈值的 token 数（如 18000 - 16384 = 1616）
+    penalty_values = -(excess / buffer_len) * penalty            # 线性惩罚 = -(超出量 / 缓冲区长度) × p
+    shaped[over_mask] = torch.min(rewards[over_mask], penalty_values)  # 取 min：确保超长回答奖励不高于惩罚值
+    return shaped                                                # 安全区内的回答奖励不变，超长回答被惩罚
 
 
 def dynamic_sampling(model, dataset, target_size, G, batch_multiplier=3,
@@ -412,134 +395,69 @@ def dynamic_sampling(model, dataset, target_size, G, batch_multiplier=3,
 
 
 def compute_group_advantages(rewards_list, G):
-    """GRPO 组内相对优势 (与 GRPO 完全相同).
-
-    Args:
-        rewards_list: 长度 batch*G 的奖励列表或可 stack 张量。
-        G: 每组 rollout 条数。
-
-    Returns:
-        advantages: 展平优势，形状 (batch * G,).
-    """
-    rewards = torch.stack(rewards_list).reshape(-1, G)  # (batch, G)
-    # 组内基线 μ_R，去价值网络
-    mean_r = rewards.mean(dim=1, keepdim=True)  # (batch, 1)
-    # 组内标准差 σ_R；动态采样保证其 >0
-    std_r = rewards.std(dim=1, keepdim=True)  # (batch, 1)
-    # 标准化优势 Â_i，同组内相对比较好坏
-    advantages = (rewards - mean_r) / (std_r + 1e-8)
-    # 展平为 (batch*G,) 与逐条 response 对齐
-    return advantages.reshape(-1)  # (batch * G,)
+    """GRPO 组内相对优势（与 GRPO 完全相同）。"""
+    rewards = torch.stack(rewards_list).reshape(-1, G)           # (batch, G)
+    mean_r = rewards.mean(dim=1, keepdim=True)
+    std_r  = rewards.std(dim=1, keepdim=True)
+    advantages = (rewards - mean_r) / (std_r + 1e-8)            # z-score
+    return advantages.reshape(-1)                                # (batch*G,)
 
 
 def dapo_loss(log_probs, old_log_probs, advantages, loss_mask,
               eps_low=0.2, eps_high=0.28):
-    """技术一 + 技术三: Clip-Higher + Token-Level 归一化.
-
-    Args:
-        log_probs: 当前策略 token 对数概率，形状 (*, T) 或与 mask 对齐。
-        old_log_probs: 旧策略 token 对数概率，同形状。
-        advantages: Token 级或广播后的优势，同形状。
-        loss_mask: 有效 token 掩码，同形状，1 表示参与损失。
-        eps_low: 裁剪下界参数。
-        eps_high: 裁剪上界参数。
-
-    Returns:
-        loss: 标量，token 平均裁剪代理目标。
-    """
-    # 重要性采样比 r_t = π_θ/π_old，token 级 trust region
-    ratio = torch.exp(log_probs - old_log_probs)
+    """技术一 + 技术三: Clip-Higher + Token-Level 归一化。"""
+    ratio = torch.exp(log_probs - old_log_probs)                # r_t(θ)
 
     # 技术一: 非对称裁剪
-    # 未裁剪代理目标，鼓励按优势方向更新策略
     surr1 = ratio * advantages
-    # Clip-Higher：上界更宽利探索
-    surr2 = (
-        torch.clamp(ratio, 1.0 - eps_low, 1.0 + eps_high) * advantages
-    )
-    # PPO 式 pessimistic bound，取较小者抑制过大策略步长
-    token_loss = -torch.min(surr1, surr2)
+    surr2 = torch.clamp(ratio, 1.0 - eps_low, 1.0 + eps_high) * advantages
+    token_loss = -torch.min(surr1, surr2)                       # PPO 悲观下界
 
-    # 技术三: Token-Level 归一化 (除以有效 Token 总数)
-    # 全 batch 有效生成 token 数，长短回答按 token 等权
-    total_tokens = loss_mask.sum()
-    # 全局平均：长链推理每步梯度不再被稀释
-    loss = (token_loss * loss_mask).sum() / total_tokens
-    # 标量目标，无 KL 项，仅靠裁剪约束偏离
+    # 技术三: Token-Level 归一化——除以有效 Token 总数而非回答数
+    loss = (token_loss * loss_mask).sum() / loss_mask.sum()
     return loss
 ```
 
 **Step 3: 完整训练循环**
 
 ```python
-# 外层训练步：每步先采样一批有效轨迹再做多轮策略更新
 for step in range(total_steps):
-    # === 阶段 1: 动态采样 (技术二 + 技术四) ===
-    # 反复采样直到积累够 target_batch_size 个有效 Prompt 组
-    # 在线 rollout + 过滤零方差组
+    # ══════════ 阶段 1: 动态采样（技术二 + 技术四）══════════
     batch = dynamic_sampling(
         actor, dataset, target_batch_size, G, batch_multiplier
     )
 
-    # === 阶段 2: 计算组内相对优势 ===
-    # 每条 trajectory 的（已塑形）回答级奖励列表
+    # ══════════ 阶段 2: 计算组内相对优势 ══════════
     all_rewards = [item["rewards"] for item in batch]
-    # GRPO：同题 G 条间标准化，得到无 critic 的优势信号
-    advantages = compute_group_advantages(all_rewards, G)  # (batch * G,)
-    # 将序列级优势广播到每个 Token（同一回答内各 token 共享该序列的 Â）
-    # (batch*G,) → (batch*G, T)，与 GRPO 一致再喂入 token 级裁剪目标
+    advantages = compute_group_advantages(all_rewards, G)       # (batch*G,)
 
-    # === 阶段 3: 多 Epoch 更新 (技术一 + 技术三) ===
-    # 对同一批数据重复利用，提高样本效率（仍受 clip 约束）
+    # ══════════ 阶段 3: 多 Epoch PPO 式更新（技术一 + 技术三）══════════
     for epoch in range(K_epochs):
-        # 小批量降低显存、稳定梯度
         for mini_batch in create_minibatches(batch, minibatch_size=64):
-            # 用当前策略重新计算 Token 级对数概率
             new_log_probs = compute_token_log_probs(
-                actor,
-                mini_batch["prompts"],
-                mini_batch["responses"],
-            )  # (*, T)
-            # 采样时冻结的 log π_old，构造比率
-            old_log_probs = mini_batch["old_log_probs"]  # (*, T)
-            # 回答级 Â 广播到每个 token 位置
+                actor, mini_batch["prompts"], mini_batch["responses"],
+            )                                                   # (*, T)
+            old_log_probs = mini_batch["old_log_probs"]         # (*, T)
             adv = mini_batch["advantages"].unsqueeze(-1).expand_as(
                 new_log_probs
-            )  # (*, T)
-            # 仅对实际生成的 token 累计损失，忽略 padding
-            mask = mini_batch["loss_mask"]  # (*, T)
+            )                                                   # (*, T)
+            mask = mini_batch["loss_mask"]                      # (*, T)
 
-            # DAPO 损失 (Clip-Higher + Token-Level)
-            # 注意: 没有 KL 惩罚项! (对比 GRPO 的 loss = policy_loss + β·kl)
-            # 联合实现非对称裁剪与 token 归一化
+            # DAPO 损失（注意：没有 KL 惩罚项！）
             loss = dapo_loss(
-                new_log_probs,
-                old_log_probs,
-                adv,
-                mask,
-                eps_low=eps_low,
-                eps_high=eps_high,
+                new_log_probs, old_log_probs, adv, mask,
+                eps_low=eps_low, eps_high=eps_high,
             )
 
-            # 清空上一轮梯度
             optimizer.zero_grad()
-            # 反传得到 ∇_θ L，更新鼓励高优势 token、抑制低优势 token
             loss.backward()
-            # 全局梯度裁剪，抑制 RL 不稳定
-            torch.nn.utils.clip_grad_norm_(
-                actor.parameters(), max_norm=1.0
-            )
-            # AdamW 一步，策略向 DAPO 目标前进
+            torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
             optimizer.step()
 
-    # === 阶段 4: 监控 (可选但推荐) ===
-    # 监控不参与反传，节省计算与显存
+    # ══════════ 阶段 4: 监控（可选）══════════
     with torch.no_grad():
-        # 批次平均回报，观察整体是否在提升
         mean_reward = torch.stack(all_rewards).mean().item()
-        # 策略熵，诊断是否熵崩溃
         entropy = compute_policy_entropy(actor, batch)
-        # 如果 entropy 持续下降，可能需要增大 eps_high
 ```
 
 > **与 GRPO 训练循环的关键区别**：

@@ -467,9 +467,30 @@ $$
 \mathcal{L}^{\text{PPO}}(\theta) = \mathcal{L}^{\text{CLIP}}(\theta) - c_1 \mathcal{L}^{\text{VF}}(\theta) + c_2 S[\pi_\theta](s_t)
 $$
 
-1. **策略损失 $\mathcal{L}^{\text{CLIP}}$**：即上述的裁剪目标函数。
-2. **价值损失 $\mathcal{L}^{\text{VF}}$**：Critic 网络预测的价值 $V_\theta(s_t)$ 与实际回报 $V_t^{\text{target}}$ 的均方误差，用于训练 Critic。
-3. **熵奖励（Entropy Bonus）$S[\pi_\theta]$**：鼓励策略保持一定的随机性，防止过早收敛到局部最优（探索与利用的权衡）。
+1. **策略损失 $\mathcal{L}^{\text{CLIP}}$**：即上文推导的裁剪目标函数：
+
+   $$\mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[\min\!\left(r_t(\theta)\,\hat{A}_t,\;\text{clip}\!\left(r_t(\theta),\,1-\epsilon,\,1+\epsilon\right)\hat{A}_t\right)\right]$$
+
+   其中 $r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}$ 是新旧策略的概率比率，$\hat{A}_t$ 是 GAE 计算的优势估计。$\min$ 加上裁剪构成了"悲观下界"——当优势为正（好动作）时阻止概率涨过 $1+\epsilon$，当优势为负（坏动作）时阻止概率降过 $1-\epsilon$。这确保了每次更新不会偏离旧策略太远。
+
+2. **价值损失 $\mathcal{L}^{\text{VF}}$**：Critic 网络的回归目标，用均方误差衡量 Critic 预测值与实际回报之间的差距：
+
+   $$\mathcal{L}^{\text{VF}}(\theta) = \mathbb{E}_t \left[\left(V_\theta(s_t) - V_t^{\text{target}}\right)^2\right]$$
+
+   其中 $V_\theta(s_t)$ 是 Critic 对状态 $s_t$ 的价值预测，$V_t^{\text{target}}$ 是实际折扣回报（或 GAE 目标值 $\hat{A}_t + V_{\theta_{\text{old}}}(s_t)$）。通过最小化该项，Critic 学会准确预估每个状态的长期收益，从而为 Actor 提供更低方差的优势估计 $\hat{A}_t$。系数 $c_1$（通常 0.5）控制价值损失在总损失中的权重。
+
+3. **熵奖励（Entropy Bonus）$S[\pi_\theta]$**：策略熵的定义为：
+
+   $$S[\pi_\theta](s_t) = -\sum_{a \in \mathcal{A}} \pi_\theta(a \mid s_t) \log \pi_\theta(a \mid s_t)$$
+
+   其中 $\mathcal{A}$ 是**动作空间**（所有可选动作的集合），$a$ 是其中的单个动作。在传统 RL 中，$\mathcal{A}$ 是有限动作集（如游戏的上/下/左/右按键，$|\mathcal{A}|=4$）；在 LLM-RL 中，$\mathcal{A}$ 就是整个词表（vocabulary），$|\mathcal{A}|$ 为词表大小（3~13 万），每个动作 $a$ 对应一个 token，而状态 $s_t$ 则是当前已生成的上下文。
+
+   熵衡量的是**策略在当前状态下对动作空间的概率分布的不确定性**，其取值范围为 $[0, \log|\mathcal{A}|]$：
+
+   - **上限 $\log|\mathcal{A}|$（均匀分布）**：当 $\pi_\theta(a|s_t) = \frac{1}{|\mathcal{A}|}$ 对所有 $a$ 成立时，代入得 $S = -\sum_{a=1}^{|\mathcal{A}|} \frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|} = -|\mathcal{A}| \cdot \frac{1}{|\mathcal{A}|} \cdot (-\log|\mathcal{A}|) = \log|\mathcal{A}|$。可以用拉格朗日乘数法证明，均匀分布是在 $\sum_a \pi(a)=1$ 约束下的**全局最大熵分布**。
+   - **下限 $0$（确定性策略）**：当存在某个 $a_k$ 使得 $\pi_\theta(a_k|s_t)=1$，其余 $\pi_\theta(a|s_t)=0$ 时，代入得 $S = -(1\cdot\log 1 + 0\cdot\log 0 + \cdots) = 0$。这里约定 $0\log 0 = 0$，与极限 $\lim_{x\to 0^+} x\log x = 0$ 一致。
+
+   损失函数中以 $+c_2 \cdot S$ 的形式出现（注意正号），因为最小化 loss 时该项等价于**最大化熵**——鼓励策略保持随机性、避免过早坍缩到确定性行为，这正是**探索与利用（exploration vs. exploitation）权衡**的体现。系数 $c_2$（通常 0.01）较小，确保探索激励不会盖过策略优化信号。
 
 下面用 PyTorch 风格的伪代码展示 PPO 的完整训练流程。对比上面 TRPO 的实现，可以清楚地看到 PPO 的核心简化：**没有 Fisher 矩阵、没有共轭梯度、没有线搜索**——全部替换为简单的裁剪 + 标准 Adam 优化器。
 
