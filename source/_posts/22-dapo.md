@@ -45,7 +45,7 @@ series: Diffusion Models theory
 
    GRPO 因此未采用熵奖励，而**裁剪机制本身**才是导致熵崩溃的直接原因：对称裁剪 $[1-\varepsilon, 1+\varepsilon]$ 对低概率探索 Token 极不利——概率仅 0.01 的 Token 每步最多涨到 $0.01 \times 1.2 = 0.012$，几乎无法增长；高概率 Token（0.5）却可轻松涨到 $0.5 \times 1.2 = 0.6$。**对称裁剪系统性地压制低概率路径**，策略熵持续下降，最终模型只会生成少数固定模式的回答。
 
-3. **长回答的奖励噪声**：数学推理的回答长度差异极大（50 Token 到 5000+ Token）。传统 $+1/-1$ 奖励只看最终答案是否正确，**不区分长短**——50 Token 的简洁解法和 5000 Token 的循环推理（碰巧答对）都得 $+1$。而 GRPO 使用**序列级归一化**（Sequence-Level）：先对每个回答内部的 Token 损失求平均，再对 $G$ 个回答求平均——$\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$。这意味着每个回答不论长短权重都是 $\frac{1}{G}$，5000 Token 的回答中每个 Token 只分到 50 Token 回答的 $\frac{1}{100}$ 的梯度信号。当 batch 中混杂着大量超长低质回答时，有效的梯度信号被稀释，训练方向被噪声主导。
+3. **长回答的奖励噪声**：数学推理的回答长度差异极大（50 Token 到 5000+ Token）。传统 $+1/-1$ 奖励只看最终答案是否正确，**不区分长短**——50 Token 的简洁解法和 5000 Token 的循环推理（碰巧答对）都得 $+1$。而 GRPO 使用**按回答归一化**（per-response normalization，也称序列级归一化）：先对每个回答内部的 Token 损失求平均，再对 $G$ 个回答求平均——$\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$。注意 GRPO 的裁剪和 IS ratio **在 token 级逐位计算**（$\rho_{i,t}$），此处"序列级"仅指**聚合方式**——每条回答不论长短权重都是 $\frac{1}{G}$，5000 Token 的回答中每个 Token 只分到 50 Token 回答的 $\frac{1}{100}$ 的梯度信号。当 batch 中混杂着大量超长低质回答时，有效的梯度信号被稀释，训练方向被噪声主导。
 
 用原始 GRPO 训练 Qwen2.5-32B，团队在 AIME 2024 上只拿到了 30 分——远低于 DeepSeek-R1-Zero 的 47 分。**DAPO 的四个技术正是为解决以上三个问题而生**。
 
@@ -159,9 +159,9 @@ while len(cache) < target_batch_size:
         # 规则判题等得到序列级标量奖励，用于后续优势估计
         rewards = judge(responses)
 
-        # 仅保留组内奖励有差异的 Prompt（排除全对/全错，保证 GRPO 优势可分）
-        if rewards.std() > 0:
-            # 将该题及其 G 条回答与奖励加入有效缓存
+        # 论文约束：正确回答数 ∈ (0, G)，即必须同时有正确和错误回答
+        num_correct = sum(is_correct(a, o) for o in responses)
+        if 0 < num_correct < G:
             cache.append((prompt, responses, rewards))
 
     # 超过最大采样轮次仍凑不齐 batch 则中止，避免训练挂死
@@ -265,6 +265,8 @@ $$
 $$
 
 约束条件要求每组 $G$ 个采样中正确回答数严格介于 $0$ 和 $G$ 之间（动态采样保证），使得组内标准化后的优势 $\hat{A}_i$ 同时包含正、负信号。优势函数仍然使用 GRPO 的组内相对计算：$\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \epsilon}$，不依赖 Critic 网络。
+
+> **符号说明**：公式中 $\hat{A}_{i,t}$ 的下标 $t$ 仅表示该 token 位置对应的优势值。在 GRPO/DAPO 中，优势是**序列级标量**（由整条回答的奖励 $r_i$ 计算），对同一回答 $o_i$ 内的所有 token 取相同的值，即 $\hat{A}_{i,t} = \hat{A}_i, \forall t$。写作 $\hat{A}_{i,t}$ 是为了与 token 级的 $r_{i,t}$ 记号对齐。
 
 ## DAPO 与 GRPO 的差异对比
 

@@ -22,16 +22,20 @@ series: Diffusion Models theory
 
 # 从一个令人意外的实验结果说起
 
-在前几篇中，我们花了大量篇幅推导 GRPO 的组内相对优势计算，强调"组越大（$G = 16$ 或 $64$），优势估计越准确，训练效果越好"。但 2025 年末的一篇论文 *"It Takes Two"* 给出了一个反直觉的实验结果：
+在前几篇中，我们花了大量篇幅推导 GRPO 的组内相对优势计算，强调"组越大（$G = 16$ 或 $64$），优势估计越准确，训练效果越好"。但 2025 年 10 月的一篇论文 *"It Takes Two"*（arXiv:2510.00977）给出了一个反直觉的实验结果：
 
-**仅用 $G = 2$（两个 rollout）的 GRPO，在多项数学推理基准上与 $G = 16$ 基本持平（表 1 中多数指标差距在约 1–2 个百分点内，部分设置下 2-GRPO 略高）——同时作者报告总生成量约为 16-GRPO 的 12.5%（约 0.15M vs 1.2M rollouts），墙钟时间可减少约 70% 以上。**
+- **性能方面**：仅用 $G = 2$（两个 rollout）的 GRPO（记为 2-GRPO），在多项数学推理基准上**保留了 16-GRPO 约 98.1% 的平均性能**（论文 Table 1 中多数指标差距在 1–2 个百分点内，部分设置下 2-GRPO 反而略高）。
 
-![DPO / GRPO / GIFT 等对齐范式对比（摘自 *GIFT* 论文图 1，arXiv:2510.23868）](/chengYi-xun/img/grpo_variants.png)
+- **效率方面**：2-GRPO 的总 rollout 生成量**仅为 16-GRPO 的 $2/16 = 12.5\%$**（约 0.15M vs 1.2M rollouts）；由于训练还包含梯度计算等固定开销，实际墙钟时间（wall-clock time）平均降至 16-GRPO 的约 21%（所有实验均值），即**训练时间缩短约 79%**。
 
-| 方法 | 每 Prompt 的 rollout 数 | 总生成量（相对 16-GRPO） | 墙钟时间（表 1 示例：Qwen-1.5B / MATH） | 相对表现 |
+![DPO / GRPO / GIFT 等对齐范式对比（摘自 GIFT 论文图 1，arXiv:2510.23868）](/chengYi-xun/img/grpo_variants.png)
+
+| 方法 | 每 Prompt 的 rollout 数 $G$ | 总 rollout 生成量 | 墙钟时间（Qwen-1.5B / MATH） | 平均性能保留率 |
 |:---:|:---:|:---:|:---:|:---:|
-| 16-GRPO | 16 | 100%（约 1.2M） | 100%（如 8.53 h） | 基准 |
-| **2-GRPO** | **2** | **约 12.5%**（约 0.15M） | **约 24%**（如 2.05 h） | **与 16-GRPO 相当**（依模型与数据集略异） |
+| 16-GRPO | 16 | 100%（约 1.2M） | 100%（8.53 h） | 基准 |
+| **2-GRPO** | **2** | **12.5%**（约 0.15M，即 $2/16$） | **24.0%**（2.05 h） | **98.1%** |
+
+> **注**：总 rollout 生成量 12.5% 指 2-GRPO 每个 Prompt 仅采样 2 条回答（vs 16 条），因此总生成量为 $2/16 = 12.5\%$。墙钟时间 24.0% 对应 Qwen-1.5B / MATH 单组实验；所有实验的平均墙钟时间比约为 21%（论文 Abstract）。两个比值不同是因为训练的计算开销不仅包含 rollout 生成，还包含梯度计算与参数更新等固定成本。
 
 这说明 **GRPO 的核心力量不在于"大组 → 精确基线估计"**，而在于别的什么东西。那到底是什么？
 
@@ -41,17 +45,35 @@ series: Diffusion Models theory
 
 ## 用例子重新理解 GRPO 的梯度
 
-还是用数学积分题的例子。让模型用 $G = 4$ 个方式解 $\int_0^1 x^2 dx$，得到 2 个正确（$r = +1$）和 2 个错误（$r = -1$）。GRPO 计算组内优势后：
+还是用数学积分题的例子。让模型用 $G = 4$ 个方式解 $\int_0^1 x^2 dx$，得到 2 个正确（$r = 1$）和 2 个错误（$r = 0$）。在 RLVR 的二值奖励场景中，组内均值 $\bar{r} = 0.5$，标准差 $\sigma = 0.5$，经 z-score 标准化后的优势为：
 
-- 正确回答：$\hat{A}_i = +1$（鼓励）
+- 正确回答：$\hat{A}_i = \frac{1 - 0.5}{0.5} = +1$（鼓励）
 
-- 错误回答：$\hat{A}_i = -1$（抑制）
+- 错误回答：$\hat{A}_i = \frac{0 - 0.5}{0.5} = -1$（抑制）
 
-**梯度信号的本质是什么？** 把 GRPO 的梯度展开：
+**梯度信号的本质是什么？** 先回顾 GRPO 的完整目标函数（token 级推导见[第二十篇](/chengYi-xun/posts/20-grpo/)；DAPO 对归一化方式的改进见[第二十二篇](/chengYi-xun/posts/22-dapo/)）。为简洁起见，此处将 token 级操作收缩为序列级记号：
+
+$$
+\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{q \sim \mathcal{Q},\, \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}(\cdot|q)} \left[ \frac{1}{G} \sum_{i=1}^G \frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \left( \min \left( \rho_{i,t}(\theta)\, \hat{A}_i,\; \text{clip}(\rho_{i,t}(\theta),\, 1-\varepsilon,\, 1+\varepsilon)\, \hat{A}_i \right) - \beta\, \hat{D}_{\text{KL}}^{(i,t)} \right) \right]
+$$
+
+其中各符号含义如下：
+
+- $\rho_{i,t}(\theta) = \frac{\pi_\theta(o_{i,t} \mid q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,<t})}$　——第 $i$ 个回答第 $t$ 个 token 的重要性采样比率
+- $\text{clip}(\rho, 1-\varepsilon, 1+\varepsilon)$　——PPO 风格的裁剪（如 $\varepsilon = 0.2$），在 **token 级** 逐位执行
+- $\hat{A}_i = \frac{r_i - \bar{r}}{\sigma_r}$　——组内 z-score 标准化优势（序列级标量，对 $t$ 为常数）
+- $\hat{D}_{\text{KL}}^{(i,t)}$　——token 级 KL 散度近似估计
+- $\frac{1}{|o_i|}$　——按回答长度归一化，使每条回答权重均为 $\frac{1}{G}$
+
+> **关于 GRPO 与 DAPO 的归一化差异**：GRPO 的损失聚合为 $\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$——**先对每条回答的 token 求平均，再对 $G$ 条回答求平均**，每条回答无论长短权重都是 $\frac{1}{G}$。DAPO 将此改为 $\frac{1}{\sum_i |o_i|}\sum_i \sum_t L_{i,t}$——**直接对全组所有 token 取平均**，使每个 token 而非每条回答等权贡献梯度。这一归一化方式的改变是 DAPO 的四大改进之一，详见[第二十二篇](/chengYi-xun/posts/22-dapo/)。
+
+为便于分析本节的核心论证（对比学习结构），我们暂时忽略裁剪操作和 KL 惩罚项。在这些简化下，对 $\mathcal{J}_{\text{GRPO}}$ 关于 $\theta$ 求梯度可得：
 
 $$
 \hat{g}_{\text{GRPO}} = \frac{1}{G}\sum_{i=1}^{G} \hat{A}_i \nabla_\theta \log \pi_\theta(o_i | q)
 $$
+
+> **注**：上式省略了裁剪和 KL 项。完整梯度中，$\min(\rho \hat{A}, \text{clip}(\rho)\hat{A})$ 的效果是：当 $\rho$ 偏离 1 过多时截断梯度，防止策略更新过激进。省略这些项不影响下文关于对比结构的分析，因为裁剪仅改变梯度的幅度，不改变其"正样本向上、负样本向下"的方向性。
 
 将回答分为正确组 $\mathcal{G}^+$（$G^+$ 个）和错误组 $\mathcal{G}^-$（$G^-$ 个），上式可以改写为：
 
@@ -59,7 +81,7 @@ $$
 \hat{g}_{\text{GRPO}} \propto \underbrace{\frac{1}{G^+}\sum_{o \in \mathcal{G}^+} \nabla_\theta \log \pi_\theta(o | q)}_{\text{增加正确回答的概率}} - \underbrace{\frac{1}{G^-}\sum_{o \in \mathcal{G}^-} \nabla_\theta \log \pi_\theta(o | q)}_{\text{减少错误回答的概率}}
 $$
 
-**这不就是 DPO 的对比学习结构吗？** DPO 的梯度也是"增加 $y_w$ 的概率、减少 $y_l$ 的概率"的对比形式。区别仅在于：
+**这与 DPO 的对比学习结构在形式上是一致的。** DPO 的梯度同样具有"增加偏好回答 $y_w$ 的概率、减少非偏好回答 $y_l$ 的概率"的对比形式。主要区别在于：
 
 | | DPO | GRPO |
 |---|---|---|
@@ -69,27 +91,44 @@ $$
 
 ## 控制变量与方差缩减
 
-论文进一步证明了 GRPO 组内配对的第二个关键作用：**方差缩减**。
+上面我们看到 GRPO 的梯度是"正样本梯度 $-$ 负样本梯度"的对比形式。一个自然的问题是：**为什么要减去负样本的梯度？只用正样本梯度不行吗？**
 
-考虑两个回答 $o^+$（正确）和 $o^-$（错误）来自**同一 Prompt、同一策略**。它们的策略梯度 $g^+ = \nabla_\theta \log \pi_\theta(o^+)$ 和 $g^- = \nabla_\theta \log \pi_\theta(o^-)$ 之间存在正相关性 $\rho > 0$（因为共享了 Prompt 的上下文信息）。
+仅使用正样本梯度（即 REINFORCE 的做法）当然可以，但**方差会很大**——不同正样本的梯度方向差异很大，导致训练不稳定。GRPO 减去负样本梯度的做法，本质上是蒙特卡罗估计中经典的**控制变量法**（control variate method）。
 
-**定理（控制变量方差缩减）**：对于配对梯度估计 $g^+ - c \cdot g^-$，最优系数 $c^* = \frac{\text{Cov}(g^+, g^-)}{\text{Var}(g^-)}$ 下的方差为：
+**控制变量法的直觉**：假设你想估计一个随机变量 $X$ 的期望，但 $X$ 的方差很大。如果你能找到另一个随机变量 $Y$，满足两个条件：(1) $Y$ 的期望已知（或可以消掉），(2) $Y$ 与 $X$ **正相关**，那么用 $X - c \cdot Y$（$c$ 为适当系数）代替 $X$ 进行估计，可以**在不改变期望的前提下降低方差**。$X$ 和 $Y$ 的相关性越强，方差缩减的效果越好。
+
+在 GRPO 中：
+- $X$ 对应正样本的策略梯度 $\boldsymbol{g}^+ = \nabla_\theta \log \pi_\theta(o^+ | q)$（我们想要的信号）
+- $Y$ 对应负样本的策略梯度 $\boldsymbol{g}^- = \nabla_\theta \log \pi_\theta(o^- | q)$（控制变量）
+- 因为 $o^+$ 和 $o^-$ 都是**同一模型对同一 Prompt 生成**的回答，它们共享 Prompt 的上下文信息，所以 $\boldsymbol{g}^+$ 和 $\boldsymbol{g}^-$ 之间通常存在**正相关性**
+
+论文将这一直觉形式化为以下命题：
+
+**命题 4.1（原文 Proposition 4.1）**：设 $\boldsymbol{g}^+$ 和 $\boldsymbol{g}^-$ 的相关系数为 $\rho$。若 $\text{Cov}(\boldsymbol{g}^+, \boldsymbol{g}^-) > 0$（即 $\rho > 0$），则对于配对梯度估计 $\boldsymbol{g}^+ - c \cdot \boldsymbol{g}^-$，存在最优系数：
 
 $$
-\text{Var}(g^+ - c^* g^-) = (1 - \rho^2) \cdot \text{Var}(g^+)
+c^* = \frac{\text{Cov}(\boldsymbol{g}^+, \boldsymbol{g}^-)}{\text{Var}(\boldsymbol{g}^-)}
 $$
 
-当 $\rho > 0$ 时，配对估计的方差**严格小于**单独估计。这就是为什么 GRPO 要在**同一 Prompt 的同一组内**做对比——不是为了更精确的均值估计，而是利用**同源配对的相关性**来降低梯度方差。
+使得方差达到最小值：
+
+$$
+\text{Var}(\boldsymbol{g}^+ - c^* \boldsymbol{g}^-) = (1 - \rho^2) \cdot \text{Var}(\boldsymbol{g}^+)
+$$
+
+> 此处 $\text{Var}(\cdot)$ 和 $\text{Cov}(\cdot, \cdot)$ 分别表示梯度向量协方差矩阵的迹（trace），$\rho$ 为对应的相关系数。证明见原文 Appendix B.5。
+
+**关键含义**：由于 $0 < \rho \leq 1$，因此 $(1 - \rho^2) < 1$，配对估计的方差**严格小于**仅使用正样本梯度 $\boldsymbol{g}^+$ 的方差。相关性 $\rho$ 越大，方差缩减越显著。这解释了 GRPO 为什么要在**同一 Prompt 的同一组内**做对比——目的不是为了更精确的均值估计，而是利用同源配对的正相关性来降低策略梯度估计量的方差。
 
 ## 2-GRPO：最小对比单元
 
-既然 GRPO 的核心是对比，那对比的最小单元就是 **2 个 rollout**。当 $G = 2$ 且 $r_1 \neq r_2$ 时（一对一错），GRPO 的优势退化为：
+既然 GRPO 的核心是对比，那对比的最小单元就是 **2 个 rollout**。当 $G = 2$ 且 $r_1 \neq r_2$ 时（一对一错），经 z-score 标准化后优势退化为：
 
 $$
-\hat{A}_1 = +1, \quad \hat{A}_2 = -1 \quad \text{（归一化后的符号翻转）}
+\hat{A}_1 = +1, \quad \hat{A}_2 = -1 \quad \text{（二值奖励下 $n=2$ 的 z-score 标准化恒为 $\pm 1$）}
 $$
 
-这完全等价于一个**在线版的 DPO 更新**：增加正确回答的概率，减少错误回答的概率。
+其梯度结构与**在线版的 DPO 更新**一致：增加正确回答的概率，减少错误回答的概率。但二者在损失函数形式上仍有区别——2-GRPO 使用 PPO 风格的裁剪代理目标，而 DPO 使用对数 sigmoid 损失。
 
 **2-GRPO 的训练目标**：
 
@@ -162,7 +201,7 @@ for step in range(total_steps):
     advantages = (
         (rewards[valid_mask] - mean_r) / (std_r + 1e-8)
     ).reshape(-1)  # (B'*2,)
-    # 对于二值奖励 (+1, -1), advantages 恰好是 (+1, -1)
+    # 对于二值奖励 (1, 0), z-score 标准化后 advantages 恰好是 (+1, -1)
 
     # 多 epoch 更新 (与标准 GRPO 相同)
     for epoch in range(K_epochs):
@@ -171,9 +210,9 @@ for step in range(total_steps):
         pass
 ```
 
-**2-GRPO 的核心优势**：相同总 rollout 预算下，2-GRPO 用了 256 个不同的 Prompt（vs 标准 GRPO 的 32 个），**Prompt 多样性提升 8 倍**。实验表明，更多的 Prompt 比更精确的基线估计更重要。
+**2-GRPO 的核心优势**：在相同总 rollout 预算下，2-GRPO 可覆盖 256 个不同的 Prompt（vs 标准 GRPO 的 32 个），**Prompt 多样性提升 8 倍**。论文的核心论点是：GRPO 的有效性源于其隐含的**对比学习机制**（正负样本配对），而非大组带来的优势估计精度；组规模仅影响对比目标的蒙特卡罗估计量的方差，不改变优化方向的无偏性（原文 Section 5, Lemma 5.2）。
 
-**总结**：GRPO 的第一重面孔——它是**在线版的 DPO**，核心机制是**对比学习**，不是精确的基线估计。
+**总结**：GRPO 的第一重面孔——其梯度结构与**在线版 DPO** 共享相同的对比学习框架（增加正样本概率、抑制负样本概率），核心有效机制是**对比配对带来的方差缩减**，而非大组带来的优势估计精度。
 
 ---
 
@@ -233,7 +272,7 @@ $$
 
 ## f-GRPO 的理论保证
 
-**定理 4.3（f-HAL & f-GRPO 的收敛性）**：在 $G \to \infty$ 的渐近极限下：
+**定理 4.3（f-HAL & f-GRPO 的收敛性，摘自 f-GRPO 论文）**：在 $G \to \infty$ 的渐近极限下：
 
 1. **散度估计**：f-GRPO 的负损失值与奖励诱导的正/负分布之间的 f-散度成正比：
 
@@ -245,7 +284,7 @@ $$
 
 **对比标准 GRPO**：
 
-**定理 4.4（GRPO 的不动点特征）**：标准 GRPO 的隐式更新等价于按标准化奖励对参考策略做指数重加权：
+**定理 4.4（GRPO 的不动点特征，摘自 f-GRPO 论文）**：标准 GRPO 的隐式更新等价于按标准化奖励对参考策略做指数重加权：
 
 $$
 \pi_{\theta_{\text{GRPO}}^{(t+1)}}(y|x) \propto \pi_{\text{ref}}(y|x) \exp\left(\frac{r(x,y) - \mu_r^{(t)}}{\beta \cdot \sigma_r^{(t)}}\right)
@@ -255,17 +294,21 @@ $$
 
 ## 实验结果
 
-f-GRPO 在 Qwen2.5-Math 1.5B/7B 上的数学推理实验中，**所有测试的 f-散度变体都优于标准 GRPO**：
+f-GRPO 在 Qwen2.5-Math 1.5B/7B 上的数学推理实验中，**所有测试的 f-散度变体都优于标准 GRPO**（数据摘自 f-GRPO 论文 Table 2，LIMR 数据集 + Qwen-1.5B）：
 
-| f-散度 | Relative Overall（1.5B） | 与 GRPO 对比 |
-|:---:|:---:|:---:|
-| GRPO（KL baseline） | 74.26 | — |
-| Pearson $\chi^2$ | **86.49** | +12.23 |
-| Hellinger | 82.15 | +7.89 |
-| JS | 80.93 | +6.67 |
-| 逆 KL | 79.41 | +5.15 |
+| f-散度 | Relative Overall（1.5B）$\uparrow$ | 与 GRPO 差值 | 平均排名 $\downarrow$ |
+|:---:|:---:|:---:|:---:|
+| GRPO（KL baseline） | 74.26 | — | 5.2 |
+| Pearson $\chi^2$ | **86.49** | **+12.23** | **2.6** |
+| Total Variation | 83.11 | +8.85 | 3.8 |
+| 逆 KL | 82.47 | +8.21 | 3.0 |
+| KL（前向） | 81.83 | +7.57 | 4.4 |
+| Hellinger | 81.11 | +6.85 | 4.2 |
+| JS | 78.99 | +4.73 | 4.2 |
 
-Pearson $\chi^2$ 散度在数学推理任务上表现最优，可能是因为其对奖励分布尾部的二次敏感性更适合稀疏二值奖励场景。
+> **指标说明**（论文 Table 2）：实验基于 Qwen2.5-Math-1.5B 在 LIMR 数据集上训练。Relative Overall 定义为各基准（GSM8K、MATH-500、AMC 2023、AIME 2024、AIME 2025）上 Pass@1 准确率分别做 min-max 归一化至 $[0, 100]$（以 Base 模型为 0、最佳方法为 100）后的算术平均。
+
+Pearson $\chi^2$ 散度在 LIMR 数据集 + Qwen-1.5B 设定下表现最优（Relative Overall 86.49，平均排名 2.6）。但值得注意的是，论文 Table 3 显示不同数据集和模型规模下最优散度并不一致——例如在 GSM8K + 7B 设定下，Jensen–Shannon 以 95.08 领先。论文推测 Pearson $\chi^2$ 在 LIMR/1.5B 场景的优势可能与其对奖励分布尾部差异的二次敏感性有关。
 
 ### f-GRPO 的具体实现
 
@@ -395,7 +438,7 @@ $$
 r_\theta(x, y) = \beta \log \frac{\pi_\theta(y | x)}{\pi_{\text{ref}}(y | x)} + \beta \log Z(x)
 $$
 
-其中 $Z(x) = \sum_y \pi_{\text{ref}}(y|x) \exp(\frac{r(x,y)}{\beta})$ 是配分函数——这是一个关于 $x$ 的常数（不随 $y$ 变化），但不可计算。它是 DPO 无法做"单点"奖励匹配（只能做配对比较）的根本原因。
+其中 $Z(x) = \sum_y \pi_{\text{ref}}(y|x) \exp(\frac{r(x,y)}{\beta})$ 是配分函数——对于给定的 $x$，$Z(x)$ 不随 $y$ 变化，但需要对整个输出空间求和（或积分），计算上不可行（intractable）。这正是 DPO 无法做"单点"奖励匹配、只能做配对比较的根本原因。
 
 **GIFT 的关键发现**：如果我们对同一 Prompt 的**一组**回答做**均值归一化**，配分函数 $Z(x)$ 就会被消掉！
 
@@ -450,7 +493,7 @@ $$
 | 损失函数类型 | 裁剪策略梯度 | 对数 sigmoid | **MSE** |
 | 过拟合风险 | 较高 | 中等 | **较低**（凸损失） |
 
-实验中 GIFT 在 7B 模型上的 AlpacaEval LC Win Rate 为 48.77（vs GRPO 的 35.33），Arena-Hard Win Rate 为 72.43（vs GRPO 的 38.25）。
+GIFT 论文（arXiv:2510.23868, Table 2）报告，在 7B 模型上 GIFT 的 AlpacaEval LC Win Rate 为 48.77（vs GRPO 的 35.33），Arena-Hard Win Rate 为 72.43（vs GRPO 的 38.25）。需要指出，该对比中 GRPO 使用的是论文作者的复现版本，不同实现的超参数选择可能影响结果。
 
 ---
 
@@ -462,7 +505,7 @@ $$
 | **f-散度优化** | GRPO 的正负划分 ≈ f-散度变分表示的两侧 | f-GRPO |
 | **隐式奖励回归** | 组内归一化消除配分函数，变为 MSE 回归 | GIFT |
 
-这三种视角不是互斥的——它们揭示了 **GRPO 同一枚硬币的三个侧面**。理解这些联系，可以帮助我们：
+这三种视角不是互斥的——它们从不同的数学工具出发，揭示了 **GRPO 优化行为的不同侧面**。理解这些联系，对算法设计有直接启示：
 
 1. **设计更高效的算法**（2-GRPO：减少 rollout 数量）
 

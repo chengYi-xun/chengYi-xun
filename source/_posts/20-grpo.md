@@ -283,25 +283,31 @@ $$
 \rho_i(\theta) = \frac{\pi_\theta(o_i|s)}{\pi_{\theta_{\text{old}}}(o_i|s)} = \exp\left(\sum_{t=1}^{T} \left[\log \pi_\theta(o_i^t | s, o_i^{<t}) - \log \pi_{\theta_{\text{old}}}(o_i^t | s, o_i^{<t})\right]\right)
 $$
 
-KL 散度中的 $u = \frac{\pi_{\text{ref}}}{\pi_\theta}$ 同理构造。实际实现中，通常对每个 token 分别计算比率后取平均（而非序列级乘积），以避免长序列导致比率指数级爆炸或塌缩。
+KL 散度中的 $u = \frac{\pi_{\text{ref}}}{\pi_\theta}$ 同理构造。上式给出的是**序列级**似然比 $\rho_i = \prod_t \rho_{i,t}$，它等于各 token 比率的乘积。但实际实现中**不**计算这个乘积（长序列会导致数值溢出或下溢），而是在每个 token 位置 $t$ 独立计算 $\rho_{i,t}$ 并直接用于 PPO 的逐 token 裁剪代理目标（即对每个 $t$ 分别做 $\min(\rho_{i,t} \hat{A}_i, \text{clip}(\rho_{i,t}) \hat{A}_i)$），然后对 $t$ 求平均。这意味着裁剪在 **token 级** 逐位执行，而非对序列级 $\rho_i$ 做单次裁剪。
 
 ## 3. GRPO 最终目标函数
 
 结合 PPO 的裁剪机制和组内相对优势，GRPO 的最终目标函数（需要最大化）定义为：
 
 $$
-\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{s \sim P(S), \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}} \left[ \frac{1}{G} \sum_{i=1}^G \left( \min \left( \rho_i(\theta) \hat{A}_i, \text{clip}(\rho_i(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_i \right) - \beta \hat{D}_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) \right) \right]
+\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{q \sim P(Q),\, \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}(\cdot|q)} \left[ \frac{1}{G} \sum_{i=1}^G \frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \left( \min \left( \rho_{i,t}(\theta)\, \hat{A}_i,\; \text{clip}(\rho_{i,t}(\theta),\, 1-\varepsilon,\, 1+\varepsilon)\, \hat{A}_i \right) - \beta\, \hat{D}_{\text{KL}}^{(i,t)} \right) \right]
 $$
 
 其中：
 
-- $\rho_i(\theta) = \frac{\pi_\theta(o_i|s)}{\pi_{\theta_{\text{old}}}(o_i|s)}$ 是重要性采样比率（同 PPO）。
+- $\rho_{i,t}(\theta) = \frac{\pi_\theta(o_{i,t} \mid q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,<t})}$ 是第 $i$ 个回答第 $t$ 个 token 的重要性采样比率。
 
-- $\epsilon$ 是裁剪阈值（如 0.2），防止单步更新过大。
+- $\varepsilon$ 是裁剪阈值（如 0.2），防止单步更新过大。
 
 - $\beta$ 是 KL 惩罚系数，控制偏离参考策略的代价。
 
-- $\hat{A}_i$ 是组内归一化优势，$\hat{D}_{\text{KL}}$ 是 $f$-散度形式的 KL 估计。
+- $\hat{A}_i$ 是组内归一化优势（序列级标量，对 $t$ 为常数，广播到每个 token）。
+
+- $\hat{D}_{\text{KL}}^{(i,t)}$ 是 token 级 KL 散度近似估计（采用 $e^{\log u} - \log u - 1$ 形式，其中 $u = \pi_{\text{ref}} / \pi_\theta$，详见下文），并非严格的 $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ 积分定义。
+
+- $\frac{1}{|o_i|}$ 对每条回答按长度归一化（per-response normalization）：先对 token 求平均，再对 $G$ 条回答平均。这意味着不论回答长短，每条回答的权重都是 $\frac{1}{G}$。后续 DAPO 论文将此聚合方式改为按 token 归一化（$\frac{1}{\sum_i |o_i|}\sum_i\sum_t$，使每个 token 等权），详见[第二十二篇](/chengYi-xun/posts/22-dapo/)。
+
+> **注**：上式使用 token 级记号 $\rho_{i,t}$，与 DeepSeekMath 原论文（arXiv:2402.03300）从 PPO 继承的 $\frac{1}{|o|}\sum_t$ 结构一致。**GRPO 的所有计算**（IS ratio、裁剪、KL）**均在 token 级逐位执行**——此处"序列级"仅指**聚合方式**（每条回答等权），不是计算粒度。DAPO 改变的是聚合方式（从 per-response 到 per-token），而非引入 token 级计算。
 
 
 ---
