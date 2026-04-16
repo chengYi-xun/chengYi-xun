@@ -73,13 +73,23 @@ Sora 的架构未完全公开，但从技术说明和第三方分析可推断：
 
 - 本质上是**统计相关性**而非**物理因果模型**
 
-### 1.4 数学分析：为什么像素相关性 ≠ 物理理解？
+### 1.4 数学分析与 2025 年的理论反思：为什么像素相关性 ≠ 物理理解？
 
 设 $p_\theta(V)$ 为视频生成模型学到的分布，$p_{\text{real}}(V)$ 为真实视频分布。
 
 即使 $D_{\text{KL}}(p_{\text{real}} \| p_\theta) \to 0$（模型完美拟合数据分布），也不意味着模型理解了物理：
 
 > **命题（统计模拟的不充分性）**：存在视频分布 $p(V)$ 和两个模型 $M_1, M_2$，使得 $p_{M_1}(V) = p_{M_2}(V) = p(V)$，但 $M_1$ 内部包含正确的物理模型而 $M_2$ 不包含。两者在分布匹配意义下不可区分，但在反事实推理（"如果重力加倍会怎样？"）上表现不同。
+
+**2024-2025 年的实证与机理研究**：
+
+为了回答"Sora 等模型离真正的世界模型还有多远"，2024 年末的一项重要研究（*How Far is Video Generation from World Model: A Physical Law Perspective*）构建了一个受经典力学控制的 2D 碰撞测试床。研究发现：
+
+1. **泛化能力的错觉**：模型在分布内（In-distribution）表现完美，在组合泛化上表现出可测量的缩放定律（Scaling law），但在分布外（Out-of-distribution）泛化上彻底失败。
+2. **基于案例的模仿，而非规则抽象**：机理分析表明，视频生成模型并没有抽象出一般的物理规则（如动量守恒）。相反，它们展现出"基于案例（Case-based）"的泛化——遇到新场景时，模型只是在模仿训练集中最相似的例子。
+3. **特征优先级的偏置**：在尝试泛化时，模型优先关注表观特征而非物理特征，优先级顺序为：颜色 > 大小 > 速度 > 形状。
+
+**结论**：单靠扩大模型规模（Scaling alone）不足以让视频生成模型发现基础的物理定律。这直接挑战了"只要数据足够多，视频模型就能自然涌现出物理引擎"的乐观假设。
 
 ---
 
@@ -326,17 +336,12 @@ $$
 
 当前的共识是：纯数据驱动的视频模型虽然能产生惊人的视觉效果，但在**物理准确性**和**可靠的因果推理**上还有显著差距。下一篇将介绍如何通过**显式嵌入物理定律**来弥补这个差距。
 
-> **下一篇**：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](posts/39-physics-world-model/)
+> 参考资料：
+>
+> 1. OpenAI (2024). *Video generation models as world simulators*. Technical Report.
+> 2. Bruce, J., ... & Vinyals, O. (2024). *Genie: Generative Interactive Environments*. ICML 2024.
+> 3. NVIDIA (2025). *Cosmos World Foundation Model Platform for Physical AI*. arXiv:2501.03575.
+> 4. Yang, M., ... & Levine, S. (2024). *Learning Interactive Real-World Simulators*. ICLR 2024.
+> 5. (2024). *How Far is Video Generation from World Model: A Physical Law Perspective*. arXiv:2411.02385. (关于视频生成模型物理泛化能力的实证分析)
 
----
-
-**参考文献**
-
-
-1. OpenAI (2024). *Video generation models as world simulators*. Technical Report.
-
-2. Bruce, J., et al. (2024). *Genie: Generative Interactive Environments*. ICML 2024.
-
-3. NVIDIA (2025). *Cosmos World Foundation Model Platform for Physical AI*. arXiv:2501.03575.
-
-4. Yang, M., et al. (2024). *Learning Interactive Real-World Simulators*. ICLR 2024.
+> 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)

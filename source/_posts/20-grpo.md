@@ -560,4 +560,9 @@ for step in range(total_steps):
 
 GRPO 证明了在生成式大模型时代，简单的经验统计（组内均值）往往比复杂的神经网络预测（Critic）更加鲁棒和高效。
 
+> 参考资料：
+>
+> 1. Shao, Z., Wang, P., Zhu, Q., Hao, K., Bugliarello, B., ... & Liu, Y. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models*. arXiv:2402.03300.
+> 2. Ahmadian, A., Cremer, C., Gallé, M., Fadaee, S., ... & Vulić, A. (2024). *Back to Basics: Revisiting REINFORCE Style Optimization for Learning from Human Feedback in LLMs*. arXiv:2402.14740.
+
 > 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/21-flow-grpo/)

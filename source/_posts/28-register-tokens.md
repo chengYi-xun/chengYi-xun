@@ -482,16 +482,10 @@ class MyViTWithRegisters(nn.Module):
 
 Register Token 揭示的深层洞察是：Transformer 的 self-attention 机制天然具有"全局信息聚合"的需求，但标准架构没有为此提供专用通道。当模型足够大、训练足够久时，它会自发地在低信息区域"创造"出这些通道——而这个过程会污染 patch token 的局部表征。Register Token 的优雅之处在于：它没有改变 Transformer 的计算逻辑，只是显式地提供了模型本就需要的东西。
 
----
-
-**参考文献**
-
-1. Darcet, T., Oquab, M., Mairal, J., & Bojanowski, P. (2024). *Vision Transformers Need Registers*. ICLR 2024 (Outstanding Paper).
-
-2. Oquab, M., et al. (2023). *DINOv2: Learning Robust Visual Features without Supervision*. arXiv:2304.07193.
-
-3. Caron, M., et al. (2021). *Emerging Properties in Self-Supervised Vision Transformers*. ICCV 2021.
-
-4. Wang, J., et al. (2025). *VGGT: Visual Geometry Grounded deep Transformer*. arXiv:2503.11651.
-
-5. Wang, J., et al. (2025). *Mamba-Reg: Vision Mamba Also Needs Registers*. CVPR 2025.
+> 参考资料：
+>
+> 1. Darcet, T., Oquab, M., Mairal, J., & Bojanowski, P. (2024). *Vision Transformers Need Registers*. ICLR 2024.
+> 2. Oquab, M., ... & Bojanowski, P. (2023). *DINOv2: Learning Robust Visual Features without Supervision*. arXiv:2304.07193.
+> 3. Caron, M., ... & Joulin, A. (2021). *Emerging Properties in Self-Supervised Vision Transformers*. ICCV 2021.
+> 4. Wang, Y., ... & Vedaldi, A. (2025). *VGGT: Visual Geometry Grounded Transformer*. CVPR 2025.
+> 5. Wang, J., ... & Chen, X. (2025). *Mamba-Reg: Vision Mamba Also Needs Registers*. CVPR 2025.

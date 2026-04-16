@@ -67,7 +67,40 @@ $$
 
 > **关于 GRPO 与 DAPO 的归一化差异**：GRPO 的损失聚合为 $\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$——**先对每条回答的 token 求平均，再对 $G$ 条回答求平均**，每条回答无论长短权重都是 $\frac{1}{G}$。DAPO 将此改为 $\frac{1}{\sum_i |o_i|}\sum_i \sum_t L_{i,t}$——**直接对全组所有 token 取平均**，使每个 token 而非每条回答等权贡献梯度。这一归一化方式的改变是 DAPO 的四大改进之一，详见[第二十二篇](/chengYi-xun/posts/22-dapo/)。
 
-为便于分析本节的核心论证（对比学习结构），我们暂时忽略裁剪操作和 KL 惩罚项。在这些简化下，对 $\mathcal{J}_{\text{GRPO}}$ 关于 $\theta$ 求梯度可得：
+为便于分析本节的核心论证（对比学习结构），我们暂时忽略裁剪操作（`clip` 和 `min`）和 KL 惩罚项（$- \beta \hat{D}_{\text{KL}}$）。在这些简化下，目标函数退化为最基础的重要度采样（Importance Sampling）形式：
+
+$$
+\mathcal{J}_{\text{simplified}}(\theta) = \mathbb{E}_{q \sim \mathcal{Q},\, \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}} \left[ \frac{1}{G} \sum_{i=1}^G \frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \frac{\pi_\theta(o_{i,t} | q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} | q, o_{i,<t})} \hat{A}_i \right]
+$$
+
+为了在序列级别进行分析，我们将 token 级别的累加抽象为整个序列级别的概率比率 $\frac{\pi_\theta(o_i | q)}{\pi_{\theta_{\text{old}}}(o_i | q)}$。此时简化的序列级目标函数为：
+
+$$
+\mathcal{J}_{\text{seq}}(\theta) = \mathbb{E} \left[ \frac{1}{G} \sum_{i=1}^G \frac{\pi_\theta(o_i | q)}{\pi_{\theta_{\text{old}}}(o_i | q)} \hat{A}_i \right]
+$$
+
+对该简化目标关于参数 $\theta$ 求梯度：
+
+$$
+\nabla_\theta \mathcal{J}_{\text{seq}}(\theta) = \mathbb{E} \left[ \frac{1}{G} \sum_{i=1}^G \hat{A}_i \frac{\nabla_\theta \pi_\theta(o_i | q)}{\pi_{\theta_{\text{old}}}(o_i | q)} \right]
+$$
+
+根据强化学习中经典的**对数求导技巧（Log-Derivative Trick）**，即 $\nabla_\theta \pi_\theta(o_i | q) = \pi_\theta(o_i | q) \nabla_\theta \log \pi_\theta(o_i | q)$，代入上式可得：
+
+$$
+\nabla_\theta \mathcal{J}_{\text{seq}}(\theta) = \mathbb{E} \left[ \frac{1}{G} \sum_{i=1}^G \hat{A}_i \frac{\pi_\theta(o_i | q)}{\pi_{\theta_{\text{old}}}(o_i | q)} \nabla_\theta \log \pi_\theta(o_i | q) \right]
+$$
+
+在 PPO/GRPO 的每次更新起点，当前策略 $\pi_\theta$ 和采样策略 $\pi_{\theta_{\text{old}}}$ 是相等的（即 $\theta = \theta_{\text{old}}$），此时重要度比率 $\frac{\pi_\theta(o_i | q)}{\pi_{\theta_{\text{old}}}(o_i | q)} = 1$。
+
+此时真实的策略梯度为：
+
+$$
+\nabla_\theta \mathcal{J}_{\text{seq}}(\theta) = \mathbb{E}_{q \sim \mathcal{Q},\, \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}} \left[ \frac{1}{G} \sum_{i=1}^G \hat{A}_i \nabla_\theta \log \pi_\theta(o_i | q) \right]
+$$
+
+**为什么最终公式中去掉了期望符号 $\mathbb{E}$？**
+在实际训练中，我们无法计算遍历所有可能 Prompt 和所有可能回答的真实数学期望。因此，强化学习采用**蒙特卡罗采样（Monte Carlo Sampling）**：通过从当前策略中实际采样一个批次的 Prompt 和对应的 $G$ 个回答，用这些样本的平均值来近似真实的期望。去掉期望符号后得到的 $\hat{g}_{\text{GRPO}}$（带有 $\hat{}$ 符号），正是单次采样的**经验梯度估计（Empirical Gradient Estimate）**：
 
 $$
 \hat{g}_{\text{GRPO}} = \frac{1}{G}\sum_{i=1}^{G} \hat{A}_i \nabla_\theta \log \pi_\theta(o_i | q)
@@ -95,9 +128,34 @@ $$
 
 仅使用正样本梯度（即 REINFORCE 的做法）当然可以，但**方差会很大**——不同正样本的梯度方向差异很大，导致训练不稳定。GRPO 减去负样本梯度的做法，本质上是蒙特卡罗估计中经典的**控制变量法**（control variate method）。
 
-**控制变量法的直觉**：假设你想估计一个随机变量 $X$ 的期望，但 $X$ 的方差很大。如果你能找到另一个随机变量 $Y$，满足两个条件：(1) $Y$ 的期望已知（或可以消掉），(2) $Y$ 与 $X$ **正相关**，那么用 $X - c \cdot Y$（$c$ 为适当系数）代替 $X$ 进行估计，可以**在不改变期望的前提下降低方差**。$X$ 和 $Y$ 的相关性越强，方差缩减的效果越好。
+**定理（控制变量法，Control Variates）**：假设我们要估计随机变量 $X$ 的期望 $\mathbb{E}[X]$。如果存在另一个随机变量 $Y$，满足：
+
+1. $Y$ 的期望 $\mathbb{E}[Y] = \mu_Y$ 已知（或者在对比中可以被消掉）；
+2. $Y$ 与 $X$ 存在相关性，设它们的皮尔逊相关系数为 $\rho = \frac{\text{Cov}(X, Y)}{\sqrt{\text{Var}(X)\text{Var}(Y)}}$，且 $\rho \neq 0$。
+
+则构造的新估计量 $Z = X - c^*(Y - \mu_Y)$（其中最优系数 $c^* = \frac{\text{Cov}(X, Y)}{\text{Var}(Y)}$）是 $\mathbb{E}[X]$ 的无偏估计，且其方差为：
+$$
+\text{Var}(Z) = (1 - \rho^2) \text{Var}(X) < \text{Var}(X)
+$$
+即：只要 $X$ 和 $Y$ 相关，新估计量的方差就**严格小于**原估计量 $X$ 的方差。相关性越强（$\rho^2$ 越接近 1），方差缩减的效果越好。
+
+> **注（定理证明）**：
+> 首先，新估计量是无偏的：
+> $$
+> \mathbb{E}[Z] = \mathbb{E}[X] - c^*(\mathbb{E}[Y] - \mu_Y) = \mathbb{E}[X] - 0 = \mathbb{E}[X]
+> $$
+> 其次，计算包含任意系数 $c$ 的方差：
+> $$
+> \text{Var}(X - cY) = \text{Var}(X) + c^2 \text{Var}(Y) - 2c \text{Cov}(X, Y)
+> $$
+> 对 $c$ 求导并令其为 0，得到使方差最小化的最优系数 $c^* = \frac{\text{Cov}(X, Y)}{\text{Var}(Y)}$。
+> 将 $c^*$ 代回方差公式，并利用相关系数定义 $\rho = \frac{\text{Cov}(X, Y)}{\sqrt{\text{Var}(X)\text{Var}(Y)}}$，可得最小方差为：
+> $$
+> \text{Var}(Z^*) = \text{Var}(X) - \frac{\text{Cov}(X, Y)^2}{\text{Var}(Y)} = \text{Var}(X) - \rho^2 \text{Var}(X) = (1 - \rho^2) \text{Var}(X)
+> $$
 
 在 GRPO 中：
+
 - $X$ 对应正样本的策略梯度 $\boldsymbol{g}^+ = \nabla_\theta \log \pi_\theta(o^+ | q)$（我们想要的信号）
 - $Y$ 对应负样本的策略梯度 $\boldsymbol{g}^- = \nabla_\theta \log \pi_\theta(o^- | q)$（控制变量）
 - 因为 $o^+$ 和 $o^-$ 都是**同一模型对同一 Prompt 生成**的回答，它们共享 Prompt 的上下文信息，所以 $\boldsymbol{g}^+$ 和 $\boldsymbol{g}^-$ 之间通常存在**正相关性**
@@ -117,6 +175,9 @@ $$
 $$
 
 > 此处 $\text{Var}(\cdot)$ 和 $\text{Cov}(\cdot, \cdot)$ 分别表示梯度向量协方差矩阵的迹（trace），$\rho$ 为对应的相关系数。证明见原文 Appendix B.5。
+> **关于符号滥用的补充说明**：在机器学习优化理论中，对于高维随机向量（如参数量达数十亿的策略梯度 $\boldsymbol{g}$），其严格意义上的协方差 $\text{Cov}(\boldsymbol{g}, \boldsymbol{g})$ 是一个巨大的矩阵。但当我们讨论“梯度估计的方差”时，我们关心的是梯度向量偏离期望值的**总幅度**（即所有参数维度方差的总和），这在数学上等于偏差向量 $L_2$ 范数平方的期望：
+> $$ \mathbb{E}[\|\boldsymbol{g} - \mathbb{E}[\boldsymbol{g}]\|_2^2] = \mathbb{E}[(\boldsymbol{g} - \mathbb{E}[\boldsymbol{g}])^T (\boldsymbol{g} - \mathbb{E}[\boldsymbol{g}])] = \text{Tr}(\text{Cov}(\boldsymbol{g}, \boldsymbol{g})) $$
+> 同理，两个向量的“标量协方差”（内积的期望）为 $\text{Tr}(\text{Cov}(\boldsymbol{g}^+, \boldsymbol{g}^-))$。为了公式简洁，论文作者直接用标量符号 $\text{Var}(\cdot)$ 和 $\text{Cov}(\cdot, \cdot)$ 来表示这些迹（Trace），从而将高维向量的运算转化为标量运算，得出标量系数 $c^*$ 和方差缩减比例 $(1 - \rho^2)$。
 
 **关键含义**：由于 $0 < \rho \leq 1$，因此 $(1 - \rho^2) < 1$，配对估计的方差**严格小于**仅使用正样本梯度 $\boldsymbol{g}^+$ 的方差。相关性 $\rho$ 越大，方差缩减越显著。这解释了 GRPO 为什么要在**同一 Prompt 的同一组内**做对比——目的不是为了更精确的均值估计，而是利用同源配对的正相关性来降低策略梯度估计量的方差。
 
@@ -627,23 +688,17 @@ for step in range(total_steps):
 ```
 
 > **GIFT vs GRPO 训练的关键区别**：
-
+>
 > - **没有裁剪**：GIFT 用 MSE 替代了 PPO 的裁剪机制，不需要 $\varepsilon$ 超参数。
-
 > - **没有重要性采样**：GIFT 不需要 `old_log_probs` 和比率 `ratio = exp(new - old)`。
-
 > - **没有 KL 惩罚**：KL 约束被隐含在参考模型的对数概率中。
-
 > - **凸损失函数**：MSE 是凸函数，比裁剪策略梯度（分段线性）更稳定。
-
 > - 代价是 GIFT 需要每步都重新前向传播（不能像 PPO/GRPO 那样多 epoch 复用旧数据）。
-
-> 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/24-superflow/)
 
 > 参考资料：
 >
 > 1. [It Takes Two: Your GRPO Is Secretly DPO](https://arxiv.org/abs/2510.00977)
->
 > 2. [f-GRPO and Beyond: Divergence-Based RL for General LLM Alignment](https://arxiv.org/abs/2602.05946)
->
 > 3. [GIFT: Group-relative Implicit Fine Tuning](https://arxiv.org/abs/2510.23868)
+
+> 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/24-superflow/)

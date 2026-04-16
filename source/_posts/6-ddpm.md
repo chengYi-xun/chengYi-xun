@@ -272,11 +272,12 @@ $$
 该算法的核心步骤如下：
 
 1. **数据采样**：从训练数据分布 $q(\mathbf{x}_0)$ 中随机采样一个样本 $\mathbf{x}_0$
-2. **时间步采样**：从均匀分布中随机采样时间步 $t$
-3. **噪声采样**：从标准高斯分布 $\mathcal{N}(0, \mathbf{I})$ 中采样噪声 $\epsilon$
-4. **前向扩散**：利用重参数化技巧，通过公式 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$ 直接计算第 $t$ 步的噪声图像
+2. **时间步采样**：从均匀分布中随机采样时间步 $t \sim \mathcal{U}(\{1, \dots, T\})$
+3. **噪声采样**：从标准高斯分布 $\epsilon \sim \mathcal{N}(0, \mathbf{I})$ 中采样噪声 $\epsilon$
+4. **前向扩散**：利用重参数化技巧，通过公式 $\mathbf{x}_t=\sqrt{\bar{\alpha}_t}\mathbf{x}_0+\sqrt{1-\bar{\alpha}_t}\epsilon$ 直接计算第 $t$ 步的加噪图像
 5. **噪声预测**：将 $\mathbf{x}_t$ 和时间步 $t$ 输入去噪网络 $\epsilon_\theta(\mathbf{x}_t, t)$，预测添加的噪声
-6. **损失计算**：计算预测噪声与真实噪声之间的 L2 损失：$\mathcal{L} = \|\epsilon - \epsilon_\theta(\mathbf{x}_t, t)\|^2$
+6. **损失计算**：计算预测噪声与真实噪声之间的 L2 损失（MSE）：$\mathcal{L} = \|\epsilon - \epsilon_\theta(\mathbf{x}_t, t)\|^2$
+7. **反向传播**：使用梯度下降更新网络参数 $\theta$
 
 **关键理解**：这里需要澄清一个重要概念——为什么要预测"特定的"噪声 $\epsilon$ 而不是任意的高斯噪声？
 
@@ -400,3 +401,5 @@ class DDPM:
 > 
 > 1. [Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239)
 > 2. [What are Diffusion Models?](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)
+
+> 下一篇：[笔记｜生成模型（七）：加速采样的魔法 (DDIM)](/chengYi-xun/posts/7-ddim/)

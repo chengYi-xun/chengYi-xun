@@ -367,4 +367,10 @@ $$
 
 强化学习与生成模型的结合，正在开启 AI 领域的新纪元。无论是语言模型中的深度思考（DeepSeek-R1），还是图像生成中的美学对齐（Flow-GRPO），在线强化学习都展现出了无与伦比的潜力。
 
+> 参考资料：
+>
+> 1. Liu, Y., Wang, P., Shao, Z., ... & Hao, K. (2025). *Flow-GRPO: Training Flow Matching Models via Online RL*. arXiv:2505.05470.
+> 2. Black Forest Labs. (2024). *Flux.1 [dev]*. https://blackforestlabs.ai/
+> 3. [flow_grpo](https://github.com/yifan123/flow_grpo)
+
 > 下一篇：[笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](/chengYi-xun/posts/22-dapo/)

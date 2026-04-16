@@ -829,4 +829,12 @@ def compute_gae(rewards, values, gamma=0.99, lam=0.95, dones=None):
 | **优点** | 能不断探索新策略，利用最新反馈 | 无需 4 模型架构，训练简单高效 |
 | **缺点** | 需要维护生成+打分的完整流水线 | 受限于离线数据的质量和覆盖范围 |
 
+> 参考资料：
+>
+> 1. Sutton, R. S., & Barto, A. G. (2018). *Reinforcement Learning: An Introduction*. MIT press.
+> 2. Schulman, J., Moritz, P., Levine, S., Jordan, M., & Abbeel, P. (2015). *High-Dimensional Continuous Control Using Generalized Advantage Estimation*. ICLR 2016.
+> 3. [Part 3: Intro to Policy Optimization — OpenAI Spinning Up](https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html)
+> 4. [Policy Gradient Algorithms — Lil'Log](https://lilianweng.github.io/posts/2018-04-08-policy-gradient/)
+> 5. [Actor-Critic Methods, A2C and GAE](https://avandekleut.github.io/a2c/)
+
 > 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/18-trpo-ppo/)

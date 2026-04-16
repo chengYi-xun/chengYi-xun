@@ -211,29 +211,23 @@ $$
 ### 3.3 多模态 Mamba 架构
 
 **VL-Mamba**（Qiao et al., 2024）：最早将 Mamba 应用于多模态学习
-
 - 使用 Vision Selective Scan (VSS) 模块处理 2D 图像特征
-
 - Mamba-2 backbone 替代 Transformer
-
 - 在 LLaVA-1.5 的 benchmark 上达到相当性能，但推理速度更快
 
-**OmniMamba**（Chen et al., 2025）：首个基于线性架构的多模态**生成**模型
+**OmniMamba**（Chen et al., 2025 年 3 月）：首个基于线性架构的多模态**理解与生成统一**模型
 
-| 特点 | OmniMamba | LLaVA-NeXT |
-|------|-----------|------------|
-| 架构 | Mamba-2 | Transformer |
-| 推理加速 | **119.2×** | 基准 |
-| GPU 内存节省 | **63%** | 基准 |
-| 训练数据 | 2M 图文对 | 2B 图文对 |
+| 特点 | OmniMamba | LLaVA-NeXT | Show-o |
+|------|-----------|------------|--------|
+| 架构 | Mamba-2 | Transformer | Transformer |
+| 推理加速 | **119.2×** (长序列) | 基准 | - |
+| GPU 内存节省 | **63%** | 基准 | - |
+| 训练数据 | **2M** 图文对 | 2B 图文对 | 2B 图文对 |
 
-核心设计：
-
-1. **解耦词汇表**：文本和图像使用独立的 token 空间（避免干扰）
-
-2. **任务特定 LoRA**：不同生成任务（文本/图像）使用不同的 LoRA 适配器
-
-3. **自回归生成**：与 Chameleon 类似，但用 Mamba 替代 Transformer
+核心设计与理论突破：
+1. **解耦词汇表与模态特定 LoRA**：由于文本和图像 token 在特征空间和转移矩阵 $\bar{A}, \bar{B}$ 上的最优动态特性不同，OmniMamba 避免了 Chameleon 式的完全参数共享，而是使用独立的词汇表和任务特定的 LoRA 适配器，有效缓解了模态竞争。
+2. **解耦两阶段训练**：为了解决图文生成任务之间的数据不平衡，采用先理解后生成的两阶段策略，仅用 200 万图文对（比 Show-o 少 1000 倍）就达到了极具竞争力的性能。
+3. **统一的自回归生成**：在 Mamba-2 的线性状态空间中，通过 next-token prediction 同时实现文本和图像的生成，彻底摆脱了 Transformer 的二次复杂度诅咒。
 
 **mmMamba**（2025）：通过**知识蒸馏**从 Transformer MLLM 到 Mamba
 
@@ -438,18 +432,13 @@ Qwen3.5 Omni 和 Gemini 2.5 Pro 已经在这个方向上迈出了第一步。
 
 多模态融合的发展史，就是一部**如何让不同信号形态的数据在同一个计算框架中高效协作**的探索史。从最初的特征拼接，到对比学习的共享空间，到交叉注意力的深度交互，再到统一 token 的原生融合——每一步都在追求更深层、更自然的模态间信息交换。
 
----
+> 参考资料：
+>
+> 1. Chen, Z., ... & Wang, W. (2024). *InternVL: Scaling up Vision Foundation Models and Aligning for Generic Visual-Linguistic Tasks*. CVPR 2024.
+> 2. Chen, Z., ... & Wang, W. (2024). *Expanding Performance Boundaries of Open-Source Multimodal Models with Model, Data, and Test-Time Scaling* (InternVL 2.5). arXiv:2412.05271.
+> 3. Bai, J., ... & Zhou, J. (2025). *Qwen2.5-VL Technical Report*. arXiv:2502.13923.
+> 4. Gu, A. & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752.
+> 5. Chen, J., ... & Wang, Y. (2025). *OmniMamba: Efficient and Unified Multimodal Understanding and Generation via State Space Models*. arXiv:2503.08686. (华中科技大学 & 字节跳动)
+> 6. Li, Y., ... & Zhang, Z. (2025). *FUSION: Fully Integration of Vision-Language Representations for Deep Cross-Modal Understanding*. arXiv:2504.09925.
 
-**参考文献**
-
-1. Chen, Z., et al. (2024). *InternVL: Scaling up Vision Foundation Models and Aligning for Generic Visual-Linguistic Tasks*. CVPR 2024.
-
-2. Chen, Z., et al. (2024). *Expanding Performance Boundaries of Open-Source Multimodal Models with Model, Data, and Test-Time Scaling* (InternVL 2.5). arXiv:2412.05271.
-
-3. Bai, J., et al. (2025). *Qwen2.5-VL Technical Report*. arXiv:2502.13923.
-
-4. Gu, A. & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752.
-
-5. Chen, J., et al. (2025). *OmniMamba: Efficient and Unified Multimodal Understanding and Generation via State Space Models*. arXiv:2503.08686.
-
-6. Li, Y., et al. (2025). *FUSION: Fully Integration of Vision-Language Representations for Deep Cross-Modal Understanding*. arXiv:2504.09925.
+> 下一篇：[笔记｜世界模型（一）：什么是世界模型？从贝叶斯推断到联合嵌入](/chengYi-xun/posts/35-world-model-basics/)

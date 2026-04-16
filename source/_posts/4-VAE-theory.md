@@ -454,3 +454,9 @@ for batch_idx, data in enumerate(train_loader):
     optimizer.step()
 ```
 
+> 参考资料：
+>
+> 1. Kingma, D. P., & Welling, M. (2013). *Auto-Encoding Variational Bayes*. arXiv:1312.6114.
+> 2. Doersch, C. (2016). *Tutorial on Variational Autoencoders*. arXiv:1606.05908.
+
+> 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)

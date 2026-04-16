@@ -229,9 +229,9 @@ $$
 
 IRIS 在 Atari 100K 上以极少的交互样本（2 小时游戏时间）达到了 DreamerV2 级别的性能。
 
-### 5.2 TD-MPC2：无解码器的隐式世界模型
+### 5.2 TD-MPC2 与无解码器（Decoder-Free）的隐式世界模型
 
-TD-MPC2（Hansen et al., 2023）走了一条截然不同的路：**不做观测重建**。
+TD-MPC2（Hansen et al., 2023）走了一条截然不同的路：**不做观测重建（Decoder-Free）**。
 
 世界模型只在潜空间运作：
 
@@ -247,6 +247,18 @@ $$
 没有解码器——模型不需要能重建图像，只需要潜空间对**规划有用**。
 
 规划用 **Model Predictive Control (MPC)**：在每步决策时，在世界模型中短程 rollout 多条轨迹，选择 Q 值最高的动作序列。
+
+**无解码器模型的理论挑战与 2025 年的进展**：
+
+放弃解码器虽然大幅提升了训练速度（无需渲染像素），但也带来了一个致命的理论问题：**表征崩塌（Representation Collapse）**。如果没有重建损失的约束，编码器很容易将所有观测映射到同一个常数向量，从而完美但无意义地最小化动力学预测误差。
+
+早期的无解码器方法严重依赖于数据增强（Data Augmentation）或对比学习来防止崩塌。而在 2025 年的最新研究（如 R2-Dreamer，ICLR 2025）中，研究者引入了受 Barlow Twins 启发的**冗余减少（Redundancy-Reduction）目标**：
+
+$$
+\mathcal{L}_{\text{R2}} = \sum_i (1 - \mathcal{C}_{ii})^2 + \lambda \sum_i \sum_{j \neq i} \mathcal{C}_{ij}^2
+$$
+
+其中 $\mathcal{C}$ 是特征的互相关矩阵。这迫使潜变量的不同维度捕捉独立的信息，在不使用解码器和数据增强的情况下，成功防止了表征崩塌，训练速度比 DreamerV3 快 1.59 倍，同时保持了相当的性能。
 
 | 维度 | Dreamer | IRIS | TD-MPC2 |
 |------|---------|------|---------|
@@ -493,20 +505,14 @@ class RSSM(nn.Module):
 
 Dreamer 系列代表了"在潜空间想象+训练策略"的技术路线。但 LeCun 认为，Dreamer 仍然在做"生成式"预测——用解码器重建观测。下一篇将介绍他提出的替代方案：**JEPA**，一种完全不重建像素的预测架构。
 
-> **下一篇**：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](posts/37-jepa/)
+> 参考资料：
+>
+> 1. Hafner, D., ... & Ba, J. (2019). *Dream to Control: Learning Behaviors by Latent Imagination*. ICLR 2020.
+> 2. Hafner, D., ... & Ba, J. (2021). *Mastering Atari with Discrete World Models*. ICLR 2021.
+> 3. Hafner, D., ... & Ba, J. (2023). *Mastering Diverse Domains through World Models*. Nature 2025.
+> 4. Micheli, V., ... & Fleuret, F. (2023). *Transformers are Sample-Efficient World Models*. ICLR 2023.
+> 5. Hansen, N., ... & Abbeel, P. (2023). *TD-MPC2: Scalable, Robust World Models for Continuous Control*. ICLR 2024.
+> 6. Wu, P., ... & Abbeel, P. (2022). *DayDreamer: World Models for Physical Robot Learning*. CoRL 2022.
+> 7. (2025). *R2-Dreamer: Redundancy-Reduced World Models without Decoders or Augmentation*. ICLR 2025.
 
----
-
-**参考文献**
-
-1. Hafner, D., et al. (2019). *Dream to Control: Learning Behaviors by Latent Imagination*. ICLR 2020.
-
-2. Hafner, D., et al. (2021). *Mastering Atari with Discrete World Models*. ICLR 2021.
-
-3. Hafner, D., et al. (2023). *Mastering Diverse Domains through World Models*. Nature 2025.
-
-4. Micheli, V., et al. (2023). *Transformers are Sample-Efficient World Models*. ICLR 2023.
-
-5. Hansen, N., et al. (2023). *TD-MPC2: Scalable, Robust World Models for Continuous Control*. arXiv:2310.16828.
-
-6. Wu, P., et al. (2022). *DayDreamer: World Models for Physical Robot Learning*. CoRL 2022.
+> 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)

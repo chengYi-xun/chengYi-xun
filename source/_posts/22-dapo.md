@@ -510,12 +510,9 @@ DAPO 之后，强化学习领域仍在快速演进：
 
 > 参考资料：
 >
-> 1. [DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)
->
-> 2. [NVIDIA NeMo RL DAPO Guide](https://docs.nvidia.com/nemo/rl/latest/guides/dapo.html)
->
-> 3. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
->
-> 4. [f-GRPO: Divergence-Based RL for General LLM Alignment](https://arxiv.org/abs/2602.05946)
+> 1. Yu, H., Chen, X., Zhang, Y., ... & Li, Y. (2025). *DAPO: An Open-Source LLM Reinforcement Learning System at Scale*. arXiv:2503.14476.
+> 2. Shen, J., Wang, Z., Li, X., ... & Chen, Y. (2025). *Entropy Collapse in Large Language Model Reinforcement Learning*. arXiv:2509.03493.
+> 3. [NVIDIA NeMo RL DAPO Guide](https://docs.nvidia.com/nemo/rl/latest/guides/dapo.html)
+> 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
 
 > 下一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/23-grpo-variants/)

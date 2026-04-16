@@ -358,17 +358,6 @@ def step(self, model_output, timestep, sample, return_dict=True):
 
 这种设计让Flow Matching既可以确定性生成（保证质量），也可以随机生成（增加多样性）。
 
-
-
-
-
-> 参考资料：
->
-> 1. [深入解析Flow Matching技术](https://zhuanlan.zhihu.com/p/685921518)
-> 2. [【AI知识分享】你一定能听懂的扩散模型Flow Matching基本原理深度解析](https://www.bilibili.com/video/BV1Wv3xeNEds/)
-> 3. [flow_matching](https://littlenyima.github.io/posts/51-flow-matching-for-diffusion-models/)
-> 4. [Normalizing Flow](https://littlenyima.github.io/posts/12-basic-concepts-of-normalizing-flow/)
-
 # 总结与算法对比
 
 **算法对比：Flow Matching vs DDPM**
@@ -379,5 +368,13 @@ def step(self, model_output, timestep, sample, return_dict=True):
 
 **开源代码参考**：
 目前最前沿的开源图像大模型，如 **Stable Diffusion 3** 和 **Flux**，都已经全面抛弃了 DDPM，转而采用 Flow Matching（Rectified Flow）作为其核心的生成机制。你可以在 `diffusers` 库的 `FlowMatchEulerDiscreteScheduler` 中看到其采样过程的实现。
+
+> 参考资料：
+>
+> 1. Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, D. H., & Le, M. (2022). *Flow Matching for Generative Modeling*. ICLR 2023.
+> 2. [深入解析Flow Matching技术](https://zhuanlan.zhihu.com/p/685921518)
+> 3. [【AI知识分享】你一定能听懂的扩散模型Flow Matching基本原理深度解析](https://www.bilibili.com/video/BV1Wv3xeNEds/)
+> 4. [flow_matching](https://littlenyima.github.io/posts/51-flow-matching-for-diffusion-models/)
+> 5. [Normalizing Flow](https://littlenyima.github.io/posts/12-basic-concepts-of-normalizing-flow/)
 
 > 下一篇：[笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](/chengYi-xun/posts/15-sd3/)

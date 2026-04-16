@@ -278,12 +278,8 @@ VGGT 展示了"暴力"方法（更大的模型、更多的数据）在 3D 视觉
 
 > 参考资料：
 >
-> 1. [VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2503.11651)（CVPR 2025 Best Paper）
->
-> 2. [Vision Transformers Need Registers](https://arxiv.org/abs/2309.16588)（Darcet et al., 2023）
->
-> 3. [DUSt3R: Geometric 3D Vision Made Easy](https://arxiv.org/abs/2312.14132)
->
-> 4. [CoTracker: It is Better to Track Together](https://arxiv.org/abs/2307.07635)
->
-> 5. [DPT: Vision Transformers for Dense Prediction](https://arxiv.org/abs/2103.13413)
+> 1. Wang, Y., ... & Vedaldi, A. (2025). *VGGT: Visual Geometry Grounded Transformer*. CVPR 2025.
+> 2. Darcet, T., Oquab, M., Mairal, J., & Bojanowski, P. (2023). *Vision Transformers Need Registers*. arXiv:2309.16588.
+> 3. Wang, S., ... & Reizenstein, J. (2023). *DUSt3R: Geometric 3D Vision Made Easy*. CVPR 2024.
+> 4. Karaev, S., ... & Vedaldi, A. (2023). *CoTracker: It is Better to Track Together*. arXiv:2307.07635.
+> 5. Ranftl, R., Bochkovskiy, A., & Koltun, V. (2021). *Vision Transformers for Dense Prediction*. ICCV 2021.

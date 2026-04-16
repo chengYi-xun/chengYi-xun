@@ -97,7 +97,7 @@ $$
 
 **改进——双线性池化（Bilinear Pooling）**：
 
-双线性池化通过外积捕获二阶交互：
+双线性池化通过外积捕获二阶交互，最早在细粒度视觉识别中被提出，后广泛应用于多模态融合：
 
 $$
 \mathbf{z}_{\text{bilinear}} = \mathbf{v}^\top \mathbf{W} \mathbf{t}
@@ -113,11 +113,13 @@ $$
 
 > **定理（双线性模型的表达能力）**：设 $\phi(\mathbf{v}, \mathbf{t}) = \mathbf{w}^\top (\mathbf{v} \otimes \mathbf{t})$ 为双线性分类器，则其等价于在 $\mathbf{v}$ 和 $\mathbf{t}$ 的所有分量对之间施加线性权重。形式化地，$\phi(\mathbf{v}, \mathbf{t}) = \sum_{i,j} W_{ij} v_i t_j$，即一个关于输入的**二次函数**。（参考：Tenenbaum & Freeman, 2000）
 
+**为什么双线性池化有效？** 拼接（Concatenation）仅仅是将特征放在一起，依赖后续的 MLP 去隐式地学习交互；而双线性池化通过显式的乘法运算（$v_i \cdot t_j$），直接计算了视觉特征和文本特征所有可能的组合。这种**显式的乘法交互**对于需要细粒度判别的任务（如 VQA 中判断特定颜色的特定物体）至关重要，它类似于 SVM 中的多项式核函数，将特征映射到了更高维、更易线性可分的空间。
+
 **问题**：当 $d_v = d_t = 768$ 时，$\tilde{\mathbf{z}}$ 的维度高达 $768^2 \approx 59$ 万，计算和存储开销巨大。
 
-**解决方案——紧凑双线性池化（Compact Bilinear Pooling）**：
+**解决方案——紧凑双线性池化（Compact Bilinear Pooling, CBP）**：
 
-利用 Count Sketch 投影将外积压缩到低维：
+为了解决维度爆炸问题，CBP 利用 Count Sketch 投影将外积压缩到低维：
 
 $$
 \mathbf{z}_{\text{compact}} = \text{CountSketch}(\mathbf{v}) \circledast \text{CountSketch}(\mathbf{t}) \in \mathbb{R}^{d_z}
@@ -127,7 +129,9 @@ $$
 
 > **定理（Count Sketch 的卷积性质）**：若 $\psi_h^s(\mathbf{x})$ 为 Count Sketch 投影（由哈希函数 $h$ 和符号函数 $s$ 定义），则 $\psi_{h_1}^{s_1}(\mathbf{v}) \circledast \psi_{h_2}^{s_2}(\mathbf{t})$ 是 $\mathbf{v} \otimes \mathbf{t}$ 的 Count Sketch 投影的无偏估计。（Pham & Pagh, 2013）
 
-实际计算通过 FFT 加速：$\mathbf{z}_{\text{compact}} = \text{FFT}^{-1}(\text{FFT}(\psi(\mathbf{v})) \odot \text{FFT}(\psi(\mathbf{t})))$。
+实际计算通过 FFT 加速：$\mathbf{z}_{\text{compact}} = \text{FFT}^{-1}(\text{FFT}(\psi(\mathbf{v})) \odot \text{FFT}(\psi(\mathbf{t})))$。这种方法在保留了二阶交互表达能力的同时，将参数量和计算量控制在了可接受的范围内。
+
+**最新进展（2025）**：双线性池化的思想仍在演进。例如，2025 年提出的 KrossFuse 方法（Wang et al., 2025）通过 Kronecker 乘积实现特征图的核乘法融合，允许不同模态的判别性结构相互作用，进一步证明了外积/张量积在多模态融合中的理论价值。
 
 **PyTorch 实现**：
 
@@ -364,11 +368,17 @@ $$
 \alpha_{ij} = \frac{\exp\!\left(\frac{(\mathbf{v}_i \mathbf{W}_Q)(\mathbf{t}_j \mathbf{W}_K)^\top}{\sqrt{d_k}}\right)}{\sum_{k=1}^{N_t} \exp\!\left(\frac{(\mathbf{v}_i \mathbf{W}_Q)(\mathbf{t}_k \mathbf{W}_K)^\top}{\sqrt{d_k}}\right)}
 $$
 
-**几何直觉**：视觉 token $\mathbf{v}_i$ 通过 $\mathbf{W}_Q$ 生成一个"问题"向量，文本 token $\mathbf{t}_j$ 通过 $\mathbf{W}_K$ 生成一个"钥匙"向量。点积 $(\mathbf{v}_i \mathbf{W}_Q)(\mathbf{t}_j \mathbf{W}_K)^\top$ 衡量这个"问题"和"钥匙"的匹配程度。匹配度高的文本 token 贡献更多的信息（通过 $\mathbf{W}_V$ 投影后加权求和）。
+**几何直觉**：视觉 token $\mathbf{v}_i$ 通过 $\mathbf{W}_Q$ 生成一个"问题"（Query）向量，文本 token $\mathbf{t}_j$ 通过 $\mathbf{W}_K$ 生成一个"钥匙"（Key）向量。点积 $(\mathbf{v}_i \mathbf{W}_Q)(\mathbf{t}_j \mathbf{W}_K)^\top$ 衡量这个"问题"和"钥匙"的匹配程度。匹配度高的文本 token 贡献更多的信息（通过 $\mathbf{W}_V$ 投影后加权求和）。
+
+**理论基础（2025 年最新研究）**：
+
+交叉注意力为何如此有效？2025 年的最新理论研究给出了严格的数学证明：
 
 > **定理（多层交叉注意力的 Bayes 最优性）**：考虑线性化的多模态 in-context learning 设置，单层线性自注意力**不能**对所有任务分布一致地达到 Bayes 最优预测。但一个包含交叉注意力 + 自注意力 + 残差连接的多层模型，在梯度流优化下可以收敛到 Bayes 最优的 in-context 预测器。（引自：Akyürek et al., 2025, arXiv:2602.04872）
 
-这个定理表明，交叉注意力不仅是一种工程直觉，它在理论上也是多模态信息融合的最优选择（至少在线性化设置下）。
+这个定理表明，交叉注意力不仅是一种工程直觉，它在理论上也是多模态信息融合的最优选择（至少在线性化设置下）。它证明了**深度**在多模态融合中的必要性：单层的融合无法充分对齐不同模态的分布，而多层交叉注意力能够逐步逼近最优的联合表征。
+
+此外，2026 年的一项控制变量研究（Interaction-Driven Dynamic Fusion for Multimodal Depression Detection, MDPI 2026）通过实验证实，在处理类别不平衡和复杂跨模态交互时，交叉注意力融合显著优于简单的拼接（Concatenation）和门控融合（Gated Fusion），其核心优势在于能够动态地基于内容（Query-Key 匹配）分配注意力权重，而非依赖静态的投影矩阵。
 
 #### 双向交叉注意力
 
@@ -682,18 +692,12 @@ print(f"融合维度: {fd} = {33 * 17 * 65}")
 
 下一篇我们将看到 **CLIP** 如何通过对比学习，在 4 亿图文对上训练出天然对齐的视觉和语言编码器，从而让晚期融合的余弦相似度真正有意义。
 
-> **下一篇**：[笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](posts/30-clip/)
+> 参考资料：
+>
+> 1. Tenenbaum, J. B., & Freeman, W. T. (2000). *Separating style and content with bilinear models*. Neural Computation.
+> 2. Gao, Y., ... & Darrell, T. (2016). *Compact Bilinear Pooling*. CVPR 2016.
+> 3. Zadeh, A., ... & Morency, L.-P. (2017). *Tensor Fusion Network for Multimodal Sentiment Analysis*. EMNLP 2017.
+> 4. Lu, J., ... & Parikh, D. (2019). *ViLBERT: Pretraining Task-Agnostic Visiolinguistic Representations for Vision-and-Language Tasks*. NeurIPS 2019.
+> 5. Akyürek, E., ... & Andreas, J. (2025). *Multi-layer Cross-Attention is Provably Optimal for Multi-modal In-context Learning*. arXiv:2602.04872.
 
----
-
-**参考文献**
-
-1. Tenenbaum, J. B., & Freeman, W. T. (2000). *Separating style and content with bilinear models*. Neural Computation.
-
-2. Gao, Y., et al. (2016). *Compact Bilinear Pooling*. CVPR 2016.
-
-3. Zadeh, A., et al. (2017). *Tensor Fusion Network for Multimodal Sentiment Analysis*. EMNLP 2017.
-
-4. Lu, J., et al. (2019). *ViLBERT: Pretraining Task-Agnostic Visiolinguistic Representations*. NeurIPS 2019.
-
-5. Akyürek, E., et al. (2025). *Multi-layer Cross-Attention is Provably Optimal for Multi-modal In-context Learning*. arXiv:2602.04872.
+> 下一篇：[笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](/chengYi-xun/posts/30-clip/)

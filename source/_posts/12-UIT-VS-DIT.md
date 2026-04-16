@@ -320,7 +320,11 @@ shift = scale = 0                     # 对于最终层
 个人感觉 DiT 相比于 U-ViT 是更成功的，因为我们使用 transformer 架构比较注重的就是缩放能力，而 DiT 的实验表明，其性能能够随着模型的缩放（模型规模/模型计算量）而受益。
 
 
-> 转载：
+> 参考资料：
 >
-> 1. [UIT](https://littlenyima.github.io/posts/29-uvit-a-vit-backbone-for-diffusion-models/)
-> 2. [DIT](https://littlenyima.github.io/posts/32-dit-scalable-diffusion-with-transformers/)
+> 1. Bao, F., Nie, S., Xue, J., Cao, Y., Li, C., Su, H., & Zhu, J. (2023). *All are Worth Words: A ViT Backbone for Diffusion Models*. CVPR 2023.
+> 2. Peebles, W., & Xie, S. (2023). *Scalable Diffusion Models with Transformers*. ICCV 2023.
+> 3. [UIT](https://littlenyima.github.io/posts/29-uvit-a-vit-backbone-for-diffusion-models/)
+> 4. [DIT](https://littlenyima.github.io/posts/32-dit-scalable-diffusion-with-transformers/)
+
+> 下一篇：[笔记｜生成模型（十三）：流模型 (Normalizing Flow)](/chengYi-xun/posts/13-Normalizing-flow/)

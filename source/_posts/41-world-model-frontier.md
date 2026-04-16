@@ -84,34 +84,31 @@ $$
 
 ### 2.1 如何评估世界模型？
 
-传统指标（FID、FVD）只衡量生成质量，不衡量"物理正确性"。WorldScore（2025）提出了专门评估世界模型的指标体系。
+传统指标（FID、FVD）只衡量生成质量，不衡量"物理正确性"或"世界规律"。2025 年，学术界推出了专门评估世界模型的统一基准体系，代表作是 **WorldScore**（ICCV 2025）和 **WorldModelBench**（2025.02）。
 
-### 2.2 WorldScore 的五个维度
+### 2.2 WorldScore：统一 3D/4D 与视频生成
 
-| 维度 | 评测内容 | 量化方式 |
-|------|---------|---------|
-| **3D 一致性** | 多视角几何一致 | 重投影误差 + 深度一致性 |
-| **物理合理性** | 运动符合物理定律 | 速度/加速度曲线分析 |
-| **时序一致性** | 帧间内容连贯 | 光流平滑度 + 对象追踪 |
-| **可控性** | 对输入条件的响应精度 | 动作-输出对应关系 |
-| **多样性** | 不同采样的变化范围 | FID diversity |
+WorldScore 是首个统一评估世界生成的基准。它的核心创新在于：将"世界生成"分解为一系列**带有显式相机轨迹布局说明的下一场景生成任务**。这使得它能够用同一套标准评估 3D 场景生成、4D 场景生成和纯视频生成模型。
 
-### 2.3 综合评分
+WorldScore 包含 3000 个精心策划的测试用例（涵盖室内/室外、静态/动态、写实/风格化），主要评估三个维度：
+1. **可控性（Controllability）**：模型严格遵循控制输入（如相机轨迹矩阵、文本布局描述）的能力。
+2. **质量（Quality）**：生成场景的保真度和多视角一致性。
+3. **动力学（Dynamics）**：生成世界中运动的准确性和稳定性。
 
-$$
-\text{WorldScore} = \prod_{i=1}^{5} d_i^{w_i}, \quad \sum_i w_i = 1
-$$
+### 2.3 WorldModelBench：聚焦物理幻觉与常识
 
-使用几何平均而非算术平均——**任何一个维度的严重失败都会拉低总分**，这符合安全关键场景的需求（一个物理离谱的帧就足以让仿真器不可用）。
+WorldModelBench 则更侧重于评估视频生成模型的"世界建模"能力，包含 7 个应用驱动领域和 56 个子领域。它衡量三个核心能力：
+1. **指令遵循（Instruction Following）**：物体和运动是否符合指令。
+2. **常识（Common Sense）**：时序一致性和视觉质量。
+3. **物理遵循（Physical Adherence）**：专门调查 5 种常见的物理幻觉（例如违反牛顿第一定律、物体穿模等）。
 
-### 2.4 各模型表现
+为了克服传统自动化指标的缺陷，WorldModelBench 收集了 6.7 万个人类标签，并微调了一个 2B 参数的多模态裁判模型（在预测物理违规方面比 GPT-4o 准 8.6%）。
 
-| 模型 | 3D 一致性 | 物理合理性 | 时序一致性 | 综合 WorldScore |
-|------|----------|-----------|-----------|----------------|
-| Sora | 中 | 低 | 高 | 中 |
-| Cosmos | 中 | 中 | 高 | 中上 |
-| Genie 2 | 高 | 中 | 中 | 中上 |
-| DreamerV3 | - | 高 | - | -（不生成像素） |
+### 2.4 评估结果的启示
+
+根据这些最新基准的测试结果：
+- **物理推理依然是短板**：即使是最先进的闭源视频模型，在 WorldModelBench 的"物理遵循"测试中也经常出现违背牛顿定律的幻觉。
+- **4D 生成在一致性上占优，但在动态性上落后**：基于 4D Gaussian 的方法在 WorldScore 的"质量"（多视角一致性）上表现优异，但在处理复杂、非刚性的"动力学"时，往往不如大规模视频扩散模型自然。
 
 ---
 
@@ -306,12 +303,12 @@ WorldScore 是第一次尝试统一评估，但仍然不完善。
 
 世界模型是通向通用人工智能的核心模块之一。无论是 LeCun 的 JEPA 路线还是 OpenAI 的视频生成路线，最终目标一致：**构建一个能够预测、推理、规划的世界内部表征。** 技术路线的收敛还需要时间，但方向已经越来越清晰。
 
----
-
-**参考文献**
-
-1. Pearl, J. (2009). *Causality: Models, Reasoning, and Inference*. Cambridge University Press.
-2. Ha, D. & Schmidhuber, J. (2018). *World Models*. arXiv:1803.10122.
-3. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
-4. Du, Y., et al. (2023). *UniPi: Learning Universal Policies via Text-Guided Video Generation*. NeurIPS 2023.
-5. NVIDIA (2025). *Cosmos World Foundation Model Platform for Physical AI*. arXiv:2501.03575.
+> 参考资料：
+>
+> 1. Pearl, J. (2009). *Causality: Models, Reasoning, and Inference*. Cambridge University Press.
+> 2. Ha, D. & Schmidhuber, J. (2018). *World Models*. arXiv:1803.10122.
+> 3. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
+> 4. Du, Y., ... & Mordatch, P. (2023). *Learning Universal Policies via Text-Guided Video Generation*. NeurIPS 2023.
+> 5. NVIDIA (2025). *Cosmos World Foundation Model Platform for Physical AI*. arXiv:2501.03575.
+> 6. Duan, H., et al. (2025). *WorldScore: A Unified Evaluation Benchmark for World Generation*. ICCV 2025.
+> 7. WorldModelBench Team (2025). *WorldModelBench: A Comprehensive Benchmark for Evaluating World Modeling Capabilities*.

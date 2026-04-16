@@ -495,8 +495,11 @@ class StableDiffusionPipeline:
 
 > 参考资料：
 >
-> 1. [Understanding Diffusion Models: A Unified Perspective](https://arxiv.org/abs/2208.11970)
-> 2. [Multi-head attention mechanism: “queries”, “keys”, and “values,” over and over again](https://data-science-blog.com/blog/2021/04/07/multi-head-attention-mechanism/)
-> 3. [扩散模型（三）| Classifier Guidance & Classifier-Free Guidance](https://lichtung612.github.io/posts/3-diffusion-models/)
-> 4. [diffusion model（四）——文生图diffusion model（classifier-free guided）](https://zhuanlan.zhihu.com/p/642519063)
-> 5. [lassifier-Free Guidance](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)
+> 1. Ho, J., & Salimans, T. (2022). *Classifier-Free Diffusion Guidance*. NeurIPS 2022 Workshop.
+> 2. [Understanding Diffusion Models: A Unified Perspective](https://arxiv.org/abs/2208.11970)
+> 3. [Multi-head attention mechanism: “queries”, “keys”, and “values,” over and over again](https://data-science-blog.com/blog/2021/04/07/multi-head-attention-mechanism/)
+> 4. [扩散模型（三）| Classifier Guidance & Classifier-Free Guidance](https://lichtung612.github.io/posts/3-diffusion-models/)
+> 5. [diffusion model（四）——文生图diffusion model（classifier-free guided）](https://zhuanlan.zhihu.com/p/642519063)
+> 6. [Classifier-Free Guidance](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)
+
+> 下一篇：[笔记｜生成模型（十二）：U-ViT vs DiT](/chengYi-xun/posts/12-UIT-VS-DIT/)

@@ -457,18 +457,19 @@ DayDreamer (2022)                        │
 
 ### 核心分歧：生成 vs 预测
 
-这五条路线之间最根本的分歧在于一个问题：**世界模型是否需要"看得见"？**
+这五条路线之间最根本的分歧在于一个问题：**世界模型是否需要"看得见"（重建像素）？**
 
-- **生成派**（Sora, Cosmos, 视频生成）：世界模型应该能生成逼真的未来视频/图像，因为视觉细节包含重要信息
+- **生成派**（Sora, Cosmos, 视频生成）：世界模型应该能生成逼真的未来视频/图像。他们认为，"生成即理解"——如果模型能完美模拟物理世界的视觉变化（如水流、光影、碰撞），它就必然在内部学到了物理规律。
+- **预测派**（JEPA, Dreamer）：世界模型只需预测未来的**抽象表征（Latent Space）**，无需重建每个像素——就像人闭眼也能踢球。LeCun 认为，生成模型试图预测世界中的每一个细节，但许多细节是本质上不可预测且与决策无关的（如树叶的随机飘动）。一个好的世界模型应该学会在抽象层面过滤噪声，只预测与任务相关的语义变化。
 
-- **预测派**（JEPA, Dreamer）：世界模型只需预测未来的**抽象表征**，无需重建每个像素——就像人闭眼也能踢球
+**2024-2025 年的理论反思**：
 
-LeCun 在 2022 年的白皮书中明确站在预测派：
+随着 Sora 和 V-JEPA 的发布，学术界对这两种范式进行了深入的理论与哲学探讨。
 
-> *"生成模型试图预测世界中的每一个细节，但许多细节是本质上不可预测的（如树叶的随机飘动）。一个好的世界模型应该学会在抽象层面预测。"*
-> — Yann LeCun, 2022
+1. **统一视角的出现**：2025 年的一些研究（如 Var-JEPA）指出，生成派和预测派在数学结构上并非水火不容。标准的 JEPA 可以被视为应用于耦合潜变量模型的变分推断（Variational Inference）的确定性特例。这意味着，预测抽象表征本质上也是在做一种隐式的概率生成。
+2. **对"真正理解世界"的质疑**：尽管 Sora 能生成惊艳的物理交互视频，V-JEPA 能在抽象空间做精准预测，但 2024 年的一项哲学与认知科学交叉分析（*Sora and V-JEPA Have Not Learned The Complete Real World Model*）指出，两者都尚未学到完整的世界模型。Sora 缺乏对先验变化规律的结构化把握（容易出现物理穿模），而 V-JEPA 则在整合真实世界经验和先验概念范畴上存在不足。真正的世界模型需要融合：孤立对象的表征、跨时空的变化规律、以及基础的概念范畴。
 
-这个辩论至今没有定论。接下来的文章将逐一展开每条路线。
+这个辩论至今没有定论，但正在推动两条路线的相互借鉴。接下来的文章将逐一展开每条路线。
 
 ---
 
@@ -518,14 +519,12 @@ $$
 
 下一篇将深入 **Dreamer 系列**——目前 Model-based RL 方向最成功的世界模型家族。从 RSSM 的数学推导开始，一路讲到 DreamerV3 如何用**固定超参**横扫 150+ 个任务。
 
-> **下一篇**：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](posts/36-dreamer/)
+> 参考资料：
+>
+> 1. Ha, D. & Schmidhuber, J. (2018). *World Models*. arXiv:1803.10122.
+> 2. Craik, K. (1943). *The Nature of Explanation*. Cambridge University Press.
+> 3. Shannon, C. E. (1959). *Coding Theorems for a Discrete Source with a Fidelity Criterion*. IRE National Convention Record.
+> 4. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
+> 5. (2024). *Sora and V-JEPA Have Not Learned The Complete Real World Model -- A Philosophical Analysis of Video AIs*. arXiv.
 
----
-
-**参考文献**
-
-1. Ha, D. & Schmidhuber, J. (2018). *World Models*. arXiv:1803.10122.
-
-2. Craik, K. (1943). *The Nature of Explanation*. Cambridge University Press.
-
-3. Shannon, C. E. (1959). *Coding Theorems for a Discrete Source with a Fidelity Criterion*. IRE National Convention Record.
+> 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/36-dreamer/)

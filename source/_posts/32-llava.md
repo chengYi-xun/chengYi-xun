@@ -78,7 +78,6 @@ $$
 从信息论的角度，BLIP-2 的 Q-Former 做了两件事：
 
 1. **压缩**：257 个 ViT token → 32 个查询 token
-
 2. **对齐**：将视觉特征从 ViT 空间投影到 LLM 空间
 
 LLaVA 的 MLP 只做第 2 件事——不压缩，直接把所有 576 个 patch token 投影到 LLM 空间。
@@ -86,6 +85,15 @@ LLaVA 的 MLP 只做第 2 件事——不压缩，直接把所有 576 个 patch 
 为什么不压缩反而更好？
 
 > **假说（MLP 投影的充分性）**：当 LLM 具有足够的上下文窗口和推理能力时，它可以自行从 576 个视觉 token 中"注意到"与问题相关的部分（通过 self-attention 的 QKV 机制），而无需外部模块预先筛选。Q-Former 的压缩虽然降低了 LLM 的输入长度，但可能丢失了细粒度的空间信息。
+
+**2025 年的理论视角：投影层即信息瓶颈（Information Bottleneck）**
+
+虽然 LLaVA 表面上"没有压缩"（token 数量没变），但最新的理论研究（如 2025 年 3 月的 *Projection Head is Secretly an Information Bottleneck*）指出，**MLP 投影层本身就是一个隐式的信息瓶颈**。
+
+- **特征过滤**：在两阶段训练中，MLP 被迫学习一种映射，使得视觉特征能够最大化地预测后续的文本 token（因果语言建模）。这个过程会自动过滤掉与语言语义无关的视觉噪声，只保留对 LLM 有用的信息。
+- **维度对齐与子空间折叠**：MLP 通过非线性变换（GELU），在保持空间分辨率（patch 数量不变）的同时，在特征维度上进行了语义压缩和对齐。
+
+因此，LLaVA 的成功并非"不需要信息瓶颈"，而是将**空间维度的硬压缩**（Q-Former 的 token 减少）替换为了**特征维度的软压缩**（MLP 的语义过滤），从而在保留细粒度空间细节和去除冗余噪声之间找到了更好的平衡。
 
 实验验证：LLaVA-1.5 在 TextVQA（需要阅读图片中的文字）上的表现显著优于 BLIP-2，正是因为保留了所有 patch token 中的细粒度文字信息。
 
@@ -447,14 +455,11 @@ LLaVA 的成功传递了几个深层信息：
 
 下一篇将介绍 Flamingo 的门控交叉注意力和 Chameleon 的统一 token 方案。
 
-> **下一篇**：[笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](posts/33-native-multimodal/)
+> 参考资料：
+>
+> 1. Liu, H., Li, C., Wu, Q., & Lee, Y. J. (2023). *Visual Instruction Tuning*. NeurIPS 2023.
+> 2. Liu, H., ... & Lee, Y. J. (2023). *Improved Baselines with Visual Instruction Tuning*. arXiv:2310.03744.
+> 3. Liu, H., ... & Lee, Y. J. (2024). *LLaVA-NeXT: Improved Reasoning, OCR, and World Knowledge*. Blog post.
+> 4. Chen, Y., et al. (2025). *Projection Head is Secretly an Information Bottleneck*. arXiv:2503.00507. (关于投影层作为信息瓶颈的理论分析)
 
----
-
-**参考文献**
-
-1. Liu, H., et al. (2023). *Visual Instruction Tuning*. NeurIPS 2023.
-
-2. Liu, H., et al. (2023). *Improved Baselines with Visual Instruction Tuning* (LLaVA-1.5). arXiv:2310.03744.
-
-3. Liu, H., et al. (2024). *LLaVA-NeXT: Improved Reasoning, OCR, and World Knowledge*. Blog post.
+> 下一篇：[笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](/chengYi-xun/posts/33-native-multimodal/)

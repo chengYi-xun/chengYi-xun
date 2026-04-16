@@ -629,10 +629,7 @@ $$
 
 > 参考资料：
 >
-> 1. [MemoryBank: Enhancing Large Language Models with Long-Term Memory](https://arxiv.org/abs/2305.10250)
->
+> 1. Zhong, W., Guo, L., Gao, Q., Wang, Y., ... & Duan, N. (2023). *MemoryBank: Enhancing Large Language Models with Long-Term Memory*. arXiv:2305.10250.
 > 2. [Ebbinghaus, H. Memory: A Contribution to Experimental Psychology, 1885/1964](https://en.wikipedia.org/wiki/Forgetting_curve)
->
-> 3. [Dense Passage Retrieval (DPR)](https://arxiv.org/abs/2004.04906)
->
-> 4. [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)
+> 3. Karpukhin, V., Oguz, B., Min, S., Lewis, P., ... & Yih, W. (2020). *Dense Passage Retrieval for Open-Domain Question Answering*. EMNLP 2020.
+> 4. Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., ... & Chen, W. (2021). *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR 2022.

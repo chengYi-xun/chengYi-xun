@@ -221,14 +221,11 @@ $$
 
 ---
 
-下一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/posts/25-video-grpo/)
-
 > 参考资料：
 >
 > 1. [SuperFlow: Training Flow Matching Models with RL on the Fly](https://arxiv.org/abs/2512.17951)
->
 > 2. [Flow-Factory: A Unified Framework for RL in Flow-Matching Models](https://arxiv.org/html/2602.12529v3)
->
 > 3. [GenRL: Scalable RL for Generative Models](https://github.com/ModelTC/GenRL)
->
 > 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
+
+> 下一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/25-video-grpo/)

@@ -286,11 +286,11 @@ $$
 \mathcal{L}_{\text{momentum}} = \left\|\sum_i m_i \mathbf{v}_i(t) - \mathbf{p}_0\right\|^2
 $$
 
-### 6.2 PINN 式混合动力学
+### 6.2 PINN 式混合动力学与 2025 年的理论反思
 
 Physics-Informed Neural Networks（PINN）的核心思想：让神经网络的输出满足物理 PDE。
 
-对于视频世界模型，可以要求：
+对于视频世界模型，理论上可以要求：
 
 $$
 \mathcal{L}_{\text{total}} = \underbrace{\mathcal{L}_{\text{data}}}_{\text{拟合数据}} + \alpha \underbrace{\mathcal{L}_{\text{PDE}}}_{\text{满足物理方程}}
@@ -301,6 +301,16 @@ $$
 $$
 \mathcal{L}_{\text{NS}} = \left\|\frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u} \cdot \nabla)\mathbf{u} + \frac{1}{\rho}\nabla p - \nu \nabla^2 \mathbf{u}\right\|^2
 $$
+
+**理论局限性与 2025 年的实证挑战**：
+
+尽管将物理方程作为损失项（PINN 范式）在科学计算中很成功，但在高维视频生成中遇到了巨大阻力。2025 年发表于 ICML 的研究（*How Far Is Video Generation from World Model*）以及相关的物理评测基准（如 MORPHEUS，2025）揭示了深层原因：
+
+1. **表观特征的"捷径"（Shortcut Learning）**：视频模型在优化 $\mathcal{L}_{\text{total}}$ 时，倾向于优先拟合颜色、大小等表观特征，而不是速度、加速度等物理特征。因为在像素空间中，改变颜色的梯度远大于改变运动轨迹的梯度。
+2. **基于案例的泛化（Case-based Generalization）**：即使加上了物理正则化，模型依然没有抽象出普遍的物理规律（如动量守恒），而是在遇到新场景时，试图"回忆"并拼接训练集中最相似的视觉片段。这导致在分布外（OOD）场景下，物理约束往往失效。
+3. **评估的错觉**：传统的评估方法（如 FID 或人类主观评价）往往会被"视觉上合理但物理上错误"的视频欺骗。只有引入基于守恒律的严格物理指标，才能发现当前最先进的视频模型在物理推理上依然极其脆弱。
+
+因此，纯粹的软约束（Loss penalty）很难让视频模型真正"理解"物理，这也是为什么像 PhysGen 这样采用**硬约束（先显式仿真，后视频渲染）**的混合管线在当前阶段更为可靠。
 
 ---
 
@@ -316,16 +326,13 @@ $$
 
 下一篇将介绍世界模型在**自动驾驶**中的专业化应用——从像素级预测到 3D 占用预测。
 
-> **下一篇**：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](posts/40-driving-world-model/)
+> 参考资料：
+>
+> 1. Zhang, T., ... & Freeman, W. T. (2024). *PhysDreamer: Physics-Based Interaction with 3D Objects via Video Generation*. ECCV 2024.
+> 2. Liu, S., ... & Wang, S. (2024). *PhysGen: Rigid-Body Physics-Grounded Image-to-Video Generation*. ECCV 2024.
+> 3. Pan, Y., ... & Lu, C. (2025). *NewtonGen: Physics-Consistent and Controllable Text-to-Video Generation via Neural Newtonian Dynamics*. arXiv:2509.21309.
+> 4. Duan, H., ... & Li, Y. (2025). *What about gravity in video generation? Post-Training Newton's Laws with Verifiable Rewards*. arXiv:2512.00425.
+> 5. Kang, G., et al. (2025). *How Far Is Video Generation from World Model: A Physical Law Perspective*. ICML 2025.
+> 6. (2025). *MORPHEUS: A Physics-Informed Benchmark for Video Generation*. arXiv:2504.02918.
 
----
-
-**参考文献**
-
-1. Zhang, T., et al. (2024). *PhysDreamer: Physics-Based Interaction with 3D Objects via Video Generation*. ECCV 2024.
-
-2. Liu, S., et al. (2024). *PhysGen: Rigid-Body Physics-Grounded Image-to-Video Generation*. ECCV 2024.
-
-3. Pan, Y., et al. (2025). *NewtonGen: Physics-Consistent and Controllable Text-to-Video Generation via Neural Newtonian Dynamics*. arXiv:2509.21309.
-
-4. Duan, H., et al. (2025). *What about gravity in video generation? Post-Training Newton's Laws with Verifiable Rewards*. arXiv:2512.00425.
+> 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/40-driving-world-model/)

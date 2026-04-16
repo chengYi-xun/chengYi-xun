@@ -288,6 +288,9 @@ $$\sigma_t = \eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alp
 
 > 参考资料：
 >
-> 1. [DDIM 理论与实现](https://littlenyima.github.io/posts/14-denoising-diffusion-implicit-models/)
-> 2. [diffusion model(二)：DDIM技术小结 (denoising diffusion implicit model)](http://www.myhz0606.com/article/ddim)
-> 3. [扩散模型（一）| DDPM & DDIM](https://lichtung612.github.io/posts/1-diffusion-models/)
+> 1. Song, J., Meng, C., & Ermon, S. (2020). *Denoising Diffusion Implicit Models*. ICLR 2021.
+> 2. [DDIM 理论与实现](https://littlenyima.github.io/posts/14-denoising-diffusion-implicit-models/)
+> 3. [diffusion model(二)：DDIM技术小结 (denoising diffusion implicit model)](http://www.myhz0606.com/article/ddim)
+> 4. [扩散模型（一）| DDPM & DDIM](https://lichtung612.github.io/posts/1-diffusion-models/)
+
+> 下一篇：[笔记｜生成模型（八）：分数匹配 (Score Matching)](/chengYi-xun/posts/8-score-match/)

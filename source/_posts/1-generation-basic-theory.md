@@ -46,7 +46,7 @@ $$\hat{\theta} = \arg\max_\theta \mathcal{L}(\theta) = \arg\max_\theta \sum_{i=1
 
 问题引出：如果想要求 $x$ 已知的情况下，潜变量 $z$ 的概率分布 $P(z|x)$，我们要如何求呢。由于 $z$ 是潜变量的原因，直接求是很难求的。（为了更加形象，你可以将 $x$ 理解成已知的数据分布，即神经网络的输入，潜变量可以理解成隐藏变量，比如网络中间层这种难以直接定义形态和参数的变量，直接写出网络学习过程中某层的概率分布函数几乎是不可能的）。所以我们有另一个办法，那就是近似。
 
-我们可以定义一个分布形态 $Q$ (最简单的可以看做高斯分布)。然后在这个分布形态去寻找一组参数构造出一个概率分布 $q^* \in Q$ ，使得我们选定的这种分布和潜分布具有相近最大似然。
+我们可以定义一个分布族 $\mathcal{Q}$（最简单的可以看做高斯分布族）。然后在这个分布族去寻找一组参数，构造出一个概率分布 $q^* \in \mathcal{Q}$，使得我们选定的这种分布和真实的后验分布 $P(z|x)$ 尽可能接近（即最小化它们之间的散度或距离）。
 
 $${q^ * }(z) = \mathop {\arg \min }\limits_{q(z) \in Q} \{ L[q(z),P(z|x)]\} $$
 
@@ -163,9 +163,18 @@ $$
 
 $$\mathrm{KL}(q(z)\parallel P(z\mid x)) = E_q[\log q(z)] - E_q[\log P(x,z)] + \log P(x)$$
 
-这里我们定义
+这里我们定义证据下界（ELBO）：
 
-$$ELBO = {E_q}[\log P(x,z)] - {E_q}[\log q(z)] = {E_q}\left( {\log (x|z)} \right)$$
+$$ELBO = \mathbb{E}_q[\log P(x,z)] - \mathbb{E}_q[\log q(z)]$$
+
+根据联合概率公式 $P(x,z) = P(x|z)P(z)$，ELBO 还可以进一步展开为我们熟悉的变分自编码器（VAE）的损失函数形式：
+
+$$
+\begin{align*}
+ELBO &= \mathbb{E}_q[\log P(x|z) + \log P(z)] - \mathbb{E}_q[\log q(z)] \\
+&= \underbrace{\mathbb{E}_q[\log P(x|z)]}_{\text{重构似然 (Reconstruction Likelihood)}} - \underbrace{\mathrm{KL}(q(z) \parallel P(z))}_{\text{先验正则项 (Prior Regularization)}}
+\end{align*}
+$$
 
 因此就有
 
@@ -215,3 +224,10 @@ P(z \mid x) = \frac{P(x \mid z) \cdot P(z)}{P(x)}
 $$
 
 如果你读到这里，恭喜你！你被我恭喜到了！
+
+> 参考资料：
+>
+> 1. Kingma, D. P., & Welling, M. (2013). *Auto-Encoding Variational Bayes*. arXiv:1312.6114.
+> 2. Blei, D. M., Kucukelbir, A., & McAuliffe, J. D. (2017). *Variational Inference: A Review for Statisticians*. Journal of the American Statistical Association.
+
+> 下一篇：[笔记｜生成模型（二）：生成模型大家族](/chengYi-xun/posts/2-generation-model/)

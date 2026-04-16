@@ -342,29 +342,32 @@ $$
 
 不区分文本 token 和图像 token——模型需要学会**预测下一个 token 是什么，无论它是一个单词还是一个像素块**。
 
-### 2.4 训练稳定性挑战
+### 2.4 训练稳定性挑战与模态竞争（Modality Competition）
 
-混合模态的自回归训练面临严重的稳定性问题。Chameleon 发现了两个关键挑战并提出解决方案：
+混合模态的自回归训练面临严重的稳定性问题。在 2024-2025 年的研究中，这种现象被称为**模态竞争（Modality Competition）**：由于图像和文本的内在信息密度、熵和预测难度差异巨大，模型在联合优化时往往会偏向于更容易预测的模态，导致另一种模态的表征崩塌或梯度爆炸。
 
-**问题 1：梯度范数发散**
+Chameleon 发现了两个关键挑战并提出解决方案：
 
-图像 token 和文本 token 的 loss 尺度不同，导致梯度范数不稳定。
+**问题 1：梯度范数发散与表示漂移**
 
-**解决方案——QK-Norm**：
+图像 token（通常包含大量局部纹理细节，预测难度高）和文本 token（高度抽象的语义符号，预测难度相对较低）的 loss 尺度不同。在注意力机制中，这种差异会导致某些 token 的特征向量范数无限增长，最终引发梯度爆炸。
 
-对 attention 中的 Query 和 Key 做 L2 归一化：
+**解决方案——QK-Norm (Query-Key Normalization)**：
+
+对 attention 中的 Query 和 Key 做 L2 归一化（或 LayerNorm）：
 
 $$
 \text{Attn}(Q, K, V) = \text{softmax}\!\left(\frac{\hat{Q} \hat{K}^\top}{\sqrt{d_k}}\right) V, \quad \hat{Q} = \frac{Q}{\|Q\|}, \;\hat{K} = \frac{K}{\|K\|}
 $$
 
-这限制了 attention logits 的范围在 $[-1/\sqrt{d_k}, 1/\sqrt{d_k}]$，防止极端值。
+这限制了 attention logits 的范围在 $[-1/\sqrt{d_k}, 1/\sqrt{d_k}]$，强制模型关注向量的**方向（语义相似度）**而非**长度（特征范数）**，有效防止了极端值导致的注意力崩塌。
 
-**问题 2：softmax 数值溢出**
+**问题 2：softmax 数值溢出与跨模态边界不稳定**
 
-混合模态时，某些 token 的 logit 异常大（尤其是在图像→文本转换边界）。
+在混合模态序列中，当模型从预测文本 token 切换到预测图像 token（或反之）时，由于两种模态的分布差异，logits 往往会产生剧烈波动，导致 softmax 溢出。
 
-**解决方案——Layer Norm 重排**：将 RMSNorm 替换为标准 LayerNorm，并调整其在 attention 前后的位置。
+**解决方案——Layer Norm 重排（Norm Reordering）**：
+Chameleon 团队发现，传统的 Pre-Norm 架构在深层 Transformer 中容易积累残差分支的方差。他们将 RMSNorm 替换为标准 LayerNorm，并调整其在 attention 前后的位置，甚至引入了配置化的辅助损失乘子（auxiliary loss multipliers）来平衡不同模态的梯度贡献，从而在不牺牲单模态性能的前提下稳定了跨模态的联合训练。
 
 ### 2.5 Chameleon 的能力
 
@@ -572,16 +575,11 @@ class ChameleonLikeModel(nn.Module):
 
 下一篇将介绍最新一代的多模态模型——它们如何结合这些范式的优点，在实际工程中取得最佳效果。
 
-> **下一篇**：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](posts/34-multimodal-frontier/)
+> 参考资料：
+>
+> 1. Alayrac, J.-B., ... & Zisserman, A. (2022). *Flamingo: a Visual Language Model for Few-Shot Learning*. NeurIPS 2022.
+> 2. Team Chameleon (2024). *Chameleon: Mixed-Modal Early-Fusion Foundation Models*. arXiv:2405.09818 (v1: May 2024, v2: Dec 2025).
+> 3. van den Oord, A., Vinyals, O., & Kavukcuoglu, K. (2017). *Neural Discrete Representation Learning*. NeurIPS 2017.
+> 4. Jaegle, A., ... & Zisserman, A. (2021). *Perceiver: General Perception with Iterative Attention*. ICML 2021.
 
----
-
-**参考文献**
-
-1. Alayrac, J.-B., et al. (2022). *Flamingo: a Visual Language Model for Few-Shot Learning*. NeurIPS 2022.
-
-2. Team Chameleon (2024). *Chameleon: Mixed-Modal Early-Fusion Foundation Models*. arXiv:2405.09818.
-
-3. van den Oord, A., Vinyals, O., & Kavukcuoglu, K. (2017). *Neural Discrete Representation Learning*. NeurIPS 2017.
-
-4. Jaegle, A., et al. (2021). *Perceiver: General Perception with Iterative Attention*. ICML 2021.
+> 下一篇：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](/chengYi-xun/posts/34-multimodal-frontier/)

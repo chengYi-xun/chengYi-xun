@@ -247,7 +247,10 @@ $$
 
 > 参考资料：
 >
-> 1. [Generative Modeling by Estimating Gradients of the Data Distribution](https://yang-song.net/blog/2021/score/#score-based-generative-modeling-with-multiple-noise-perturbations)
-> 2. [CVPR 2022 Tutorial: Denoising Diffusion-based Generative Modeling: Foundations and Applications](https://cvpr2022-tutorial-diffusion-models.github.io/)
-> 3. [一文解释 Diffusion Model (二) Score-based SDE 理论推导](https://zhuanlan.zhihu.com/p/589106222)
-> 4. [基于 SDE 的模型](https://littlenyima.github.io/posts/17-score-based-modeling-with-sde/)
+> 1. Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S., & Poole, B. (2020). *Score-Based Generative Modeling through Stochastic Differential Equations*. ICLR 2021.
+> 2. [Generative Modeling by Estimating Gradients of the Data Distribution](https://yang-song.net/blog/2021/score/#score-based-generative-modeling-with-multiple-noise-perturbations)
+> 3. [CVPR 2022 Tutorial: Denoising Diffusion-based Generative Modeling: Foundations and Applications](https://cvpr2022-tutorial-diffusion-models.github.io/)
+> 4. [一文解释 Diffusion Model (二) Score-based SDE 理论推导](https://zhuanlan.zhihu.com/p/589106222)
+> 5. [基于 SDE 的模型](https://littlenyima.github.io/posts/17-score-based-modeling-with-sde/)
+
+> 下一篇：[笔记｜生成模型（十）：Classifier Guidance](/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/)

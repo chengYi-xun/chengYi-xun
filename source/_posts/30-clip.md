@@ -224,6 +224,13 @@ $$
 >
 > 这通过 Constant Embedding Model (CCEM) 框架证明，临界温度由类别数 $N$ 和正负样本比例共同决定。
 
+**2025 年最新理论进展**：
+2025 年 9 月，一项发表在 NeurIPS 的研究（Global Minimizers of Sigmoid Contrastive Loss, 2025）进一步深化了对 SigLIP 的理论理解。该研究引入了 $(\mathsf{m}, \mathsf{b}_{\mathsf{rel}})$-Constellations（一种与球面编码相关的组合对象），从数学上严格证明了 SigLIP 中**可学习的逆温度和偏置项**的必要性。
+理论分析表明：
+1. **模态鸿沟（Modality Gap）的必然性**：在 SigLIP 和 CLIP 中观察到的图像和文本嵌入分离的现象，实际上是优化过程达到全局极小值时的必然几何特征。
+2. **维度要求**：为了获得高质量的表征（即避免特征坍缩），嵌入空间的维度必须达到一定的理论下界。
+3. 这些理论工具不仅解释了为什么 SigLIP 在检索任务上表现优异，还提出了一种带有显式相对偏置的改进版 Sigmoid 损失重参数化方法。
+
 ### 4.3 实际性能
 
 SigLIP 在效率上的优势显著：
@@ -495,18 +502,13 @@ print(f"相似度: {similarity}")
 | **核心能力** | 零样本迁移：文本嵌入 = 分类器权重 |
 | **核心限制** | 无细粒度交互，无组合推理能力 |
 
-> **下一篇**：[笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](posts/31-blip2-qformer/)
+> 参考资料：
+>
+> 1. Radford, A., ... & Sutskever, I. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021.
+> 2. Oord, A. v. d., Li, Y., & Vinyals, O. (2018). *Representation Learning with Contrastive Predictive Coding*. arXiv:1807.03748.
+> 3. Zhai, X., ... & Houlsby, N. (2023). *Sigmoid Loss for Language Image Pre-Training*. ICCV 2023.
+> 4. Graf, F., ... & Roth, K. (2021). *Dissecting Supervised Contrastive Learning*. ICML 2021.
+> 5. Lee, J., ... & Papailiopoulos, V. (2024). *Analysis of Using Sigmoid Loss for Contrastive Learning*. AISTATS 2024.
+> 6. *Global Minimizers of Sigmoid Contrastive Loss*. (2025). NeurIPS 2025. (arXiv:2509.18552).
 
----
-
-**参考文献**
-
-1. Radford, A., et al. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021.
-
-2. Oord, A. v. d., Li, Y., & Vinyals, O. (2018). *Representation Learning with Contrastive Predictive Coding*. arXiv:1807.03748.
-
-3. Zhai, X., et al. (2023). *Sigmoid Loss for Language Image Pre-Training*. ICCV 2023.
-
-4. Graf, F., et al. (2021). *Dissecting Supervised Contrastive Learning*. ICML 2021.
-
-5. Lee, J., et al. (2024). *Analysis of Using Sigmoid Loss for Contrastive Learning*. AISTATS 2024.
+> 下一篇：[笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](/chengYi-xun/posts/31-blip2-qformer/)

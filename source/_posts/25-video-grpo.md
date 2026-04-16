@@ -343,10 +343,7 @@ DanceGRPO 之后，视频生成 RL 仍在快速发展：
 
 > 参考资料：
 >
-> 1. [DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)
->
+> 1. Xue, Z., Zhang, Y., Wang, Y., ... & Li, X. (2025). *DanceGRPO: Unleashing GRPO on Visual Generation*. arXiv:2505.07818.
 > 2. [Self-Paced GRPO for Video Generation](https://arxiv.org/abs/2511.19356)
->
 > 3. [InfLVG: Reinforce Inference-Time Consistent Long Video Generation with GRPO](https://arxiv.org/abs/2505.17574)
->
 > 4. [TAGRPO: Boosting GRPO on Image-to-Video Generation with Direct Trajectory Alignment](https://arxiv.org/abs/2601.05729)

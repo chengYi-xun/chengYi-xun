@@ -300,19 +300,24 @@ $$
 - **舒适**：$r_{\text{comfort}} = -\|a_t - a_{t-1}\|^2$（动作平滑）
 - **效率**：$r_{\text{progress}} = v_t \cos(\theta_t)$（沿目标方向前进）
 
-### 6.3 Sim2Real 差距
+### 6.3 Sim2Real 差距与 2025 年的因果性反思
 
-世界模型作为仿真器的关键挑战：
+世界模型作为仿真器的关键挑战在于 **Sim2Real Gap**：
 
 $$
 \text{Performance Gap} = |J(\pi, \text{Real}) - J(\pi, \text{WM})|
 $$
 
-其中 $J(\pi, \text{env})$ 是策略 $\pi$ 在环境 env 中的期望回报。差距来源：
+其中 $J(\pi, \text{env})$ 是策略 $\pi$ 在环境 env 中的期望回报。传统的差距来源包括视觉差距（渲染不真实）和动力学差距（运动轨迹不准）。
 
-1. **视觉差距**：世界模型生成的图像与真实图像的分布偏移
-2. **动力学差距**：预测的运动轨迹与真实运动的偏差
-3. **分布外场景**：罕见场景（如连环车祸）在训练数据中不存在
+**2025 年的理论突破：因果性与反事实推理的缺失**
+
+最新的研究（如 2025 年的 *Beyond Simulation: Benchmarking World Models for Planning and Causality*）指出，当前自动驾驶世界模型面临的最致命差距并非视觉上的不真实，而是**因果推理（Causal Reasoning）和反事实生成（Counterfactual Generation）能力的缺失**。
+
+- **统计相关性 vs 因果互动**：当前模型（如基于 Transformer 的 token 预测）主要依赖统计相关性。当测试车（Ego vehicle）改变动作时，世界模型往往无法正确预测周围车辆的**反应**（例如：我突然刹车，后车应该减速或变道）。研究发现，排名靠前的模型在重放原始轨迹时表现良好，但一旦引入扰动，预测就会崩溃。
+- **反事实安全测试的失败**：为了生成"危险的边缘场景"（Corner cases），我们需要模型回答反事实问题："如果那辆车当时没有减速，会发生什么？" 2025 年的新框架（如基于因果交互图的生成式 BEV 世界模型）开始尝试显式建模智能体之间的动态依赖关系，通过最小干预让风险通过自然的交互传播自然涌现，而不是生硬地修改像素。
+
+这表明，下一代自动驾驶世界模型必须从单纯的"视频预测器"进化为真正的"因果模拟器"。
 
 ---
 
@@ -326,13 +331,12 @@ $$
 
 自动驾驶世界模型正在从"展示酷炫视频"走向"实际替代仿真器训练规划器"。下一篇将总结世界模型所有路线，探讨它们的收敛趋势和未来方向。
 
-> **下一篇**：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](posts/41-world-model-frontier/)
+> 参考资料：
+>
+> 1. Hu, A., ... & Kendall, A. (2023). *GAIA-1: A Generative World Model for Autonomous Driving*. arXiv:2309.17080.
+> 2. Wang, X., ... & Zhao, H. (2023). *DriveDreamer: Towards Real-world-driven World Models for Autonomous Driving*. ECCV 2024.
+> 3. Gao, J., ... & Wang, N. (2024). *Vista: A Generalizable Driving World Model with High Fidelity and Versatile Controllability*. NeurIPS 2024.
+> 4. Zheng, W., ... & Lu, J. (2024). *OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving*. CVPR 2024.
+> 5. (2025). *Beyond Simulation: Benchmarking World Models for Planning and Causality in Autonomous Driving*. arXiv:2508.01922. (关于世界模型因果性与反事实推理的最新研究)
 
----
-
-**参考文献**
-
-1. Hu, A., et al. (2023). *GAIA-1: A Generative World Model for Autonomous Driving*. arXiv:2309.17080.
-2. Wang, Y., et al. (2023). *DriveDreamer: Towards Real-world-driven World Models for Autonomous Driving*. ECCV 2024.
-3. Gao, J., et al. (2024). *Vista: A Generalizable Driving World Model with High Fidelity and Versatile Controllability*. NeurIPS 2024.
-4. Zheng, W., et al. (2024). *OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving*. CVPR 2024.
+> 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/41-world-model-frontier/)

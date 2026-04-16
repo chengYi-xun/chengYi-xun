@@ -282,7 +282,9 @@ $$
 
 > 参考资料：
 >
-> 1. [Score-based Generative Models](https://littlenyima.github.io/posts/16-score-based-generative-models/)
-> 2. [Score-based Generative Models总结](https://www.zhihu.com/search?type=content&q=score%20matching)
+> 1. Song, Y., & Ermon, S. (2019). *Generative Modeling by Estimating Gradients of the Data Distribution*. NeurIPS 2019.
+> 2. [Score-based Generative Models](https://littlenyima.github.io/posts/16-score-based-generative-models/)
 > 3. [Yang Song's Blog: Generative Modeling by Estimating Gradients of the Data Distribution](https://yang-song.net/blog/2021/score/)
+
+> 下一篇：[笔记｜生成模型（九）：SDE 随机微分方程](/chengYi-xun/posts/9-SDE/)
 

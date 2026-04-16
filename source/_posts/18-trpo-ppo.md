@@ -786,4 +786,12 @@ PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 
 
 接下来的两篇文章，我们将分别探讨这两条激动人心的前沿路线。
 
+> 参考资料：
+>
+> 1. Schulman, J., Levine, S., Abbeel, P., Jordan, M., & Moritz, P. (2015). *Trust Region Policy Optimization*. ICML 2015.
+> 2. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). *Proximal Policy Optimization Algorithms*. arXiv:1707.06347.
+> 3. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., ... & Lowe, R. (2022). *Training language models to follow instructions with human feedback*. NeurIPS 2022.
+> 4. [Trust Region Methods: From REINFORCE to TRPO to PPO](https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo)
+> 5. [Natural Gradient Descent — Agustinus Kristiadi](https://agustinus.kristia.de/blog/natural-gradient/)
+
 > 下一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/19-dpo/)

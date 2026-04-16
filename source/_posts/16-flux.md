@@ -106,4 +106,10 @@ Flux 通过 Double Stream 和 Single Stream 的混合架构，结合 2D RoPE 和
 
 随着 SD3 和 Flux 的解析完成，我们补齐了现代大模型架构的拼图。接下来，我们将正式进入本系列的最高潮：**大模型对齐与强化学习（RLHF）**。
 
+> 参考资料：
+>
+> 1. Black Forest Labs. (2024). *Flux.1 [dev]*. https://blackforestlabs.ai/
+> 2. Su, J. (2021). *RoFormer: Enhanced Transformer with Rotary Position Embedding*. arXiv:2104.09864.
+> 3. Dehghani, C., Djolonga, J., Mustafa, B., Padigela, P., Heek, J., Gilmer, J., ... & Houlsby, N. (2023). *Scaling Vision Transformers to 22 Billion Parameters*. ICML 2023.
+
 > 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/17-rl-basics/)

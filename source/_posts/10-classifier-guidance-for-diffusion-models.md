@@ -170,6 +170,9 @@ new_mean = mean.float() + guidance_scale * variance * guidance.float()
 
 > 参考资料：
 >
-> 1. [Understanding Diffusion Models: A Unified Perspective](https://arxiv.org/abs/2208.11970)
-> 2. [Classifier Guidance 和 Classifier Free Guidance，一堆公式不如两行代码](https://zhuanlan.zhihu.com/p/660518657)
-> 3. [openai/guided-diffusion](https://github.com/openai/guided-diffusion/tree/main)
+> 1. Dhariwal, P., & Nichol, A. (2021). *Diffusion Models Beat GANs on Image Synthesis*. NeurIPS 2021.
+> 2. [Understanding Diffusion Models: A Unified Perspective](https://arxiv.org/abs/2208.11970)
+> 3. [Classifier Guidance 和 Classifier Free Guidance，一堆公式不如两行代码](https://zhuanlan.zhihu.com/p/660518657)
+> 4. [openai/guided-diffusion](https://github.com/openai/guided-diffusion/tree/main)
+
+> 下一篇：[笔记｜生成模型（十一）：Classifier-Free Guidance](/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/)

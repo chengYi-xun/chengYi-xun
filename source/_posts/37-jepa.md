@@ -91,17 +91,23 @@ $$
 >
 > 即 $s$ 保留了所有与 $y$ 相关的信息，同时丢弃与 $y$ 无关的信息。这正好是**最小充分统计量**（Minimal Sufficient Statistics）的定义。
 
-### 1.4 防止崩塌
+### 1.4 防止崩塌的理论探讨（2024-2025 视角）
 
-JEPA 面临的最大风险是**表征崩塌**——编码器输出常数向量也能让损失为零。
+JEPA 面临的最大风险是**表征崩塌（Representation Collapse）**——编码器输出常数向量也能让损失为零。
 
-三种防崩塌机制：
+传统的防崩塌机制主要依赖工程技巧：
+1. **EMA 目标编码器**：目标侧参数缓慢更新，提供稳定的预测目标。
+2. **掩码策略**：让预测任务足够困难（不是简单复制）。
 
-1. **EMA 目标编码器**：目标侧参数缓慢更新，提供稳定的预测目标
+**2025 年的理论突破：变分推断视角（Var-JEPA / VJEPA）**
 
-2. **掩码策略**：让预测任务足够困难（不是简单复制）
+最新的理论研究指出，标准 JEPA 依赖 EMA 等启发式技巧来防止崩塌，缺乏严谨的概率基础。2025 年提出的 **Var-JEPA** 和 **VJEPA** 将 JEPA 重新表述为变分推断（Variational Inference）框架下的概率模型：
 
-3. **方差正则**（可选）：确保嵌入维度间有足够方差
+- 它们证明了标准的 JEPA 架构（耦合编码器 + 预测器）实际上是变分推断在特定条件下的确定性特例。
+- 通过显式地优化证据下界（ELBO），Var-JEPA 能够**在不使用 EMA 等 ad-hoc 正则化器的情况下**，从原理上避免表征崩塌。
+- VJEPA 进一步从理论上保证了其学习到的表征是用于最优控制的充分信息状态（Sufficient Information States），并能有效过滤掉导致生成式模型崩塌的高方差干扰噪声。
+
+这表明，预测派（JEPA）和生成派（基于 ELBO 的模型）在底层数学结构上正在走向统一。
 
 ---
 
@@ -378,17 +384,13 @@ $$
 
 JEPA 代表了一种优雅的世界模型哲学：**不需要能"画出"未来，只需要能"理解"未来。** 但它有一个明显的限制——无法生成可视化的预测。下一篇将介绍走向另一个极端的方案：**视频生成即世界模拟**。
 
-> **下一篇**：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](posts/38-video-world-model/)
+> 参考资料：
+>
+> 1. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
+> 2. Assran, M., ... & Rabbat, M. (2023). *Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture*. ICCV 2023.
+> 3. Bardes, A., ... & Rabbat, M. (2024). *Revisiting Feature Prediction for Learning Visual Representations from Video*. arXiv:2404.08471.
+> 4. Tishby, N., Pereira, F., & Bialek, W. (2000). *The Information Bottleneck Method*. arXiv:physics/0004057.
+> 5. Gögl, S., & Yau, C. (2025). *Var-JEPA: A Variational Formulation of the Joint-Embedding Predictive Architecture*. arXiv:2603.20111. (关于 JEPA 表征崩塌与变分推断的理论分析)
+> 6. Huang, B., et al. (2025). *Variational Joint-Embedding Predictive Architecture*. arXiv:2601.14354.
 
----
-
-**参考文献**
-
-
-1. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
-
-2. Assran, M., et al. (2023). *Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture*. ICCV 2023.
-
-3. Bardes, A., et al. (2024). *Revisiting Feature Prediction for Learning Visual Representations from Video*. arXiv:2404.08471.
-
-4. Tishby, N., Pereira, F., & Bialek, W. (2000). *The Information Bottleneck Method*. arXiv:physics/0004057.
+> 下一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/38-video-world-model/)
