@@ -28,7 +28,6 @@ series: Diffusion Models theory
 
 - **效率方面**：2-GRPO 的总 rollout 生成量**仅为 16-GRPO 的 $2/16 = 12.5\%$**（约 0.15M vs 1.2M rollouts）；由于训练还包含梯度计算等固定开销，实际墙钟时间（wall-clock time）平均降至 16-GRPO 的约 21%（所有实验均值），即**训练时间缩短约 79%**。
 
-![DPO / GRPO / GIFT 等对齐范式对比（摘自 GIFT 论文图 1，arXiv:2510.23868）](/chengYi-xun/img/grpo_variants.png)
 
 | 方法 | 每 Prompt 的 rollout 数 $G$ | 总 rollout 生成量 | 墙钟时间（Qwen-1.5B / MATH） | 平均性能保留率 |
 |:---:|:---:|:---:|:---:|:---:|
