@@ -317,7 +317,7 @@ $$
 当 $G = 16$ 时，同一 Prompt 的 16 个回答提供了更丰富的统计信息：
 
 1. **排序鲁棒性**：即使 RM 对部分回答的评分有偏，组内排序仍然大概率保留正确趋势。RM 需要在**多数** pairwise 比较上犯错才能完全颠覆排序。
-2. **优势的连续性**：$G = 16$ 时的 z-score 标准化产生的优势值是**连续的**（如 $+1.5, +0.8, -0.3, -1.2, \ldots$），不同回答获得与其相对质量成比例的梯度权重，单个评分错误只会略微扭曲分布，而非完全翻转信号。
+2. **优势的连续性**：回顾 z-score 标准化公式 $\hat{A}_i = \frac{r_i - \bar{r}}{\sigma_r}$，其中 $\bar{r} = \frac{1}{G}\sum_{j=1}^G r_j$，$\sigma_r = \sqrt{\frac{1}{G}\sum_{j=1}^G (r_j - \bar{r})^2}$ 为组内奖励的总体标准差（population standard deviation），度量 $G$ 个奖励围绕均值 $\bar{r}$ 的离散程度。当 $G = 2$ 时，分子 $r_i - \bar{r} = \pm\frac{r_1 - r_2}{2}$，分母 $\sigma_r = \frac{|r_1 - r_2|}{2}$，二者的绝对值恒等，因此 $\hat{A}_i = \pm 1$——**奖励差异的幅度信息被完全消除**，无论 $|r_1 - r_2| = 0.01$ 还是 $0.9$，结果都是相同的 $\pm 1$。而当 $G \geq 3$ 时，分母 $\sigma_r$ 由**全组所有 $G$ 个奖励共同决定**，不再与单个分子 $r_i - \bar{r}$ 成比例，因此不同回答的优势值保持**连续且不等**（如 $G = 16$ 时可能得到 $+1.5, +0.8, -0.3, -1.2, \ldots$）。这意味着梯度权重与回答的相对质量成比例，单个评分错误只会略微扭曲优势分布，而非完全翻转信号。
 3. **稀释效应**：一个被错误高估的回答只占 $1/16$ 的梯度权重，其影响被其余 15 个样本的正确信号所稀释。
 
 Pref-GRPO 论文（arXiv:2508.20751）将这一现象命名为**"虚幻优势"（illusory advantage）**：当组内奖励差异很小时，组内标准化会不成比例地放大这些微小差异，产生虚假的对比信号。在 $G = 2$ 时，这一问题最为严重——任何非零的奖励差异都会被放大为最大强度的 $\pm 1$ 信号。
@@ -360,41 +360,127 @@ $$
 \max_\theta \mathbb{E}[r(x, y)] - \beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})
 $$
 
-但 KL 散度只是众多散度中的一种。不同的散度对分布差异的度量方式不同：
+但 KL 散度只是众多散度中的一种。不同的散度对"两个分布差多远"的度量方式不同，选择不同的散度意味着对策略施加不同的约束。
 
-| 散度 | $f(t)$ | 特性 |
-|:---:|:---:|:---|
-| KL（前向） | $t \ln t$ | 对 $\pi_\theta$ 的"模式覆盖"敏感 |
-| 逆 KL | $-\ln t$ | 对"模式搜索"敏感，倾向集中 |
-| Pearson $\chi^2$ | $(t-1)^2$ | 对尾部差异二次敏感 |
-| Hellinger | $(\sqrt{t}-1)^2$ | 对称，对中等差异敏感 |
-| JS | $t\ln t - (t+1)\ln\frac{t+1}{2}$ | 对称且有界 |
-| 全变差 TV | $\frac{1}{2}|t-1|$ | 最强的拓扑性度量 |
+### 插曲：KL 散度的"偏心"惩罚
 
-**用例子理解**：模型解数学题有 3 种"模式"（直接计算、换元法、部分分式）。KL 散度倾向于让 $\pi_\theta$ 覆盖所有模式（即使参考模型只擅长一种），而逆 KL 倾向于让 $\pi_\theta$ 集中到最好的那个模式上。选择不同的散度，意味着选择不同的"探索 vs 集中"策略。
+要理解为什么换散度可能有帮助，先看 KL 散度自身的一个重要性质。
+
+KL 散度 $D_{\text{KL}}(P \| Q) = \sum_x P(x) \log \frac{P(x)}{Q(x)}$ 的惩罚是**不对称**的——对两种"缺质量"的情况态度截然不同：
+
+- 当 $P(x) > 0$ 但 $Q(x) \to 0$ 时：$P(x) \log \frac{P(x)}{Q(x)} \to +\infty$（**惩罚爆炸**）
+- 当 $P(x) = 0$ 但 $Q(x) > 0$ 时：$0 \cdot \log \frac{0}{Q(x)} = 0$（**完全不管**）
+
+一句话概括：KL 只关心**第一个参数 $P$ 有质量的地方**——在那里 $Q$ 不能缺席；而 $P$ 没质量的地方，$Q$ 想怎样都行。
+
+这种不对称导致了变分推断中的经典现象——**前向 KL 是 mode-covering、反向 KL 是 mode-seeking**（Minka, 2005；Le, 2017）。设目标分布 $p$ 是双峰混合高斯，我们用一个单峰高斯 $q$ 去拟合：
+
+- **前向 KL**（$\min_{q} D_{\text{KL}}(p \| q)$）：$q$ 处于第二参数位置。凡是 $p$ 有质量的地方，$q$ 都**不能为零**（否则惩罚爆炸）。结果：$q$ 被迫"撑开"以覆盖两个峰 → **mode-covering**（模式覆盖），代价是中间的谷也被填满，拟合不精确。
+
+- **反向 KL**（$\min_{q} D_{\text{KL}}(q \| p)$）：$q$ 处于第一参数位置。$q = 0$ 处惩罚为零——$q$ 可以放弃 $p$ 的某个峰而不受惩罚。结果：$q$ 精确锁定一个峰、忽略另一个 → **mode-seeking**（模式搜索）。
+
+![前向 KL vs 反向 KL 的拟合行为（图源：Le, 2017）。实线为双峰目标 $p$；虚线为前向 KL 的最优 $q$（覆盖两峰但不精确）；点线为反向 KL 的最优 $q$（锁定一峰、忽略另一峰）。从左到右双峰间距递增，差异越发显著。](/chengYi-xun/img/forward_reverse_kl.png)
+
+> 从梯度量级也能看出差异：前向 KL 对 $q(x) \to 0$ 的梯度为 $O(p/q)$（爆炸式增长），逼迫 $q$ 覆盖；反向 KL 的梯度仅为 $O(\log(p/q))$（增长缓慢），对缺失质量的惩罚弱得多（argmax.blog, 2025）。
+
+### 回到 GRPO：标准 KL 是 mode-seeking
+
+上图中 $p$ 和 $q$ 映射到 RL 语境：$p$（固定的双峰目标）对应 $\pi_{\text{ref}}$（参考模型），$q$（被优化的分布）对应 $\pi_\theta$（正在训练的策略）。判断前向还是反向的口诀是：**被优化的 $\pi_\theta$ 在第一个参数位置 → 反向 KL（mode-seeking）；在第二个参数位置 → 前向 KL（mode-covering）**。
+
+在 GRPO 中，正则化项为 $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$，$\pi_\theta$ 在**第一参数**——对应**反向 KL**（$\min_q D_{\text{KL}}(q \| p)$）。因此标准 GRPO 的 KL 约束是 **mode-seeking** 的：
+
+- $\pi_\theta$ 可以放弃 $\pi_{\text{ref}}$ 的部分"解法模式"（$\pi_\theta = 0$ 处无惩罚）
+- 但 $\pi_\theta$ 不能大幅提升 $\pi_{\text{ref}}$ 认为极不可能的回答的概率（因为 $\pi_{\text{ref}}(y) \to 0$ 时 $\log \frac{\pi_\theta(y)}{\pi_{\text{ref}}(y)} \to +\infty$，KL 惩罚会爆炸）
+
+**用例子理解**：假设参考模型会三种解法（直接计算、换元法、部分分式），GRPO 训练后模型可能只保留得分最高的那种解法（mode-seeking）。如果换用逆 KL 散度，效果等价于 $D_{\text{KL}}(\pi_{\text{ref}} \| \pi_\theta)$——$\pi_\theta$ 在**第二参数**，对应**前向 KL**（$\min_q D_{\text{KL}}(p \| q)$），此时模型被强制保留参考模型支持的所有解法（mode-covering）。
+
+> **但这个直觉在 RL 中有局限**。Chen et al. (2025) 在 *KL-Regularized RL is Designed to Mode Collapse*（arXiv:2510.20817, ICLR 2026）中证明：在实际 RL 训练中，**"最终策略保留几种解法"主要由 $\beta$ 和奖励大小决定，而不是由前向/反向 KL 决定**。原因是：最优策略的闭式解为 $\pi^*(y|x) \propto \pi_{\text{ref}}(y|x)\exp(r(x,y)/\beta)$，当 $\beta$ 很小时，$\exp(r/\beta)$ 中奖励最高的回答占据绝大部分概率质量——无论用哪种 KL，最终策略都会"塌缩"到得分最高的那一种解法上。所以 mode-covering/seeking 的区别更多体现在**训练过程中**（每步梯度方向不同、收敛快慢不同、训练稳定性不同），而不是最终结果。
+
+这也解释了为什么 f-GRPO 换用不同散度能在实验中带来改进——不同散度让训练的每一步走不同的梯度方向，有些方向更高效、更稳定，因此在有限的训练步数内能达到更好的效果。
+
+| 散度 | 在 GRPO 中的行为 |
+|:---:|:---|
+| KL | mode-seeking（可丢弃模式），GRPO 的默认选择 |
+| 逆 KL | mode-covering（须覆盖所有模式） |
+| Pearson $\chi^2$ | 对尾部差异二次敏感，实验中表现最优 |
+| Hellinger | 对称，对中等差异敏感 |
+| Jensen–Shannon | 对称且有界，训练较平滑 |
+| 全变差 (TV) | 最强的拓扑性度量 |
 
 ## f-GRPO 的核心思想
 
-f-GRPO 论文的关键洞察是：GRPO 的组内正确/错误划分，可以自然地映射到 **f-散度的变分表示**中的"正侧"和"负侧"分布。
+f-GRPO 的关键洞察是：GRPO 将回答分为"好"和"坏"两组的做法，与 f-散度的数学结构天然吻合。要理解这一点，需要先弄清三个概念：f-散度是什么、Fenchel 共轭是什么、变分表示是什么。
 
-给定 f-散度的变分表示：
+### 什么是 f-散度
 
-$$
-D_f(P \| Q) = \sup_T \left(\mathbb{E}_P[T(v)] - \mathbb{E}_Q[f^*(T(v))]\right)
-$$
-
-其中 $f^*$ 是 $f$ 的 Fenchel 共轭。f-GRPO 将高于平均奖励的回答视为"正侧"样本，低于平均的视为"负侧"样本：
+f-散度是一族衡量"两个分布差多远"的度量，由一个凸函数 $f$（满足 $f(1) = 0$）参数化（Nowozin et al., 2016）：
 
 $$
-\hat{I}_i^+ = \mathbf{1}\{\hat{A}_i > 0\}, \quad \hat{I}_i^- = \mathbf{1}\{\hat{A}_i \leq 0\}
+D_f(P \| Q) = \int q(x)\, f\!\left(\frac{p(x)}{q(x)}\right) dx
 $$
 
-然后通过选择不同的**链接函数** $g$ 和对应的 $f^* \circ g$，构造 f-GRPO 的损失：
+直觉：在每个点 $x$ 上，先算密度比 $p(x)/q(x)$（$P$ 相对 $Q$ 的"倍率"），再用 $f$ 度量这个倍率偏离 1（即两分布相等时的值）有多远，最后对 $Q$ 求加权平均。当 $P = Q$ 时每处倍率为 1，$f(1) = 0$，散度为零。
+
+选不同的 $f$ 就得到不同的散度——这就是上面表格中各种散度的来源。例如 $f(t) = t \ln t$ 给出 KL，$f(t) = (t-1)^2$ 给出 Pearson $\chi^2$。
+
+### 问题：为什么不能直接算
+
+上面的公式要求知道每个点的密度比 $p(x)/q(x)$，但在语言模型的输出空间中，$p$ 和 $q$ 是定义在**所有可能的 token 序列**上的分布——空间维度极高，无法穷举，密度比也无法直接计算。
+
+### Fenchel 共轭：把凸函数"翻译"成另一种形式
+
+这里需要一个数学工具：**Fenchel 共轭**（也叫凸共轭）。对任意凸函数 $f$，其共轭定义为：
+
+$$
+f^*(t) = \sup_{x \in \text{dom}(f)} \{x \cdot t - f(x)\}
+$$
+
+> 这里 $\sup$（supremum，上确界）可以理解为"所有可能取值中的最大值"。与 $\max$ 的区别是：$\max$ 要求最大值能被取到，$\sup$ 允许"无限逼近但取不到"的情况。在实际应用中，当函数族足够灵活（如神经网络）时，$\sup$ 近似等于 $\max$。
+
+几何直觉：想象 $f(x)$ 是一条向上凸的曲线。给定一个斜率 $t$，我们画一条斜率为 $t$ 的直线 $y = tx$，然后**向下平移**直到刚好碰到曲线 $f(x)$——这条切线在 $y$ 轴上的截距（取负号）就是 $f^*(t)$。换言之，$f^*$ 用"斜率"来描述 $f$ 的形状，是同一个凸函数的另一种等价表达。
+
+核心性质：对闭凸函数，**做两次共轭回到自身**：$(f^*)^* = f$，即
+
+$$
+f(x) = \sup_{t \in \text{dom}(f^*)} \{x \cdot t - f^*(t)\}
+$$
+
+### 变分表示：把不可算的积分变成可优化的期望
+
+将 $(f^*)^* = f$ 代入 f-散度的定义：
+
+$$
+D_f(P \| Q) = \int q(x) \sup_t \left\{\frac{p(x)}{q(x)} \cdot t - f^*(t)\right\} dx
+$$
+
+引入一个函数 $T(x)$（对每个 $x$ 选一个 $t$），由于 $T(x)$ 不一定处处取到上确界，所以有：
+
+$$
+D_f(P \| Q) \geq \int p(x)\, T(x)\, dx - \int q(x)\, f^*(T(x))\, dx = \mathbb{E}_P[T] - \mathbb{E}_Q[f^*(T)]
+$$
+
+对所有可能的 $T$ 取上确界，等号成立。这就是 **f-散度的变分表示**：
+
+$$
+\boxed{D_f(P \| Q) = \sup_T \left(\mathbb{E}_P[T(x)] - \mathbb{E}_Q[f^*(T(x))]\right)}
+$$
+
+**为什么这很有用？** 因为右边不再需要计算密度比 $p/q$——只需要从 $P$ 和 $Q$ 中**采样**，然后分别计算 $T$ 和 $f^*(T)$ 的期望。这正是 GAN（Nowozin et al., 2016）和 f-GRPO 的理论基础。
+
+### 映射到 GRPO：正组 ≈ $P$ 的样本，负组 ≈ $Q$ 的样本
+
+现在回到 GRPO。变分表示的公式有两个期望项：$\mathbb{E}_P[\cdot]$（"正侧"）和 $\mathbb{E}_Q[\cdot]$（"负侧"）。f-GRPO 的关键洞察是：**GRPO 本身已经在做这样的分组**——
+
+$$
+\hat{I}_i^+ = \mathbf{1}\{\hat{A}_i > 0\} \quad (\text{高于平均的回答} \approx P\text{ 的样本}), \quad \hat{I}_i^- = \mathbf{1}\{\hat{A}_i \leq 0\} \quad (\text{低于平均的回答} \approx Q\text{ 的样本})
+$$
+
+在标准 GRPO 中，正组和负组都乘以相同形式的裁剪损失。而在 f-GRPO 中，**正组用链接函数 $g$、负组用 $f^* \circ g$**——完全对应变分表示的两个期望项：
 
 $$
 \psi(r_{\theta,i}, a_i) = \begin{cases}
-w_i^+ \cdot g(r_{\theta,i}) & \text{if } a_i > 0 \\
-w_i^- \cdot f^* \circ g(r_{\theta,i}) & \text{if } a_i \leq 0
+w_i^+ \cdot g(r_{\theta,i}) & \text{if } a_i > 0 \quad (\text{对应 } \mathbb{E}_P[T]) \\
+w_i^- \cdot f^* \circ g(r_{\theta,i}) & \text{if } a_i \leq 0 \quad (\text{对应 } \mathbb{E}_Q[f^*(T)])
 \end{cases}
 $$
 
@@ -402,7 +488,7 @@ $$
 \mathcal{L}_{\text{f-GRPO}}^{(f,g)}(\theta) = \mathbb{E}_x \sum_{i=1}^G \frac{-a_i}{1+\beta^{-1}} \cdot \frac{1}{G} \cdot \psi(r_{\theta,i}, a_i)
 $$
 
-其中 $r_{\theta,i} = \beta \ln \frac{\pi_\theta(y_i | x)}{\pi_{\text{ref}}(y_i | x)}$ 是隐式奖励，$w_i^{\pm}$ 是基于 softmax 的归一化权重。
+其中 $r_{\theta,i} = \beta \ln \frac{\pi_\theta(y_i | x)}{\pi_{\text{ref}}(y_i | x)}$ 是隐式奖励（与 DPO 相同的定义），$w_i^{\pm}$ 是基于 softmax 的归一化权重。选择不同的 $f$（从而不同的 $f^*$）就得到不同散度下的 f-GRPO 变体。
 
 ## f-GRPO 的理论保证
 
@@ -775,5 +861,7 @@ for step in range(total_steps):
 > 3. [GIFT: Group-relative Implicit Fine Tuning](https://arxiv.org/abs/2510.23868)
 > 4. [How RLHF Amplifies Sycophancy](https://arxiv.org/abs/2602.01002)
 > 5. [Pref-GRPO: Pairwise Preference Reward-based GRPO for Stable Text-to-Image Reinforcement Learning](https://arxiv.org/abs/2508.20751)
+> 6. [KL-Regularized Reinforcement Learning is Designed to Mode Collapse](https://arxiv.org/abs/2510.20817)
+> 7. [Demystifying GRPO: Its Policy Gradient is a U-Statistic](https://arxiv.org/abs/2603.01162)
 
 > 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/24-superflow/)
