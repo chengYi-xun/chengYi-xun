@@ -15,6 +15,7 @@ mathjax: true
 > **核心论文**：
 >
 > ⬅️ 上一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/36-dreamer/)
+>
 > ➡️ 下一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/38-video-world-model/)
 
 >

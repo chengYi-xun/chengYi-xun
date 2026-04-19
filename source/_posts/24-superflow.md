@@ -19,6 +19,7 @@ series: Diffusion Models theory
 > 本文为 RL 系列的图像生成篇。在第 20 篇中我们介绍了 Flow-GRPO，将 GRPO 应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进 SuperFlow，以及 2026 年图像/视频生成 RL 的统一框架生态，最后回顾整个系列的完整技术脉络。
 >
 > ⬅️ 上一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/23-grpo-variants/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/25-video-grpo/)
 
 >

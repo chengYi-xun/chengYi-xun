@@ -15,6 +15,7 @@ series: Diffusion Models theory
 > 论文链接：*[Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598)*
 >
 > ⬅️ 上一篇：[笔记｜生成模型（九）：Classifier Guidance 理论与实现](/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（十一）：UIT和DiT架构详解](/chengYi-xun/posts/12-UIT-VS-DIT/)
 
 

@@ -21,6 +21,7 @@ mathjax: true
 > - OccWorld: arXiv:2311.16038 (CVPR 2024)
 >
 > ⬅️ 上一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)
+>
 > ➡️ 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/41-world-model-frontier/)
 
 >

@@ -14,9 +14,11 @@ mathjax: true
 ---
 
 > **系列说明**：本文是多模态融合系列的第一篇，从最基本的概念出发，建立三级融合的数学框架，为后续 CLIP、BLIP-2、LLaVA 等模型打下理论基础。
+>
 > **前置知识**：线性代数基础、Transformer 注意力机制（可参考本站第十一篇 UIT/DiT 详解）。
 >
 > ⬅️ 上一篇：[笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](/chengYi-xun/posts/28-register-tokens/)
+>
 > ➡️ 下一篇：[笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](/chengYi-xun/posts/30-clip/)
 
 

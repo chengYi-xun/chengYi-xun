@@ -15,6 +15,7 @@ series: Diffusion Models theory
 > 论文链接：*[Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502)*
 >
 > ⬅️ 上一篇：[笔记｜生成模型（五）：DDPM理论](/chengYi-xun/posts/6-ddpm/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（七）：Score-Based理论](/chengYi-xun/posts/8-score-match/)
 
 

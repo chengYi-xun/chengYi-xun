@@ -15,6 +15,7 @@ mathjax: true
 > **核心论文**：
 >
 > ⬅️ 上一篇：[笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](/chengYi-xun/posts/35-world-model-basics/)
+>
 > ➡️ 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)
 
 >

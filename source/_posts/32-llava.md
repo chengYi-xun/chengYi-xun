@@ -17,6 +17,7 @@ mathjax: true
 > **前置知识**：[上一篇：BLIP-2 / Q-Former](posts/31-blip2-qformer/)
 >
 > ⬅️ 上一篇：[笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](/chengYi-xun/posts/31-blip2-qformer/)
+>
 > ➡️ 下一篇：[笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](/chengYi-xun/posts/33-native-multimodal/)
 
 

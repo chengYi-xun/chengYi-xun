@@ -12,6 +12,7 @@ series: Diffusion Models theory
 ---
 >
 > ⬅️ 上一篇：[笔记｜生成模型（六）：DDIM理论](/chengYi-xun/posts/7-ddim/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（八）：SDE统一DDPM和SMLD](/chengYi-xun/posts/9-SDE/)
 
 # Score-based 模型理论基础

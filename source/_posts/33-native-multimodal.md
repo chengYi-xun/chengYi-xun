@@ -17,6 +17,7 @@ mathjax: true
 > - *Flamingo: a Visual Language Model for Few-Shot Learning*（Alayrac et al., 2022, DeepMind）
 >
 > ⬅️ 上一篇：[笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片](/chengYi-xun/posts/32-llava/)
+>
 > ➡️ 下一篇：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](/chengYi-xun/posts/34-multimodal-frontier/)
 >
 > - *Chameleon: Mixed-Modal Early-Fusion Foundation Models*（Meta, 2024）

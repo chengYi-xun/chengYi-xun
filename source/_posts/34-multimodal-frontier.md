@@ -17,6 +17,7 @@ mathjax: true
 > - *InternVL 2.5*（Chen et al., 2024, Shanghai AI Lab）
 >
 > ⬅️ 上一篇：[笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](/chengYi-xun/posts/33-native-multimodal/)
+>
 > ➡️ 下一篇：[笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](/chengYi-xun/posts/35-world-model-basics/)
 >
 > - *Qwen2.5-VL*（Bai et al., 2025, Alibaba）

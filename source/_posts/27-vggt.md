@@ -19,7 +19,9 @@ series: Multi-modal Fusion
 > CVPR 2025 Best Paper Award
 >
 > ⬅️ 上一篇：[笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](/chengYi-xun/posts/26-memory-bank/)
+>
 > ➡️ 下一篇：[笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](/chengYi-xun/posts/28-register-tokens/)
+>
 > 论文：[VGGT: Visual Geometry Grounded Transformer](https://arxiv.org/abs/2503.11651)（Oxford VGG + Meta AI）
 >
 > 代码：[github.com/facebookresearch/vggt](https://github.com/facebookresearch/vggt)

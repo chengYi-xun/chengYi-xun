@@ -19,8 +19,11 @@ series: Diffusion Models theory
 > 在前面的系列中，我们将 GRPO 从语言模型（第 19 篇）推广到了图像生成（第 20、23 篇 Flow-GRPO / SuperFlow）。本文将目光转向**视频生成**——一个更具挑战性的领域。我们以 DanceGRPO 框架为核心，解析如何将 GRPO 统一应用于文生图（T2I）、文生视频（T2V）和图生视频（I2V）三种任务。
 >
 > ⬅️ 上一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/24-superflow/)
+>
 > ➡️ 下一篇：[笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](/chengYi-xun/posts/26-memory-bank/)
+>
 > 论文：[DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（2025.05）
+>
 > 代码：[github.com/XueZeyue/DanceGRPO](https://github.com/XueZeyue/DanceGRPO)
 
 # 从图像到视频：新的挑战

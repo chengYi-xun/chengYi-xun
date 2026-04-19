@@ -15,6 +15,7 @@ series: Diffusion Models theory
 > 论文链接：*[Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239)*
 >
 > ⬅️ 上一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（六）：DDIM理论](/chengYi-xun/posts/7-ddim/)
 
 

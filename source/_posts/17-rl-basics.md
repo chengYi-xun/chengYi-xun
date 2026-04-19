@@ -15,6 +15,7 @@ series: Diffusion Models theory
 > 本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，从最基础的 REINFORCE 算法讲起，逐步引入 Actor-Critic 架构，为后续深入理解 PPO 和 GRPO 打下坚实的理论基础。
 >
 > ⬅️ 上一篇：[笔记｜生成模型（十五）：Flux 架构解析](/chengYi-xun/posts/16-flux/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/18-trpo-ppo/)
 
 

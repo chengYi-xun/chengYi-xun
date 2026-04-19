@@ -16,6 +16,7 @@ series: Diffusion Models theory
 > 论文链接：*[Diffusion Models Beat GANs on Image Synthesis](https://arxiv.org/abs/2105.05233)*
 >
 > ⬅️ 上一篇：[笔记｜生成模型（八）：SDE统一DDPM和SMLD](/chengYi-xun/posts/9-SDE/)
+>
 > ➡️ 下一篇：[笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/)
 
 
