@@ -15,6 +15,10 @@ mathjax: true
 
 > **核心论文**：
 >
+> ⬅️ 上一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)
+> ➡️ 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)
+
+>
 > - Genie: arXiv:2402.15391 (ICML 2024)
 >
 > - Cosmos: arXiv:2501.03575 (2025)

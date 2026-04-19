@@ -2,27 +2,22 @@
 title: 笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon
 date: 2026-04-06 00:15:00
 categories:
-
  - Tutorials
-
 tags:
-
  - Flamingo
-
  - Chameleon
-
  - Perceiver Resampler
-
  - VQ-VAE
-
  - Native Multimodal
 series: "多模态融合"
 mathjax: true
 ---
 
 > **论文**：
->
 > - *Flamingo: a Visual Language Model for Few-Shot Learning*（Alayrac et al., 2022, DeepMind）
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片](/chengYi-xun/posts/32-llava/)
+> ➡️ 下一篇：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](/chengYi-xun/posts/34-multimodal-frontier/)
 >
 > - *Chameleon: Mixed-Modal Early-Fusion Foundation Models*（Meta, 2024）
 >

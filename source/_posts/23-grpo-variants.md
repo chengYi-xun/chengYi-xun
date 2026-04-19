@@ -14,6 +14,10 @@ series: Diffusion Models theory
 
 > 本文为 RL 系列第七篇。上一篇介绍了 DAPO 的四大工程改进。本文从理论角度出发，剖析 GRPO 的数学本质：为什么 GRPO 其实是在做 DPO？为什么 2 个 rollout 就够了？如何从 KL 散度推广到任意 f-散度？最后介绍融合了 GRPO 和 DPO 优势的 GIFT 算法。
 >
+> ⬅️ 上一篇：[笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](/chengYi-xun/posts/22-dapo/)
+> ➡️ 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/24-superflow/)
+
+>
 > 论文：
 >
 > - [It Takes Two: Your GRPO Is Secretly DPO](https://arxiv.org/abs/2510.00977)（2025.10）
@@ -420,17 +424,40 @@ $$
 f-GRPO 的核心改动是：**对正组（好回答）和负组（坏回答）施加不同形式的损失函数**。完整的损失函数为：
 
 $$
-\mathcal{L}_{\text{f-GRPO}}^{(f,g)}(\theta) = \mathbb{E}_x \left[ \frac{1}{G} \sum_{i=1}^G \frac{-a_i}{1+\beta^{-1}} \cdot \psi(r_{\theta,i}, a_i) \right]
+\mathcal{L}_{\text{f-GRPO}}^{(f,g)}(\theta) = \mathbb{E}_x \left[ \frac{1}{\sum_{i=1}^{G} |y_i|} \sum_{i=1}^G \sum_{t=1}^{|y_i|} \frac{-a_i}{1+\beta^{-1}} \cdot \psi(r_{\theta,i,t}, a_i) \right]
 $$
 
 **这个公式在干什么？（物理意义）**
 
-1. **$\mathbb{E}_x$ 和 $\frac{1}{G} \sum_{i=1}^G$**：这部分和标准 GRPO 一样。
+1. **$\mathbb{E}_x$ 和 $\sum_{i=1}^G$**：这部分和标准 GRPO 一样。
    - **$\mathbb{E}_x$**：表示**求数学期望**。在实际训练中，它代表“对训练集里的每一个问题（prompt）$x$ 取平均”。
-   - **$\frac{1}{G} \sum_{i=1}^G$**：表示对于**同一个问题 $x$**，我们让模型生成 $G$ 个不同的回答（比如 $G=4$ 或 $G=8$），然后把这 $G$ 个回答的损失加起来**求平均**。
-   - 综合起来，这两项的意思就是：“对所有问题，以及每个问题下的所有回答，计算平均损失”。
-2. **$\frac{-a_i}{1+\beta^{-1}}$**：这是一个**缩放系数**。其中 $a_i$ 是优势值（成绩单），成绩越好，这个系数的绝对值越大，说明这个回答对最终损失的贡献（权重）越大。前面的负号是为了把最大化奖励变成最小化损失。
-3. **$\psi(r_{\theta,i}, a_i)$**：这是**真正的核心引擎**。它根据回答是好是坏（$a_i$ 的正负），决定用什么规则来计算损失。
+   - **$\sum_{i=1}^G$**：表示对于**同一个问题 $x$**，我们让模型生成 $G$ 个不同的回答（比如 $G=4$ 或 $G=8$），把这 $G$ 个回答的损失加起来。
+2. **$\frac{1}{\sum |y_i|} \sum_{t=1}^{|y_i|}$**：这是**Token 级的全局平均**。因为大语言模型是逐字（token）生成的，所以我们需要把所有回答里所有 token 的损失加起来，再除以总的有效 token 数。这与代码里的 `loss.sum() / total_tokens` 完全对应。
+3. **$\frac{-a_i}{1+\beta^{-1}}$**：这是一个**优势加权与缩放系数**。
+   - $a_i$ 是优势值（成绩单），成绩越好，绝对值越大，说明这个回答对最终损失的贡献（权重）越大。前面的负号是为了把最大化奖励变成最小化损失。
+   - $\frac{1}{1+\beta^{-1}}$ 是论文中为了将梯度量级与标准 PPO 对齐而引入的全局缩放常数。由于 $\beta$ 是一个固定的超参数（如 0.1），这个系数对于所有 prompt、所有回答、所有 token 都是**完全一样**的常数。因此在实际代码实现中，它通常会被优化器的学习率（Learning Rate）直接吸收，代码里也就省略了这一项。
+4. **$\psi(r_{\theta,i,t}, a_i)$**：这是**真正的核心引擎**。它根据回答是好是坏（$a_i$ 的正负），决定用什么规则来计算当前 token $t$ 的损失。
+
+为了在代码中更方便地实现，我们把上面的公式做一步等价代换。
+首先，忽略掉常数分母 $1+\beta^{-1}$。
+然后，注意到 $\psi$ 函数本身就是分段的（好回答和坏回答分别用不同的公式），我们可以把外面的 $-a_i$ 拆成两部分：**符号（正负号）** 和 **绝对值（$|a_i|$）**。
+- 如果 $a_i > 0$（好回答），$-a_i = -|a_i|$。我们把负号扔进 $\psi$ 里面，外面就只剩下 $|a_i|$。
+- 如果 $a_i \le 0$（坏回答），$-a_i = +|a_i|$。我们把正号扔进 $\psi$ 里面，外面也只剩下 $|a_i|$。
+
+经过这样拆解后，公式就变成了代码里实际实现的样子：
+
+$$
+\mathcal{L}_{\text{f-GRPO}}(\theta) = \mathbb{E} \left[ \frac{1}{\sum_{i=1}^{G} |y_i|} \sum_{i=1}^G \sum_{t=1}^{|y_i|} |a_i| \cdot \begin{cases}
+g(r_{\theta,i,t}) & \text{if } a_i > 0 \quad \text{(正侧/好回答)} \\[4pt]
+f^* \circ g(r_{\theta,i,t}) & \text{if } a_i \le 0 \quad \text{(负侧/坏回答)}
+\end{cases} \right]
+$$
+
+在这个等价公式中：
+
+- 外面的 $|a_i|$ 对应代码里的 `abs_adv = advantages.abs()`。
+- 里面的 $g(r_{\theta,i,t})$ 对应代码里的正组损失 `pos_loss`（注意，这里的 $g$ 已经吸收了刚才扔进来的负号，所以代码里 `pos_loss = -implicit_reward`）。
+- 里面的 $f^* \circ g(r_{\theta,i,t})$ 对应代码里的负组损失 `neg_loss`（这里的 $f^*$ 吸收了正号，所以代码里 `neg_loss = implicit_reward + ...`）。
 
 **与标准 GRPO 的对照**：
 在标准 GRPO 中，损失函数的核心部分是 $\min\!\big(\rho_i\,\hat{A}_i,\;\text{clip}(\rho_i,\,1\!-\!\varepsilon,\,1\!+\!\varepsilon)\,\hat{A}_i\big)$。
@@ -529,90 +556,119 @@ Pearson $\chi^2$ 散度在 LIMR 数据集 + Qwen-1.5B 设定下表现最优（Re
 
 ### f-GRPO 的具体实现
 
-不同 f-散度的选择对应不同的链接函数 $g$ 和共轭函数 $f^*$。以下是几种常见散度的实现：
+在代码实现中，我们要把前面提到的理论公式转化为具体的张量计算。回顾一下，我们最原始的核心损失函数是：
+
+$$
+\mathcal{L}_{\text{f-GRPO}}^{(f,g)}(\theta) = \mathbb{E}_x \left[ \frac{1}{\sum_{i=1}^{G} |y_i|} \sum_{i=1}^G \sum_{t=1}^{|y_i|} \frac{-a_i}{1+\beta^{-1}} \cdot \psi(r_{\theta,i,t}, a_i) \right]
+$$
+
+为了在代码中更方便地实现，我们需要对这个公式做一步**等价变形**。
+
+1. **忽略常数缩放**：分母 $1+\beta^{-1}$ 是一个全局常数，它只影响梯度的整体大小，不影响方向。在代码中，它会被优化器的学习率直接吸收，因此我们可以安全地将其省略。
+2. **拆解优势值 $a_i$**：注意到 $\psi(r_{\theta,i,t}, a_i)$ 函数本身就是分段的（好回答和坏回答分别用不同的公式），我们可以把外面的 $-a_i$ 拆成两部分：**符号（正负号）** 和 **绝对值（$|a_i|$）**。
+   - 如果 $a_i > 0$（好回答），$-a_i = -|a_i|$。我们把负号扔进 $\psi$ 里面，外面就只剩下 $|a_i|$。
+   - 如果 $a_i \le 0$（坏回答），$-a_i = +|a_i|$。我们把正号扔进 $\psi$ 里面，外面也只剩下 $|a_i|$。
+
+经过这样拆解后，公式就变成了代码里实际实现的样子：
+
+$$
+\mathcal{L}_{\text{f-GRPO}}(\theta) = \mathbb{E} \left[ \frac{1}{\sum_{i=1}^{G} |y_i|} \sum_{i=1}^G \sum_{t=1}^{|y_i|} |a_i| \cdot \begin{cases}
+-g(r_{\theta,i,t}) & \text{if } a_i > 0 \quad \text{(正侧/好回答)} \\[4pt]
++f^* \circ g(r_{\theta,i,t}) & \text{if } a_i \le 0 \quad \text{(负侧/坏回答)}
+\end{cases} \right]
+$$
+
+在这个等价公式中，我们就能和下方的代码实现**完美地一一对应**了：
+
+- 外面的 $|a_i|$ 对应代码里的 `abs_adv = advantages.abs()`。
+- 里面的 $-g(r_{\theta,i,t})$ 对应代码里的正组损失 `pos_loss`（注意，这里的负号是从外面的 $-a_i$ 拿进来的，所以代码里 `pos_loss = -implicit_reward`）。
+- 里面的 $+f^* \circ g(r_{\theta,i,t})$ 对应代码里的负组损失 `neg_loss`（这里的正号是从外面的 $-a_i$ 拿进来的，所以代码里 `neg_loss = implicit_reward + ...`）。
+
+不同 f-散度的选择对应不同的链接函数 $g$ 和共轭函数 $f^*$。以下是几种常见散度的完整实现：
 
 ```python
 import torch
 import torch.nn.functional as F
 
 def f_grpo_loss(
-    log_probs,
-    ref_log_probs,
-    old_log_probs,
-    advantages,
-    loss_mask,
-    f_type="pearson_chi2",
-    beta=0.1,
+    log_probs,       # 当前策略模型生成的 token 概率对数 (log π_θ)
+    ref_log_probs,   # 冻结的参考模型生成的 token 概率对数 (log π_ref)
+    old_log_probs,   # 采样时旧策略生成的 token 概率对数 (log π_old，这里保留是为了接口兼容，f-GRPO 核心计算其实不用它)
+    advantages,      # 组内标准化后的优势值 A_i (正数代表好回答，负数代表坏回答)
+    loss_mask,       # 掩码 (用于过滤掉 padding 等无效 token，1 为有效，0 为无效)
+    f_type="pearson_chi2", # 选择使用哪种 f-散度 (默认 Pearson χ²)
+    beta=0.1,        # 隐式奖励的缩放系数 (控制 KL 惩罚的强度)
 ):
     """f-GRPO 损失函数，支持多种 f-散度（正/负侧链接不同；标准 GRPO 两侧裁剪相同）。
-
-    Args:
-        log_probs: 当前策略 log π_θ，与 token 对齐，形状 (*, T) 或与 loss_mask 广播一致。
-        ref_log_probs: 参考 log π_ref，形状同 log_probs。
-        old_log_probs: 采样时 log π_old，可与 PPO 比率联用（本损失核心在 f 侧）。
-        advantages: 组内标准化优势 A_i，形状 (*, T) 或与 loss_mask 对齐。
-        loss_mask: 有效 token mask，形状 (*, T)，float/bool。
-        f_type: f-散度名称，如 ``pearson_chi2``、``hellinger``、
-            ``reverse_kl``、``js``。
-        beta: 隐式奖励缩放，r_θ = β·log(π_θ/π_ref)。
-
+    
     Returns:
         标量，平均每有效 token 的 f-GRPO 损失。
     """
-    # 隐式奖励 (与 DPO 相同的定义)
+    # 1. 计算隐式奖励 (Implicit Reward)
+    # 公式：r_θ = β * (log π_θ - log π_ref)
+    # 物理意义：模型当前对这个 token 的“自信度”相对参考模型的偏移量。
     implicit_reward = beta * (log_probs - ref_log_probs)  # (*, T)
 
-    # 将回答分为正侧 (A > 0) 和负侧 (A ≤ 0)
-    # 高于组均：f-散度变分“正侧”
+    # 2. 划分正负样本组
+    # pos_mask: 找出所有优势值大于 0 的 token（好回答），并与 loss_mask 相乘确保是有效 token
     pos_mask = (advantages > 0).float().unsqueeze(-1) * loss_mask
-    # 不高于均值：变分“负侧”/ 共轭支
+    # neg_mask: 找出所有优势值小于等于 0 的 token（坏回答），同样确保是有效 token
     neg_mask = (advantages <= 0).float().unsqueeze(-1) * loss_mask
 
-    # Pearson χ²：对尾部差异二次放大，利于稀疏二值奖励
+    # 3. 根据不同的 f-散度类型，分别计算正组和负组的损失
     if f_type == "pearson_chi2":
-        # f(t) = (t-1)², f*(s) = s + s²/4
-        # 正侧: g(r) = r (identity link)
-        # 负侧: f*(g(r)) = r + r²/4
+        # Pearson χ² 散度：对坏回答的过度自信给予“二次方暴击”惩罚
+        # 正侧 (好回答): 损失 = -r_θ。模型越自信 (r_θ 越大)，损失越小。
         pos_loss = -implicit_reward
+        # 负侧 (坏回答): 损失 = r_θ + (r_θ^2)/4。如果模型对坏回答很自信 (r_θ 很大)，会受到平方级的巨大惩罚。
         neg_loss = implicit_reward + implicit_reward ** 2 / 4
 
-    # Hellinger：对称、对中等密度差异敏感
     elif f_type == "hellinger":
-        # f(t) = (√t - 1)², f*(s) = s/(1-s)
-        # 正侧: g(r) = 1 - exp(-r) (饱和链接)
-        # 负侧: f*(g(r))
-        # 饱和链接，抑制过大隐式奖励导致的梯度爆炸
+        # Hellinger 散度：温和型，惩罚有上限，防止梯度爆炸
+        # g_r 是一个“饱和链接”函数：1 - exp(-r_θ)。当 r_θ 很大时，g_r 趋近于 1，不会无限变大。
         g_r = 1.0 - torch.exp(-implicit_reward)
+        # 正侧 (好回答): 损失 = -g_r。鼓励 r_θ 变大，但收益有上限 (-1)。
         pos_loss = -g_r
-        # 负侧走 f*∘g，鼓励与 ref 的 Hellinger 几何一致
-        neg_loss = g_r / (1.0 - g_r + 1e-8)
+        # 负侧 (坏回答): 损失 = g_r / (1 - g_r)。惩罚坏回答的自信度。
+        neg_loss = g_r / (1.0 - g_r + 1e-8)  # +1e-8 是为了防止分母为 0 导致除零错误
 
-    # 逆 KL：倾向模式寻求、分布更尖锐
     elif f_type == "reverse_kl":
-        # f(t) = -ln t, f*(s) = -1 - ln(-s)
+        # 逆 KL 散度：标准 GRPO 默认的散度类型，倾向于“模式寻求”(偏科型)
+        # 正侧 (好回答): 损失 = -r_θ。
         pos_loss = -implicit_reward
-        # 共轭支要求自变量为负，截断防 log(0)
+        # 负侧 (坏回答): 损失 = -1 - ln(-r_θ)。
+        # 注意：clamp(max=-1e-8) 是为了确保 -r_θ 严格大于 0，防止 log(0) 或对负数求对数导致 NaN 报错。
         neg_loss = -1.0 - torch.log(-implicit_reward.clamp(max=-1e-8))
 
-    # JS：有界对称散度，训练较平滑
     elif f_type == "js":
-        # Jensen-Shannon: f(t) = t ln t - (t+1) ln((t+1)/2)
-        # 恢复 π_θ/π_ref 密度比，代入 JS 变分形式
+        # JS 散度 (Jensen-Shannon)：对称且有界，训练过程非常平滑
+        # ratio: 还原出概率比值 π_θ / π_ref = exp(r_θ / β)
         ratio = torch.exp(implicit_reward / beta)
+        # 正侧 (好回答): 代入 JS 散度的变分公式推导出的复杂项
         pos_loss = -(
             ratio * implicit_reward / beta
             - (ratio + 1) * torch.log((ratio + 1) / 2)
         )
-        # 负侧与正侧对称配对（与论文 ψ 分段对应）
+        # 负侧 (坏回答): 在 JS 散度下，负侧损失刚好与正侧完全对称 (互为相反数)
         neg_loss = -pos_loss
 
     else:
+        # 如果传入了不支持的散度类型，抛出异常
         raise ValueError(f"未知 f-散度类型: {f_type}")
 
-    # 用绝对优势值作为权重 (优势越大/越小，权重越高)
+    # 4. 优势加权与掩码过滤
+    # abs_adv: 取优势值的绝对值 |A_i|。优势的绝对值越大，说明这个回答“特别好”或“特别差”，应该给予更大的更新权重。
+    # unsqueeze(-1) 是为了在最后增加一个维度，以便与 token 级别的 loss 张量形状对齐 (广播机制)。
     abs_adv = advantages.abs().unsqueeze(-1)
+    
+    # 最终的 token 级 loss:
+    # (正侧损失 * 正侧掩码 * 优势绝对值) + (负侧损失 * 负侧掩码 * 优势绝对值)
     loss = pos_loss * pos_mask * abs_adv + neg_loss * neg_mask * abs_adv
+    
+    # 5. 求平均并返回
+    # 计算当前 batch 中有效的 token 总数
     total_tokens = loss_mask.sum()
+    # 将所有有效 token 的 loss 求和，然后除以有效 token 总数，得到平均 loss
     return loss.sum() / total_tokens
 ```
 
@@ -670,6 +726,20 @@ $$
 **GIFT 的天才发现**：
 我们不需要让两个回答去打擂台！只要我们对同一个问题生成的**一组**回答做一下**“组内均值归一化”**（也就是减去这组回答的平均分），那个讨厌的 $Z(x)$ 就会奇迹般地消失！
 
+> **深度辨析：GIFT 的组内归一化和 GRPO 的组内归一化有什么不同？**
+> 
+> 很多读者可能会敏锐地发现：**GRPO 不也是在做组内归一化吗？** 没错，但它们归一化的**对象**和**目的**截然不同，这导致了两者在数学本质上的天壤之别：
+> 
+> 1. **GRPO 归一化的是“外部奖励”**：
+>    - **做法**：GRPO 拿到裁判给的 $G$ 个分数，算出组内均值，然后用 $r_i - \mu_R$ 算出**优势值（Advantage）**。
+>    - **目的**：为了**取代 Critic 网络（Baseline）**。它只是想知道一个回答是“好于平均”还是“差于平均”，从而决定梯度是鼓励还是抑制。
+>    - **本质**：它依然是**策略梯度（Policy Gradient）**，需要 PPO 的 `clip` 裁剪来防止模型更新崩溃。
+> 
+> 2. **GIFT 归一化的是“隐式奖励”和“外部奖励”双方**：
+>    - **做法**：GIFT 不仅对裁判给的分数做归一化，它还让模型自己算出一个“内心打分”（即上面的 $r_\theta$），然后对这 $G$ 个“内心打分”也做组内归一化。
+>    - **目的**：为了**消灭配分函数 $Z(x)$**！因为 $Z(x)$ 对同一个 prompt 是一个常数，一减去组内均值，它就彻底消失了。
+>    - **本质**：它把强化学习直接降维打击成了一个**监督回归（MSE Regression）**任务。不需要算优势，不需要 `clip` 裁剪，天生极其稳定。
+
 **数学推导非常简单**：
 假设我们对同一个问题 $x$ 生成了 $N$ 个回答 $\{y_1, y_2, \dots, y_N\}$。
 
@@ -725,6 +795,21 @@ $$
 | **需要参考模型？** | ✓ | ✓ | **✓**（但 $\beta$ 和 $Z(x)$ 被巧妙消除） |
 | **数学稳定性** | 容易剧烈震荡 | 中等 | **极高**（MSE 是凸函数，非常好优化） |
 
+> **深度辨析：GRPO 和 GIFT 都要算参考模型概率（`ref_logp`），它们的作用一样吗？**
+> 
+> 很多读者在看代码时会发现：**GRPO 和 GIFT 都在采样阶段计算了参考模型的对数概率 `ref_logp`**。但它们拿这个概率去做的事情，却有着本质的区别：
+> 
+> 1. **在 GRPO 中，`ref_logp` 是一个“外挂的惩罚项”（紧箍咒）**：
+>    - GRPO 的核心驱动力是**策略梯度**（用优势值 $\hat{A}_i$ 乘以重要性比率）。
+>    - `ref_logp` 仅仅出现在最后的 KL 散度惩罚项中：$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{policy}} + \beta (\log \pi_\theta - \log \pi_{\text{ref}})$。
+>    - 它的作用是：你可以去追求高分，但你的输出概率不能偏离老模型太远，偏离了就要扣分，防止你“走火入魔”（Reward Hacking）。
+> 
+> 2. **在 GIFT 中，`ref_logp` 是“核心损失函数的基础部件”（打分器）**：
+>    - GIFT 完全抛弃了策略梯度和优势值计算。
+>    - 它直接把 $\log \pi_\theta - \log \pi_{\text{ref}}$ 组合起来，定义为模型内心的**隐式奖励**（即模型自己给这个回答打的分数）。
+>    - 然后，直接拿这个内心打分去和外部裁判的打分算 MSE 均方误差。
+>    - 它的作用是：和 $\log \pi_\theta$ 深度绑定，共同构成模型内心的“真实想法”，是回归目标不可或缺的一半。
+
 > **实验效果**：GIFT 论文指出，在 7B 模型上，由于 MSE 损失函数极其稳定，GIFT 在多个基准测试（如 AlpacaEval 和 Arena-Hard）上的胜率甚至大幅超越了标准 GRPO。这证明了“大道至简”的回归方法在 LLM 对齐中蕴含着巨大的潜力。
 
 ---
@@ -774,26 +859,34 @@ def gift_loss(log_probs, ref_log_probs, rewards):
     隐式奖励 = β·log(π_θ/π_ref) + β·log Z(x)；组内归一化后 β·log Z(x) 被消除。
 
     Args:
-        log_probs: log π_θ(y|x)，形状 (B, G)，可带梯度。
-        ref_log_probs: log π_ref(y|x)，形状 (B, G)，固定分支。
-        rewards: 外部 r_φ(x, y)，形状 (B, G)。
+        log_probs: log π_θ(y|x)，当前策略的对数概率，形状 (B, G)，**带有梯度**。
+        ref_log_probs: log π_ref(y|x)，参考策略的对数概率，形状 (B, G)，**固定无梯度**。
+        rewards: 外部裁判打分 r_φ(x, y)，形状 (B, G)，**固定无梯度**。
 
     Returns:
         标量 MSE，默认对元素取 mean。
     """
-    # 隐式奖励 (不含 β 和 Z(x)，它们会在归一化中被消除)
+    # 1. 计算内部奖励 (Implicit Reward)
+    # 公式：r_θ = log π_θ - log π_ref (这里省略了超参数 β，因为归一化后它也会被消掉)
+    # 物理意义：模型自己心里对这个回答打的分数。
     implicit_rewards = log_probs - ref_log_probs  # (B, G)
 
-    # 组内归一化 (在 G 维标准化 → 消除 Z(x))
+    # 2. 内部奖励的组内归一化 (在 G 维标准化)
+    # 这一步是 GIFT 的灵魂！减去均值后，那个无法计算的配分函数 Z(x) 就被彻底消除了。
     impl_mean = implicit_rewards.mean(dim=1, keepdim=True)  # (B, 1)
     impl_std = implicit_rewards.std(dim=1, keepdim=True) + 1e-8  # (B, 1)
     norm_implicit = (implicit_rewards - impl_mean) / impl_std  # (B, G)
 
+    # 3. 外部奖励的组内归一化
+    # 裁判给的分数可能在 [0, 1] 之间，也可能在 [-100, 100] 之间。
+    # 归一化后，外部奖励和内部奖励就处于同一个尺度（均值为0，方差为1）了。
     rew_mean = rewards.mean(dim=1, keepdim=True)  # (B, 1)
     rew_std = rewards.std(dim=1, keepdim=True) + 1e-8  # (B, 1)
     norm_rewards = (rewards - rew_mean) / rew_std  # (B, G)
 
-    # detach 外部奖励：不把梯度回传到 RM
+    # 4. MSE 回归损失
+    # 强迫模型心里的打分 (norm_implicit) 去逼近裁判的打分 (norm_rewards)。
+    # detach 外部奖励：确保梯度只流向 actor 模型，不回传到外部奖励。
     loss = F.mse_loss(norm_implicit, norm_rewards.detach())
     return loss
 ```
@@ -810,16 +903,27 @@ for step in range(total_steps):
     # 预留与 GRPO 一致的缓存结构（可存 response）
     all_log_probs, all_ref_log_probs, all_rewards = [], [], []
 
-    # 生成与 ref 概率在采样时无需对 θ 求导
+    # 采样阶段不需要对 θ 求导，纯粹为了生成回答和收集外部裁判分数
     with torch.no_grad():
         for prompt in prompts_batch:
             group_logps, group_ref_logps, group_rewards = [], [], []
             for _ in range(G):
+                # 1. 生成回答
                 response = actor.generate(prompt, do_sample=True)
+                
+                # 2. 收集外部奖励 (External Reward)
+                # 调用裁判模型或规则判题器给当前回答打分。
                 reward = reward_fn(prompt, response)
+                
+                # 3. 收集内部奖励的基础部件 (Reference Log Prob)
+                # 计算老模型 (参考模型) 生成这个回答的概率对数 log π_ref。
+                # 为什么这里不算 log π_θ？因为我们要用它算梯度更新模型！
+                # 所以 log π_θ 必须留到阶段 2 (有梯度环境) 去算。
                 ref_logp = compute_seq_log_prob(ref_model, prompt, response)
+                
                 group_rewards.append(reward)
                 group_ref_logps.append(ref_logp)
+            
             all_rewards.append(torch.tensor(group_rewards))
             all_ref_log_probs.append(torch.stack(group_ref_logps))
 
@@ -827,20 +931,24 @@ for step in range(total_steps):
     ref_logps = torch.stack(all_ref_log_probs)  # (B, G)
 
     # 过滤零方差组 (与 DAPO 类似)
+    # 如果一组内所有回答得分都一样，归一化时分母会是 0，而且也无法提供对比信号，直接跳过。
     valid = rewards.std(dim=1) > 0
     if valid.sum() == 0:
         continue
 
     # --- 阶段 2: GIFT 更新 ---
     # GIFT 不需要"多 epoch 更新"和"重要性采样比率"!
-    # 它直接对当前策略做前向传播计算隐式奖励
+    # 它直接对当前策略做前向传播计算隐式奖励，并用 MSE 损失更新。
 
     for prompt_idx in valid.nonzero(as_tuple=True)[0]:
         prompt = prompts_batch[prompt_idx]
         # G 条解码结果；须与阶段 1 写入的 all_responses 对齐（示意伪代码）
         responses = all_responses[prompt_idx]
 
-        # 用当前策略重新计算对数概率 (需要梯度)
+        # 4. 计算内部奖励的另一半部件 (Actor Log Prob)
+        # 注意：这里没有 with torch.no_grad()！
+        # 用当前策略 (actor) 重新计算这 G 个回答的对数概率 log π_θ。
+        # 这样算出来的 log_probs 是带有计算图的，梯度可以顺着它流回模型参数 θ。
         log_probs = torch.stack(
             [
                 compute_seq_log_prob(actor, prompt, resp)
@@ -851,8 +959,11 @@ for step in range(total_steps):
         ref_lps = ref_logps[prompt_idx].unsqueeze(0)  # (1, G)
         rews = rewards[prompt_idx].unsqueeze(0)  # (1, G)
 
+        # 5. 计算 GIFT 损失 (MSE)
+        # 内部会把 log_probs - ref_lps 拼成内部奖励，并与外部奖励 rews 做 MSE。
         loss = gift_loss(log_probs, ref_lps, rews)
 
+        # 6. 反向传播与梯度更新
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)

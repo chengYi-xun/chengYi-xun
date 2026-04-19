@@ -14,6 +14,10 @@ mathjax: true
 
 > **系列说明**：本文是世界模型系列的第一篇。世界模型领域目前技术路线**尚未收敛**，存在五大并行分支。本系列将从基础概念出发，按分支逐一展开。
 > **核心论文**：*World Models*（Ha & Schmidhuber, 2018, arXiv:1803.10122）
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](/chengYi-xun/posts/34-multimodal-frontier/)
+> ➡️ 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/36-dreamer/)
+
 
 ---
 

@@ -14,6 +14,10 @@ series: Diffusion Models theory
 ---
 
 > 本文为系列第十六篇。继 Stable Diffusion 3 之后，Black Forest Labs（由原 Stable Diffusion 核心团队创立）推出了 Flux 系列模型。Flux 同样采用了 Flow Matching 和 DiT 架构，但在细节设计上有着独特的创新，使其在图像质量和指令遵循上达到了目前的顶尖水平。本文将深入解析 Flux 的核心架构。
+>
+> ⬅️ 上一篇：[笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](/chengYi-xun/posts/15-sd3/)
+> ➡️ 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/17-rl-basics/)
+
 
 # Flux 整体架构概览
 

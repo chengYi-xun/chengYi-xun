@@ -16,6 +16,10 @@ mathjax: true
 > **论文**：*Vision Transformers Need Registers*（Darcet et al., ICLR 2024 Outstanding Paper）
 > **代码**：[facebookresearch/dinov2](https://github.com/facebookresearch/dinov2) · [HuggingFace DINOv2-with-Registers](https://huggingface.co/docs/transformers/model_doc/dinov2_with_registers)
 > **参考资料**：本文结合论文原文与 DINOv2 开源代码进行讲解。
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（一）：VGGT——用一个 Transformer 完成所有 3D 视觉任务](/chengYi-xun/posts/27-vggt/)
+> ➡️ 下一篇：[笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](/chengYi-xun/posts/29-multimodal-basics/)
+
 
 ![有无 Register 时 DeiT-III / OpenCLIP / DINOv2 的注意力对比（Darcet et al., ICLR 2024 / arXiv:2309.16588 图 1 风格，论文 HTML 资源拼接）](/chengYi-xun/img/register_tokens.png)
 

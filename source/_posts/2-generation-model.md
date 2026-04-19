@@ -10,6 +10,9 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
+>
+> ⬅️ 上一篇：[笔记｜生成模型（一）：一些概率论的基础概念和理论](/chengYi-xun/posts/1-generation-basic-theory/)
+> ➡️ 下一篇：[笔记｜生成模型（三）：生成对抗理论](/chengYi-xun/posts/3-GAN-theory/)
 
 ## 判别模型 vs 生成模型
 

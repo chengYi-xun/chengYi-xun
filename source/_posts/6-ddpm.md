@@ -13,6 +13,10 @@ series: Diffusion Models theory
 
 
 > 论文链接：*[Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239)*
+>
+> ⬅️ 上一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)
+> ➡️ 下一篇：[笔记｜生成模型（六）：DDIM理论](/chengYi-xun/posts/7-ddim/)
+
 
 之前我们讨论过，生成模型的目的是：给定从真实分布 $P(x)$ 中采样的观测数据 $x$，训练得到一个由参数 $\theta$ 控制、能够逼近真实分布的模型 $p_\theta(x)$，这个任务太难了，所以使用变分推断去逼近，即为从一个标准高斯分布出发，经过某种映射或推导得到真实分布。而这个“某种映射”，并不要求一步到位，可以分多步执行。其中一个影响最大的实现方式，就是**扩散模型。**
 

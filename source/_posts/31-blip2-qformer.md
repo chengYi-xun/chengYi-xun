@@ -16,6 +16,10 @@ mathjax: true
 > **论文**：*BLIP-2: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models*（Li et al., 2023, Salesforce）
 > **代码**：[salesforce/LAVIS](https://github.com/salesforce/LAVIS) · `lavis/models/blip2_models/blip2_qformer.py`
 > **前置知识**：[上一篇：CLIP 对比学习](posts/30-clip/)
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](/chengYi-xun/posts/30-clip/)
+> ➡️ 下一篇：[笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片](/chengYi-xun/posts/32-llava/)
+
 
 ---
 

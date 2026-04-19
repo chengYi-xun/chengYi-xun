@@ -11,6 +11,10 @@ tags:
  - Generative models
 series: Diffusion Models theory
 ---
+>
+> ⬅️ 上一篇：[笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/)
+> ➡️ 下一篇：[笔记｜生成模型（十二）：Normalizing Flow理论与实现](/chengYi-xun/posts/13-Normalizing-flow/)
+
 # UIT
 
 > 论文链接：*[All are Worth Words: A ViT Backbone for Diffusion Models](https://arxiv.org/abs/2209.12152)*

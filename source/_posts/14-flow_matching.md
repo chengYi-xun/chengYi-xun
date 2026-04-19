@@ -12,6 +12,10 @@ series: Diffusion Models theory
 ---
 
 > 论文链接：*[Flow Matching for Generative Modeling](https://arxiv.org/abs/2210.02747)*
+>
+> ⬅️ 上一篇：[笔记｜生成模型（十二）：Normalizing Flow理论与实现](/chengYi-xun/posts/13-Normalizing-flow/)
+> ➡️ 下一篇：[笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](/chengYi-xun/posts/15-sd3/)
+
 
 在 Stable Diffusion 3 中，模型是通过 Flow Matching 的方法训练的。从这个方法的名字来看，就知道它和 Flow-based Model 有比较强的关联，因此在正式开始介绍这个方法之前先交代一些 Flow-based Model 相关的背景知识。
 

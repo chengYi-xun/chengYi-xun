@@ -10,7 +10,9 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
-
+>
+> ⬅️ 上一篇：[笔记｜生成模型（七）：Score-Based理论](/chengYi-xun/posts/8-score-match/)
+> ➡️ 下一篇：[笔记｜生成模型（九）：Classifier Guidance 理论与实现](/chengYi-xun/posts/10-classifier-guidance-for-diffusion-models/)
 
 # 随机微分方程简介
 

@@ -13,6 +13,10 @@ series: Diffusion Models theory
 
 
 > 论文链接：*[Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502)*
+>
+> ⬅️ 上一篇：[笔记｜生成模型（五）：DDPM理论](/chengYi-xun/posts/6-ddpm/)
+> ➡️ 下一篇：[笔记｜生成模型（七）：Score-Based理论](/chengYi-xun/posts/8-score-match/)
+
 
 在[DDPM理论](../6-ddpm)中我们进行了 DDPM 的理论推导以及给出了核心代码。但 DDPM 有一个非常明显的问题：采样过程很慢。因为 DDPM 的反向过程利用了马尔可夫假设，所以每次都必须在相邻的时间步之间进行去噪，而不能跳过中间步骤。原始论文使用了 1000 个时间步，所以我们在采样时也需要循环 1000 次去噪过程，这个过程是非常慢的。
 

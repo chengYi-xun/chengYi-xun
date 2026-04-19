@@ -10,6 +10,9 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
+>
+> ⬅️ 上一篇：[笔记｜生成模型（三）：生成对抗理论](/chengYi-xun/posts/3-GAN-theory/)
+> ➡️ 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)
 
 ## 自编码器（Autoencoder, AE） VS 变分自编码器（Variational Autoencoder，VAE）
 

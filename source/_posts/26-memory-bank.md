@@ -14,6 +14,8 @@ tags:
 
 > 论文：[MemoryBank: Enhancing Large Language Models with Long-Term Memory](https://arxiv.org/abs/2305.10250)（arXiv 2023.05；作者单位含中山大学、哈尔滨工业大学、KTH 等）
 >
+> ⬅️ 上一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/25-video-grpo/)
+> ➡️ 下一篇：[笔记｜多模态融合（一）：VGGT——用一个 Transformer 完成所有 3D 视觉任务](/chengYi-xun/posts/27-vggt/)
 > 代码：[github.com/zhongwanjun/MemoryBank-SiliconFriend](https://github.com/zhongwanjun/MemoryBank-SiliconFriend)
 
 # 为什么 LLM 需要长期记忆？

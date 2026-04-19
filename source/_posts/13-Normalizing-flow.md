@@ -10,6 +10,9 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
+>
+> ⬅️ 上一篇：[笔记｜生成模型（十一）：UIT和DiT架构详解](/chengYi-xun/posts/12-UIT-VS-DIT/)
+> ➡️ 下一篇：[笔记｜生成模型（十三）：Flow Matching理论与实现](/chengYi-xun/posts/14-flow_matching/)
 
 Normalizing flow（标准化流）是一类对概率分布进行建模的工具，它能完成简单的概率分布（例如高斯分布）和任意复杂分布之间的相互转换，经常被用于 data generation、density estimation、inpainting 等任务中，例如 Stability AI 提出的 [Stable Diffusion 3](https://arxiv.org/abs/2403.03206) 中用到的 rectified flow 就是 normalizing flow 的变体之一。
 

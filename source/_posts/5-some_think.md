@@ -9,6 +9,9 @@ tags:
  - thinking
 series: other talk
 ---
+>
+> ⬅️ 上一篇：[笔记｜生成模型（四）：变分自编码器理论](/chengYi-xun/posts/4-VAE-theory/)
+> ➡️ 下一篇：[笔记｜生成模型（五）：DDPM理论](/chengYi-xun/posts/6-ddpm/)
 
 # 写作的目的
 

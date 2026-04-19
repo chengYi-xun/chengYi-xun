@@ -14,6 +14,10 @@ series: Diffusion Models theory
 
 > 转载自：*[Classifier-Free Guidance 理论与实现](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)
 > 论文链接：*[Diffusion Models Beat GANs on Image Synthesis](https://arxiv.org/abs/2105.05233)*
+>
+> ⬅️ 上一篇：[笔记｜生成模型（八）：SDE统一DDPM和SMLD](/chengYi-xun/posts/9-SDE/)
+> ➡️ 下一篇：[笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](/chengYi-xun/posts/11-classifier-free-guidance-for-diffusion-models/)
+
 
 在前边的几篇文章中我们已经学习了DDPM和DDIM，不过这些方法都只能进行无条件生成，而无法对生成过程进行控制。我们这次学习的不再是无条件生成，而是通过一定方式对生成过程进行控制，比较常见的有两种：Classifier Guidance 与 Classifier-Free Guidance，本文首先介绍第一种。
 

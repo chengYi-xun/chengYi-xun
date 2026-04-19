@@ -10,7 +10,9 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
-
+>
+> ⬅️ 上一篇：[笔记｜生成模型（二）：生成模型的技术路线总览](/chengYi-xun/posts/2-generation-model/)
+> ➡️ 下一篇：[笔记｜生成模型（四）：变分自编码器理论](/chengYi-xun/posts/4-VAE-theory/)
 
 ## 生成对抗网络（Generative Adversarial Nets，GAN）
 

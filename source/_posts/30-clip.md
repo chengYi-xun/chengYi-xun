@@ -16,6 +16,10 @@ mathjax: true
 > **论文**：*Learning Transferable Visual Models From Natural Language Supervision*（Radford et al., 2021, OpenAI）
 > **代码**：[openai/CLIP](https://github.com/openai/CLIP) · [mlfoundations/open_clip](https://github.com/mlfoundations/open_clip)
 > **前置知识**：[上一篇：多模态融合基础](posts/29-multimodal-basics/)
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](/chengYi-xun/posts/29-multimodal-basics/)
+> ➡️ 下一篇：[笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](/chengYi-xun/posts/31-blip2-qformer/)
+
 
 ---
 

@@ -15,6 +15,10 @@ mathjax: true
 
 > **核心论文**：
 >
+> ⬅️ 上一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/38-video-world-model/)
+> ➡️ 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/40-driving-world-model/)
+
+>
 > - PhysDreamer: arXiv:2404.13026 (ECCV 2024)
 >
 > - PhysGen: arXiv:2409.18964 (ECCV 2024)

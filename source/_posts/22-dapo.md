@@ -17,6 +17,10 @@ series: Diffusion Models theory
 
 > 本文为 RL 系列的第六篇。在上几篇中我们推导了 GRPO（组相对策略优化，Group Relative Policy Optimization）的核心思想并将其应用于图像生成。本文将介绍 GRPO 的工程增强版——**DAPO**（解耦裁剪与动态采样策略优化，**D**ecoupled clip and dyn**A**mic sam**P**ling policy **O**ptimization），它是字节跳动 Seed 团队与清华 AIR 联合提出的大规模 LLM 强化学习算法，用 Qwen2.5-32B 基座模型在 AIME 2024 上达到 50 分（超过 DeepSeek-R1-Zero 的 47 分），且训练步数减少 50%。
 >
+> ⬅️ 上一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/21-flow-grpo/)
+> ➡️ 下一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/23-grpo-variants/)
+
+>
 > 论文：[DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)（2025.03）
 
 # 先看问题：GRPO 在大规模训练中遇到了什么？

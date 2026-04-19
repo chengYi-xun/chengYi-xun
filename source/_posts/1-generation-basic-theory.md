@@ -10,6 +10,8 @@ tags:
  - Generative models theory
 series: Diffusion Models theory
 ---
+>
+> ➡️ 下一篇：[笔记｜生成模型（二）：生成模型的技术路线总览](/chengYi-xun/posts/2-generation-model/)
 
 ## 概率 vs 似然
 
@@ -229,5 +231,7 @@ $$
 >
 > 1. Kingma, D. P., & Welling, M. (2013). *Auto-Encoding Variational Bayes*. arXiv:1312.6114.
 > 2. Blei, D. M., Kucukelbir, A., & McAuliffe, J. D. (2017). *Variational Inference: A Review for Statisticians*. Journal of the American Statistical Association.
+>
+>
 
 > 下一篇：[笔记｜生成模型（二）：生成模型大家族](/chengYi-xun/posts/2-generation-model/)

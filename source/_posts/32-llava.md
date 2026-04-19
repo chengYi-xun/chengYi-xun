@@ -2,17 +2,11 @@
 title: 笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片
 date: 2026-04-06 00:10:00
 categories:
-
  - Tutorials
-
 tags:
-
  - LLaVA
-
  - Visual Instruction Tuning
-
  - Multimodal LLM
-
  - Vision-Language Model
 series: "多模态融合"
 mathjax: true
@@ -21,6 +15,10 @@ mathjax: true
 > **论文**：*Visual Instruction Tuning*（Liu et al., 2023, UW-Madison / Microsoft）
 > **代码**：[haotian-liu/LLaVA](https://github.com/haotian-liu/LLaVA)
 > **前置知识**：[上一篇：BLIP-2 / Q-Former](posts/31-blip2-qformer/)
+>
+> ⬅️ 上一篇：[笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](/chengYi-xun/posts/31-blip2-qformer/)
+> ➡️ 下一篇：[笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](/chengYi-xun/posts/33-native-multimodal/)
+
 
 ---
 
