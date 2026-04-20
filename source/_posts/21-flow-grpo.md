@@ -118,6 +118,7 @@ $$
 在 Rectified Flow 中，前向加噪过程是干净图像 $x_0$ 和纯噪声 $x_1 \sim \mathcal{N}(0, I)$ 的直线插值：
 $$x_t = (1-\sigma)x_0 + \sigma x_1$$
 由于 $x_1$ 是标准高斯噪声，所以给定 $x_0$ 时，$x_t$ 的条件分布 $p(x_t | x_0)$ 自然也是一个高斯分布：
+
 - 均值 $\mu_t = (1-\sigma)x_0$
 - 方差 $\sigma_t^2 = \sigma^2 I$
 
@@ -143,59 +144,120 @@ $$\hat{x}_0 = x_t - \sigma \cdot v_\theta$$
 
 把模型预测的 $\hat{x}_0$ 代入 Score 公式，就能在代码中直接计算出纠偏所需的“指南针”了。
 
-### 2. Langevin Dynamics 如何修正偏航？
+### 2. 从前向 SDE 推导逆向 SDE（Anderson 定理）
 
 在 SDE 理论中，一个连续时间的随机微分方程（如扩散模型的前向加噪过程）通常写为：
 $$\mathrm{d}x_t = f(x_t, t) \mathrm{d}t + g(t) \mathrm{d}w_t$$
 
-根据 Anderson 定理，任何一个前向 SDE 都对应一个**逆向 SDE（Reverse SDE）**，用于从纯噪声生成数据。逆向 SDE 的标准公式为：
-$$\mathrm{d}x_t = \left[ f(x_t, t) - \frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t) \right] \mathrm{d}t + g(t) \mathrm{d}\bar{w}_t$$
+其中 $f(x_t, t)$ 是漂移项（决定运动的宏观方向），$g(t) \mathrm{d}w_t$ 是扩散项（注入高斯噪声，导致分布发散）。
 
-仔细观察这个逆向 SDE 的漂移项（方括号内的部分）：
+**如何推导它的逆向过程？**
+我们可以通过离散化的时间步结合贝叶斯公式来进行直观推导。
+
+假设时间步长为 $\Delta t > 0$，前向过程从 $t$ 走到 $t + \Delta t$：
+$$x_{t+\Delta t} = x_t + f(x_t, t)\Delta t + g(t)\sqrt{\Delta t} \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)$$
+
+这说明，给定 $x_t$ 时，$x_{t+\Delta t}$ 服从高斯分布：
+$$p(x_{t+\Delta t} | x_t) \approx \mathcal{N}(x_t + f(x_t, t)\Delta t, \; g(t)^2 \Delta t I)$$
+
+现在我们要推导逆向过程，即给定 $x_{t+\Delta t}$ 时，求 $x_t$ 的分布 $p(x_t | x_{t+\Delta t})$。根据贝叶斯公式：
+$$p(x_t | x_{t+\Delta t}) = \frac{p(x_{t+\Delta t} | x_t) p(x_t)}{p(x_{t+\Delta t})}$$
+
+我们在两边取对数：
+$$\log p(x_t | x_{t+\Delta t}) = \log p(x_{t+\Delta t} | x_t) + \log p(x_t) - \log p(x_{t+\Delta t})$$
+
+利用一阶泰勒展开，我们可以将 $\log p(x_t)$ 在 $x_{t+\Delta t}$ 处近似展开：
+$$\log p(x_t) \approx \log p(x_{t+\Delta t}) + \nabla_{x_{t+\Delta t}} \log p(x_{t+\Delta t}) \cdot (x_t - x_{t+\Delta t})$$
+
+将这个展开式和前面前向转移概率 $p(x_{t+\Delta t} | x_t)$ 的高斯对数密度代入贝叶斯公式。经过代数化简和配方（合并关于 $x_t$ 的二次项），我们可以发现逆向分布 $p(x_t | x_{t+\Delta t})$ 依然是一个高斯分布，其均值为：
+$$\mathbb{E}[x_t | x_{t+\Delta t}] \approx x_{t+\Delta t} - \left[ f(x_{t+\Delta t}, t+\Delta t) - g(t+\Delta t)^2 \nabla_{x} \log p(x_{t+\Delta t}) \right] \Delta t$$
+
+当 $\Delta t \to 0$ 时，我们将时间倒流记为逆向微元 $\mathrm{d}\bar{t}$，上面的离散更新公式就化为了连续的**逆向 SDE（Reverse SDE，即 Anderson 定理）**：
+$$\mathrm{d}x_t = \left[ f(x_t, t) - g(t)^2 \nabla_{x_t} \log p_t(x_t) \right] \mathrm{d}t + g(t) \mathrm{d}\bar{w}_t$$
+
+**公式中各变量的物理意义与代码映射：**
+
+在图像生成（如 Diffusion/Flow Matching）的上下文中，这个逆向 SDE 公式描述了如何从纯噪声逐步去噪生成清晰图像的过程：
+
+- **$t$ 与 $\mathrm{d}t$**：时间步与时间微元。在图像生成中，$t \in [0, 1]$，$t=1$ 对应纯噪声，$t=0$ 对应清晰图像。代码中通常对应离散的时间步长 `dt = t_prev - t_curr`。
+- **$x_t$ 与 $\mathrm{d}x_t$**：时刻 $t$ 的状态及其微小变化量。在图像生成中，$x_t$ 代表**正在被去噪的中间潜变量（Latent）或图像**。$\mathrm{d}x_t$ 则是这一步去噪后像素值的变化量。代码中对应 `sample`（当前潜变量）和 `prev_sample - sample`。
+- **$f(x_t, t)$**：**漂移项（Drift term）**。物理上代表系统固有的确定性演化速度场。在图像生成中，它代表**神经网络预测的去噪主方向**（即 Probability Flow ODE 的速度）。代码中对应模型输出 `model_output`（如预测的 velocity 或 noise）。
+- **$g(t)$**：**扩散系数（Diffusion coefficient）**。物理上代表注入系统的热噪声强度。在图像生成中，它代表**为了探索（Exploration）而刻意注入的随机噪声的标准差**。代码中对应随时间变化的噪声调度参数，如 `std_dev_t`。
+- **$\nabla_{x_t} \log p_t(x_t)$**：**得分函数（Score function）**。物理上代表概率密度场在状态空间的梯度。在图像生成中，它是一个向量场，**指向真实图像数据流形的最短路径**（即告诉每个像素如何修改才能更像真实图像）。在基于 Score 的模型中，这通常由神经网络隐式或显式拟合。
+- **$- g(t)^2 \nabla_{x_t} \log p_t(x_t)$**：**得分修正项**。物理上是为了抵消布朗运动带来的发散效应而施加的恢复力。在图像生成中，它代表**纠偏项**。因为注入了随机噪声 $g(t) \mathrm{d}\bar{w}_t$，图像可能会偏离真实的数据流形；这个修正项利用 Score function 强行将偏离的像素拉回真实图像的概率分布内。
+- **$g(t) \mathrm{d}\bar{w}_t$**：**逆向标准布朗运动微元**。物理上代表纯粹的随机热运动。在图像生成（尤其是 RL 微调）中，它代表**纯随机的像素扰动（高斯白噪声）**，用于在生成轨迹中引入随机性以探索不同的生成结果。代码中对应 `noise = torch.randn_like(sample)`。
+
+**核心结论：**
+
+在图像生成与强化学习微调（如 Flow-GRPO）的结合中，该公式展示了“探索与保真”的数学平衡。为了在生成过程中探索不同的高奖励输出（如更好的美学评分或更准确的 prompt 遵循），必须通过 $g(t) \mathrm{d}\bar{w}_t$ **注入随机噪声**；但纯粹的噪声会破坏图像的真实性（导致伪影或崩坏），因此必须同步引入 $- g(t)^2 \nabla_{x_t} \log p_t(x_t)$ 作为**数学上的强制纠偏力**，确保探索轨迹始终贴合真实图像的数据流形。
+
+**Flow Matching 中的特殊性（ODE 转 SDE）：**
+在 Flow Matching 中，我们原本拥有的是一个确定性的常微分方程（ODE），即 $\mathrm{d}x_t = f(x_t, t) \mathrm{d}t$。这个 ODE 已经能够完美地在噪声和图像分布之间映射（它被称为 Probability Flow ODE）。
+现在，为了在强化学习中进行“探索”，我们想在这个 ODE 中**强行注入噪声** $g(t) \mathrm{d}\bar{w}_t$，但又**不想改变每个时刻的边缘分布 $p_t(x_t)$**。
+根据随机过程理论，如果我们向一个保持分布的 ODE 中注入方差为 $g(t)^2$ 的噪声，为了抵消噪声带来的发散效应，必须在漂移项中加入 $-\frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t)$ 的修正。
+
+因此，Flow-GRPO 中实际使用的 SDE 漂移项修正系数是 $\frac{1}{2}$：
 
 1. $f(x_t, t)$ 是原本的 ODE 漂移项（基础更新）。
-2. $-\frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t)$ 就是**为了抵消注入噪声 $g(t) \mathrm{d}\bar{w}_t$ 带来的分布发散，而必须强制加入的 Score 修正项**。
+2. $-\frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t)$ 就是**为了抵消注入噪声带来的分布发散，而必须强制加入的 Score 修正项**。
 
-在 Flow-GRPO 的官方代码实现（`/flow_grpo/diffusers_patch/sd3_sde_with_logprob.py`）中，这套理论被精确地转化为代码。虽然代码中为了计算效率将公式合并成了一行：
+### 3. 实现公式链：从 SDE 理论到代码
 
-```python
-# 官方代码中的合并写法：
-prev_sample_mean = sample*(1+std_dev_t**2/(2*sigma)*dt) + model_output*(1+std_dev_t**2*(1-sigma)/(2*sigma))*dt
-```
+下面将上述 SDE 理论逐步具体化为离散实现公式。设 $t$ 为当前时间步，$v_\theta = v_\theta(x_t, t, c)$ 为模型预测速度场，$g$ 为 SDE 扩散系数（控制探索噪声强度），$\Delta t = t - t_{\text{next}} > 0$。
 
-但如果我们将其拆解，它在代数上完全等价于：
+> **符号对照**：官方代码 `sd3_sde_with_logprob.py` 中，`sigma` = 时间 $t$，`std_dev_t` = 扩散系数 $g(t) = \sqrt{t/(1-t)} \cdot \text{noise\_level}$（随时间自适应），`model_output` = 速度 $v_\theta$，`dt` = $-\Delta t$（符号相反）。下文伪代码中统一使用 `t_now` = $t$，`g` = $g$（简化为常数），`velocity` = $v_\theta$，`dt` = $\Delta t > 0$。其中 `noise_level` 是控制探索强度的超参数（默认 0.7）。
 
-```python
-# 预测干净样本 x_0
-pred_original_sample = sample - sigma * model_output 
+**公式 ①：Tweedie 反推干净样本**
 
-# 计算 Score Function
-score_estimate = -(sample - pred_original_sample * (1 - sigma)) / sigma**2
+$$\hat{x}_0 = x_t - t \cdot v_\theta \tag{①}$$
 
-# Langevin 修正项
-log_term = -0.5 * std_dev_t**2 * score_estimate
+> 代码：`pred_x0 = noisy_img - t_now * velocity`
 
-# 最终的均值更新 = ODE基础更新 + Langevin修正
-prev_sample_mean = (sample + model_output * dt) + log_term * dt
-```
+**公式 ②：Score Function（Tweedie 估计）**
 
-由于我们在更新时加入了方差为 `(std_dev_t * sqrt(-dt))^2` 的高斯噪声，所以 $x_{t-\Delta t}$ 的条件分布自然就是以 `prev_sample_mean` 为均值的高斯分布。
+将 ① 代入前文推导的 Score 公式 $\nabla_{x_t}\log p_t = -\frac{x_t - (1-t)x_0}{t^2}$：
 
-对应的对数概率为：
+$$\nabla_{x_t}\log p_t(x_t) \approx -\frac{x_t - (1-t)\hat{x}_0}{t^2} \tag{②}$$
 
-$$
-\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\| x_{t-\Delta t} - \text{prev\_sample\_mean} \|^2}{2\text{variance}} + \text{const}
-$$
+展开化简：$= -\frac{x_t + (1-t)v_\theta}{t}$。
 
-**直觉理解**：模型预测的"涂抹方向"是 $v_\theta$，实际走的方向可能略有偏差。偏差越小，对数概率越高——模型对自己的生成轨迹越"有信心"。
+> 代码：`score = -(noisy_img - (1 - t_now) * pred_x0) / (t_now ** 2)`
 
-整条轨迹（$T$ 步去噪）的总对数概率是所有时间步的累加：
+**公式 ③：SDE 转移均值（ODE 漂移 + Langevin 修正）**
 
-$$
-\log \pi_\theta(\text{trajectory} | c) = \sum_{k=1}^{T} \log p_\theta(x_{t_k - \Delta t} | x_{t_k}, c)
-$$
+$$\mu = \underbrace{(x_t - \Delta t \cdot v_\theta)}_{\text{ODE 漂移}} + \underbrace{\tfrac{1}{2}g^2 \cdot \nabla_{x_t}\log p_t \cdot \Delta t}_{\text{Langevin 修正}} \tag{③}$$
 
-这就与 LLM 中 token 级对数概率求和的形式完全对应了——至此，GRPO 的整套框架可以无缝迁移到图像生成。
+> 代码：`mu = (noisy_img - dt * velocity) + 0.5 * g**2 * score * dt`
+>
+> 官方合并写法：`prev_sample_mean = sample*(1+std_dev_t**2/(2*sigma)*dt) + model_output*(1+std_dev_t**2*(1-sigma)/(2*sigma))*dt`
+
+**为什么不直接用 ODE 均值？** 如果我们只在 ODE 落点 $(x_t - \Delta t \cdot v_\theta)$ 上直接加噪声（跳过 Langevin 修正），噪声会把 $x_{t-\Delta t}$ 的分布"撑大"——相比真实分布 $p_{t-\Delta t}$ 多出了一个额外的高斯扩散。随着步数累积，这种分布偏移会让图像逐渐崩坏。Langevin 修正项沿 Score 方向（即数据高密度区域）对均值做微调，恰好**预先补偿**即将注入的噪声带来的分布膨胀——确保加噪后的采样仍然落在正确的分布内。如果不注入噪声（$g=0$），该修正项为零，公式退化为纯 ODE。
+
+**公式 ④：SDE 采样（添加随机探索噪声）**
+
+$$x_{t-\Delta t} = \mu + g\sqrt{\Delta t} \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I) \tag{④}$$
+
+> 代码：`noisy_img = mu + g * noise * (dt ** 0.5)`
+
+公式 ③④ 合起来构成 SDE 一步的核心操作：**先估计修正均值 $\mu$，再以 $\mu$ 为中心重采样**。此时 $x_{t-\Delta t}$ 的条件分布为 $\mathcal{N}(\mu, \; g^2 \Delta t \cdot I)$。
+
+**边缘分布不变的含义**：③④ 的设计保证了——在**统计意义**上，SDE 采样与纯 ODE 采样生成的图像集合遵循同一分布（质量、多样性、风格等总体特征一致）。但单条轨迹变为随机的：同一个初始噪声，纯 ODE 每次产出相同的图，而 SDE 每次产出不同的图。这种"统计等效但轨迹随机"的性质，正是 GRPO 所需要的——同一 Prompt 下能生成多张不同的图做组内对比（"矮子里拔高个"），且不会因为探索而降低图像质量。
+
+**公式 ⑤：单步对数概率**
+
+由于 $x_{t-\Delta t} \sim \mathcal{N}(\mu, g^2\Delta t \cdot I)$，实际采样到的 $x_{t-\Delta t}$ 离修正均值 $\mu$ 越近，对数概率越高——模型对这条轨迹越"有信心"：
+
+$$\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\|x_{t-\Delta t} - \mu\|^2}{2\,g^2\,\Delta t} + \text{const} \tag{⑤}$$
+
+> 代码：`log_prob_step = -0.5 * ((actual_next - mu) ** 2).sum() / (g ** 2 * dt)`
+
+**公式 ⑥：整条轨迹对数概率**
+
+$$\log \pi_\theta(\text{trajectory} | c) = \sum_{k=1}^{T} \log p_\theta(x_{t_k - \Delta t} | x_{t_k}, c) \tag{⑥}$$
+
+> 代码：`total_log_prob = total_log_prob + log_prob_step`（逐步累加）
+
+这与 LLM 中 token 级对数概率求和的形式完全对应——至此，GRPO 的整套框架可以无缝迁移到图像生成。
 
 ---
 
@@ -245,44 +307,34 @@ num_steps = 50    # 去噪步数
 这是 Flow-GRPO 区别于 LLM GRPO 的**核心函数**：
 
 ```python
-def compute_trajectory_log_prob(model, trajectory, prompt_embeds, sigma=0.01):
+def compute_trajectory_log_prob(model, trajectory, prompt_embeds, g=0.01):
     """
     计算一条去噪轨迹的总对数概率 log π_θ(trajectory | c)。
-
-    对照公式（省略 const 项）：
-        单步:  log p_θ(x_{t-Δt}|x_t) = -‖x_{t-Δt} - μ‖² / (2σ²)
-        整条:  log π_θ = Σ_k log p_θ(x_{t_k-Δt} | x_{t_k})
-    其中 μ = x_t - Δt·v_θ(x_t, t, c) 是 ODE 确定性预测，即高斯转移核的均值。
-
-    Args:
-        model: 策略网络（Flux + LoRA），提供 predict_velocity 方法。
-        trajectory: 采样时记录的状态列表 [(噪声图, 时间), ...]，
-                    从 (x_T, t=1) 到 (x_0, t=0)，共 num_steps+1 个元素。
-        prompt_embeds: 文本 Prompt 的编码向量。
-        sigma: SDE 扰动强度（对应公式中的 σ_t，这里简化为常数）。
-    Returns:
-        total_log_prob: 标量，整条轨迹的对数概率。
+    依次实现公式 ①→②→③→⑤，按公式 ⑥ 逐步累加。
     """
     total_log_prob = 0.0
 
     for k in range(len(trajectory) - 1):
-        # ── 第 k 步：从 trajectory 中取出相邻两个状态 ──
-        noisy_img, t_now = trajectory[k]        # 当前时刻的噪声图 x_t 和时间 t
-        actual_next, t_next = trajectory[k + 1]  # 采样时实际走到的下一状态（含随机扰动 ε）
-        dt = t_now - t_next                       # 时间步长 Δt（> 0，从 t=1 → t=0）
+        noisy_img, t_now = trajectory[k]
+        actual_next, t_next = trajectory[k + 1]
+        dt = t_now - t_next                       # Δt > 0
 
-        # 模型预测速度场 v_θ(x_t, t, c)
         velocity = model.predict_velocity(noisy_img, t_now, prompt_embeds)
 
-        # 计算高斯均值 μ = x_t - Δt·v_θ
-        # 即"如果没有随机扰动，模型认为下一步应该到达的位置"
-        mu = noisy_img - dt * velocity
+        # 公式 ①  x̂₀ = x_t − t·v_θ
+        pred_x0 = noisy_img - t_now * velocity
 
-        # 套用高斯对数概率公式：log p = -‖actual - μ‖² / (2σ²)
-        # actual_next 与 mu 偏差越小 → log p 越大 → 模型对这条轨迹越"有信心"
-        log_prob_step = -0.5 * ((actual_next - mu) ** 2).sum() / (sigma ** 2)
+        # 公式 ②  Score = −(x_t − (1−t)·x̂₀) / t²
+        score = -(noisy_img - (1 - t_now) * pred_x0) / (t_now ** 2)
 
-        # 逐步累加，类比 LLM 中把每个 token 的 log p 求和
+        # 公式 ③  μ = (x_t − Δt·v_θ) + ½·g²·Score·Δt
+        mu = (noisy_img - dt * velocity) + 0.5 * g**2 * score * dt
+
+        # 公式 ⑤  log p = −‖x_{t−Δt} − μ‖² / (2·g²·Δt)
+        variance = g ** 2 * dt
+        log_prob_step = -0.5 * ((actual_next - mu) ** 2).sum() / variance
+
+        # 公式 ⑥  逐步累加
         total_log_prob = total_log_prob + log_prob_step
 
     return total_log_prob
@@ -291,35 +343,36 @@ def compute_trajectory_log_prob(model, trajectory, prompt_embeds, sigma=0.01):
 ## 3. 在线采样：生成图像并记录轨迹
 
 ```python
-def generate_with_trajectory(model, prompt_embeds, num_steps, sigma=0.01):
+def generate_with_trajectory(model, prompt_embeds, num_steps, g=0.01):
     """
     生成一张图像，并记录完整去噪轨迹供后续计算 log π_θ。
-
-    对照 SDE 公式：x_{t-Δt} = x_t - Δt·v_θ(x_t,t,c) + σ·ε·√Δt
-
-    Returns:
-        image: 解码后的像素图（供奖励模型打分）。
-        trajectory: [(噪声图, 时间), ...]，从 t=1 到 t=0，共 num_steps+1 个状态。
+    依次实现公式 ①→②→③→④。
     """
-    # 起点：VAE 隐空间中的纯噪声
-    noisy_img = torch.randn(1, 16, 64, 64)                     # (1, C, H, W)
-    timesteps = torch.linspace(1.0, 0.0, num_steps + 1)        # 从 t=1 到 t=0
-    trajectory = [(noisy_img.clone(), timesteps[0])]            # 记录起点
+    noisy_img = torch.randn(1, 16, 64, 64)
+    timesteps = torch.linspace(1.0, 0.0, num_steps + 1)
+    trajectory = [(noisy_img.clone(), timesteps[0])]
 
     for i in range(num_steps):
-        t_now  = timesteps[i]                                   # 当前时间
-        t_next = timesteps[i + 1]                               # 下一时间
-        dt = t_now - t_next                                     # 步长 Δt > 0
+        t_now  = timesteps[i]
+        t_next = timesteps[i + 1]
+        dt = t_now - t_next                                     # Δt > 0
 
-        # 模型预测速度场（采样阶段不需要梯度）
         with torch.no_grad():
             velocity = model.predict_velocity(noisy_img, t_now, prompt_embeds)
 
-        # SDE 一步：ODE 确定性漂移 + 随机扰动 ε（使 log p 有定义）
-        noise = torch.randn_like(noisy_img)
-        noisy_img = noisy_img - dt * velocity + sigma * noise * (dt ** 0.5)
+        # 公式 ①  x̂₀ = x_t − t·v_θ
+        pred_x0 = noisy_img - t_now * velocity
 
-        # 记录真实到达的状态（含随机扰动），后续用于计算 log π
+        # 公式 ②  Score = −(x_t − (1−t)·x̂₀) / t²
+        score = -(noisy_img - (1 - t_now) * pred_x0) / (t_now ** 2)
+
+        # 公式 ③  μ = (x_t − Δt·v_θ) + ½·g²·Score·Δt
+        mu = (noisy_img - dt * velocity) + 0.5 * g**2 * score * dt
+
+        # 公式 ④  x_{t−Δt} = μ + g·√Δt·ε
+        noise = torch.randn_like(noisy_img)
+        noisy_img = mu + g * noise * (dt ** 0.5)
+
         trajectory.append((noisy_img.clone(), t_next))
 
     image = vae_decode(noisy_img)
