@@ -74,8 +74,6 @@ tags:
 # 杂谈
 
 1. [杂谈｜写作的目的](../5-some_think)
-2. [笔记｜VGGT——用一个 Transformer 完成所有 3D 视觉任务](../27-vggt)
-3. [笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](../28-register-tokens)
 
 <!-- # 
 ## 基础理论

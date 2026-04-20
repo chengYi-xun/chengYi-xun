@@ -17,7 +17,7 @@ mathjax: true
 >
 > **前置知识**：线性代数基础、Transformer 注意力机制（可参考本站第十一篇 UIT/DiT 详解）。
 >
-> ⬅️ 上一篇：[笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](/chengYi-xun/posts/28-register-tokens/)
+> ⬅️ 上一篇：[笔记｜生成模型（二十四）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/25-video-grpo/)
 >
 > ➡️ 下一篇：[笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](/chengYi-xun/posts/30-clip/)
 
