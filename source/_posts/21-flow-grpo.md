@@ -108,20 +108,40 @@ $$
 
 **解决方案**：我们需要一个“指南针”来纠正这种偏离，这个指南针就是 **Score Function（分数函数 $\nabla_{x_t} \log p_t(x_t)$）**。它在数学上永远指向数据分布最密集（最像真实图像）的方向。一旦随机探索让你偏航，Score 就会把你拉回来。
 
-**那么，怎么计算这个 Score 呢？这就用到了统计学中神奇的 Tweedie 公式（Tweedie's Formula）：**
+**那么，怎么计算这个 Score 呢？这就用到了统计学中神奇的特威迪公式（Tweedie's Formula）：**
 
-Tweedie 公式证明了一个深刻的结论：**只要你能预测出当前的干净图像 $\hat{x}_0$，就能直接算出当前的 Score。**
+特威迪公式（Tweedie's Formula）证明了一个深刻的结论：**只要你能预测出当前的干净图像 $\hat{x}_0$，就能直接算出当前的 Score。**
 
 具体推导如下：
-在 Rectified Flow 中，给定干净图像 $x_0$ 和纯噪声 $x_1 \sim \mathcal{N}(0, I)$，根据直线插值公式 $x_t = (1-\sigma)x_0 + \sigma x_1$，我们可以看出 $x_t$ 服从均值为 $\mu_t = (1-\sigma)x_0$、标准差为 $\sigma$ 的高斯分布。
 
-对于高斯分布，对其对数概率密度求导，Score 的解析解非常简单：
-$$\text{Score} = \nabla_{x_t} \log p_t(x_t) = -\frac{x_t - \mu_t}{\text{variance}} = -\frac{x_t - (1-\sigma)x_0}{\sigma^2}$$
+**第一步：确定 $x_t$ 的条件分布**
+在 Rectified Flow 中，前向加噪过程是干净图像 $x_0$ 和纯噪声 $x_1 \sim \mathcal{N}(0, I)$ 的直线插值：
+$$x_t = (1-\sigma)x_0 + \sigma x_1$$
+由于 $x_1$ 是标准高斯噪声，所以给定 $x_0$ 时，$x_t$ 的条件分布 $p(x_t | x_0)$ 自然也是一个高斯分布：
+- 均值 $\mu_t = (1-\sigma)x_0$
+- 方差 $\sigma_t^2 = \sigma^2 I$
 
-而根据直线运动公式，我们可以直接反推当前的干净图像预测值：
+**第二步：写出高斯分布的概率密度函数（PDF）并取对数**
+多维高斯分布的概率密度函数为：
+$$p(x_t | x_0) = \frac{1}{(2\pi \sigma^2)^{d/2}} \exp\left( -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} \right)$$
+我们在两边同时取自然对数 $\log$：
+$$\log p(x_t | x_0) = -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} - \frac{d}{2}\log(2\pi\sigma^2)$$
+
+**第三步：对 $x_t$ 求梯度（即计算 Score）**
+Score Function 的定义就是对数概率密度对 $x_t$ 的偏导数（梯度）。
+因为后面的 $-\frac{d}{2}\log(2\pi\sigma^2)$ 是常数，求导后为 0。我们只需要对前面的二次项求导：
+$$\nabla_{x_t} \log p(x_t | x_0) = \nabla_{x_t} \left( -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} \right)$$
+根据向量求导法则 $\nabla_x \|x - \mu\|^2 = 2(x - \mu)$，代入上式得到：
+$$\text{Score} = -\frac{2(x_t - \mu_t)}{2\sigma^2} = -\frac{x_t - \mu_t}{\sigma^2}$$
+
+**第四步：代入均值 $\mu_t$ 与模型预测**
+将 $\mu_t = (1-\sigma)x_0$ 代入，得到：
+$$\text{Score} = -\frac{x_t - (1-\sigma)x_0}{\sigma^2}$$
+在实际生成时，我们并不知道真实的 $x_0$ 是什么，但根据特威迪公式，我们可以用模型当前预测的 $\hat{x}_0$ 来近似替代真实的 $x_0$。
+而根据直线运动公式（起点 = 当前位置 - 速度 × 时间），我们可以用模型预测的速度场 $v_\theta$ 反推 $\hat{x}_0$：
 $$\hat{x}_0 = x_t - \sigma \cdot v_\theta$$
 
-把 $\hat{x}_0$ 代入上述公式，就能在代码中直接计算出 Score。
+把模型预测的 $\hat{x}_0$ 代入 Score 公式，就能在代码中直接计算出纠偏所需的“指南针”了。
 
 ### 2. Langevin Dynamics 如何修正偏航？
 
