@@ -247,9 +247,11 @@ $$x_{t-\Delta t} = \mu + g\sqrt{\Delta t} \cdot \epsilon, \quad \epsilon \sim \m
 
 由于 $x_{t-\Delta t} \sim \mathcal{N}(\mu, g^2\Delta t \cdot I)$，实际采样到的 $x_{t-\Delta t}$ 离修正均值 $\mu$ 越近，对数概率越高——模型对这条轨迹越"有信心"：
 
-$$\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\|x_{t-\Delta t} - \mu\|^2}{2\,g^2\,\Delta t} + \text{const} \tag{⑤}$$
+$$\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\|x_{t-\Delta t} - \mu\|^2}{2\,g^2\,\Delta t} \underbrace{- \log(g\sqrt{\Delta t}) - \tfrac{1}{2}\log(2\pi)}_{\text{高斯归一化常数}} \tag{⑤}$$
 
 > 代码：`log_prob_step = -0.5 * ((actual_next - mu) ** 2).sum() / (g ** 2 * dt)`
+
+归一化常数只依赖 $g$ 和 $\Delta t$，不依赖策略参数 $\theta$，因此在 GRPO 的 importance ratio $\exp(\log\pi_\theta^{\text{new}} - \log\pi_\theta^{\text{old}})$ 中分子分母相消。伪代码省略了这些常数项；官方实现保留了完整的 `- log(std_dev_t * sqrt(-dt)) - log(sqrt(2π))` 以便调试。
 
 **公式 ⑥：整条轨迹对数概率**
 
