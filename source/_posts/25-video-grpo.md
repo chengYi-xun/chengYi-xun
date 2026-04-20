@@ -327,7 +327,12 @@ for i, sample in enumerate(samples_batched_list):       # 遍历每个样本
 
 - `torch.randperm` 为每个样本**独立打乱** T 步顺序，再只取前 K 步 → 等效于无放回随机抽样
 - 不同样本抽中的时间步组合不同 → 梯度估计的多样性更高
-- 每步单独 `.backward()` 后立即释放计算图 → 显存只需保持 1 步的图，而非 T 步
+- 每步单独 `.backward()` 后立即释放计算图 → 显存只需保持 1 步的图，而非 K 步
+
+PyTorch 的关键特性是：**在两次 `optimizer.zero_grad()` 之间，多次 `.backward()` 的梯度会自动累加**。即 `param.grad` 在每次 `.backward()` 后被加上（而非覆盖）。因此：
+
+$$\underbrace{\nabla_\theta L_1 + \nabla_\theta L_2 + \cdots + \nabla_\theta L_K}_{\text{K 次 .backward() 累加}} = \nabla_\theta(L_1 + L_2 + \cdots + L_K)$$
+
 
 > 参考资料：
 >
