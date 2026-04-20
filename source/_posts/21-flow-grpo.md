@@ -96,34 +96,78 @@ $$
 x_{t - \Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c)
 $$
 
-**如何从这个过程中提取对数概率？** 关键观察：确定性 ODE 没有概率可言，但如果我们在每一步都加入微小的高斯扰动（将 ODE 变成 SDE），转移就变成了一个随机过程：
+**如何从这个过程中提取对数概率？** 关键观察：确定性 ODE 没有概率可言，但如果我们在每一步都加入微小的高斯扰动（将 ODE 变成 SDE），转移就变成了一个随机过程。
 
-$$
-x_{t-\Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c) + \sigma_t \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
-$$
+为了保证加入噪声后轨迹依然收敛到真实数据分布，必须引入 **Score Function** 进行 Langevin 纠偏。
 
-由于 $\epsilon$ 是标准高斯噪声，$x_{t-\Delta t}$ 的条件分布自然就是以 ODE 预测值为均值、以 $\sigma_t^2 I$ 为协方差的高斯分布：
+### 1. 为什么要引入 SDE 与 Score Function？
 
-$$
-p_\theta(x_{t-\Delta t} | x_t, c) = \mathcal{N}\left(x_{t-\Delta t}; \; x_t - \Delta t \cdot v_\theta(x_t, t, c), \; \sigma_t^2 I\right)
-$$
+在纯 ODE 采样中，模型就像是沿着一条设定好的轨道平滑地滑向终点（只需速度 $v_\theta$ 即可更新 $x_t$）。但 Flow-GRPO 为了让强化学习能够“试错”和“探索”，引入了 **SDE（随机微分方程）**，也就是在滑行的过程中加入随机的扰动（噪声）。
+
+**问题来了**：如果盲目地加入随机噪声，生成的轨迹就会偏离真实图像的流形（Manifold），最终生成崩坏的画面。
+
+**解决方案**：我们需要一个“指南针”来纠正这种偏离，这个指南针就是 **Score Function（分数函数 $\nabla_{x_t} \log p_t(x_t)$）**。它在数学上永远指向数据分布最密集（最像真实图像）的方向。一旦随机探索让你偏航，Score 就会把你拉回来。
+
+**那么，怎么计算这个 Score 呢？这就用到了统计学中神奇的 Tweedie 公式（Tweedie's Formula）：**
+
+Tweedie 公式证明了一个深刻的结论：**只要你能预测出当前的干净图像 $\hat{x}_0$，就能直接算出当前的 Score。**
+
+具体推导如下：
+在 Rectified Flow 中，给定干净图像 $x_0$ 和纯噪声 $x_1 \sim \mathcal{N}(0, I)$，根据直线插值公式 $x_t = (1-\sigma)x_0 + \sigma x_1$，我们可以看出 $x_t$ 服从均值为 $\mu_t = (1-\sigma)x_0$、标准差为 $\sigma$ 的高斯分布。
+
+对于高斯分布，对其对数概率密度求导，Score 的解析解非常简单：
+$$\text{Score} = \nabla_{x_t} \log p_t(x_t) = -\frac{x_t - \mu_t}{\text{variance}} = -\frac{x_t - (1-\sigma)x_0}{\sigma^2}$$
+
+而根据直线运动公式，我们可以直接反推当前的干净图像预测值：
+$$\hat{x}_0 = x_t - \sigma \cdot v_\theta$$
+
+把 $\hat{x}_0$ 代入上述公式，就能在代码中直接计算出 Score。
+
+### 2. Langevin Dynamics 如何修正偏航？
+
+在 SDE 理论中，一个连续时间的随机微分方程（如扩散模型的前向加噪过程）通常写为：
+$$\mathrm{d}x_t = f(x_t, t) \mathrm{d}t + g(t) \mathrm{d}w_t$$
+
+根据 Anderson 定理，任何一个前向 SDE 都对应一个**逆向 SDE（Reverse SDE）**，用于从纯噪声生成数据。逆向 SDE 的标准公式为：
+$$\mathrm{d}x_t = \left[ f(x_t, t) - \frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t) \right] \mathrm{d}t + g(t) \mathrm{d}\bar{w}_t$$
+
+仔细观察这个逆向 SDE 的漂移项（方括号内的部分）：
+
+1. $f(x_t, t)$ 是原本的 ODE 漂移项（基础更新）。
+2. $-\frac{1}{2} g(t)^2 \nabla_{x_t} \log p_t(x_t)$ 就是**为了抵消注入噪声 $g(t) \mathrm{d}\bar{w}_t$ 带来的分布发散，而必须强制加入的 Score 修正项**。
+
+在 Flow-GRPO 的官方代码实现（`/flow_grpo/diffusers_patch/sd3_sde_with_logprob.py`）中，这套理论被精确地转化为代码。虽然代码中为了计算效率将公式合并成了一行：
+
+```python
+# 官方代码中的合并写法：
+prev_sample_mean = sample*(1+std_dev_t**2/(2*sigma)*dt) + model_output*(1+std_dev_t**2*(1-sigma)/(2*sigma))*dt
+```
+
+但如果我们将其拆解，它在代数上完全等价于：
+
+```python
+# 预测干净样本 x_0
+pred_original_sample = sample - sigma * model_output 
+
+# 计算 Score Function
+score_estimate = -(sample - pred_original_sample * (1 - sigma)) / sigma**2
+
+# Langevin 修正项
+log_term = -0.5 * std_dev_t**2 * score_estimate
+
+# 最终的均值更新 = ODE基础更新 + Langevin修正
+prev_sample_mean = (sample + model_output * dt) + log_term * dt
+```
+
+由于我们在更新时加入了方差为 `(std_dev_t * sqrt(-dt))^2` 的高斯噪声，所以 $x_{t-\Delta t}$ 的条件分布自然就是以 `prev_sample_mean` 为均值的高斯分布。
 
 对应的对数概率为：
 
 $$
-\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\| x_{t-\Delta t} - (x_t - \Delta t \cdot v_\theta(x_t, t, c)) \|^2}{2\sigma_t^2} + \text{const}
+\log p_\theta(x_{t-\Delta t} | x_t, c) = -\frac{\| x_{t-\Delta t} - \text{prev\_sample\_mean} \|^2}{2\text{variance}} + \text{const}
 $$
 
-**公式拆解**：这个结果直接来自多维高斯分布的概率密度取对数。对于 $\mathcal{N}(x;\mu, \sigma_t^2 I)$，密度函数为 $p(x) = (2\pi\sigma_t^2)^{-d/2}\exp\!\bigl(-\frac{\|x-\mu\|^2}{2\sigma_t^2}\bigr)$，取对数后展开：
-
-$$
-\log p(x) = -\frac{\|x - \mu\|^2}{2\sigma_t^2} \underbrace{- \frac{d}{2}\log(2\pi) - \frac{d}{2}\log \sigma_t^2}_{\text{const}}
-$$
-
-- **分母 $2\sigma_t^2$**：是高斯密度函数中 $-\frac{1}{2}$ 系数与协方差逆 $\Sigma^{-1}=\frac{1}{\sigma_t^2}I$ 相乘的结果。
-- **const 项**：包含归一化常数 $-\frac{d}{2}\log(2\pi)$ 和行列式项 $-\frac{d}{2}\log\sigma_t^2$，它们都不含模型参数 $\theta$。在 GRPO 训练中，无论是对 $\theta$ 求梯度还是计算重要性采样比 $\exp(\log\pi_\theta - \log\pi_\text{old})$，这些常数项要么导数为零、要么做差时对消，因此可以安全省略。
-
-**直觉理解**：模型预测的"涂抹方向"是 $v_\theta$，实际走的方向可能略有偏差。偏差越小（$\|x_{t-\Delta t} - \hat{x}_{t-\Delta t}\|^2$ 越小），对数概率越高——模型对自己的生成轨迹越"有信心"。
+**直觉理解**：模型预测的"涂抹方向"是 $v_\theta$，实际走的方向可能略有偏差。偏差越小，对数概率越高——模型对自己的生成轨迹越"有信心"。
 
 整条轨迹（$T$ 步去噪）的总对数概率是所有时间步的累加：
 
