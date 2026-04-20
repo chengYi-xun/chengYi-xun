@@ -138,7 +138,31 @@ DanceGRPO 在多个榜单上（比如 HPS v2.1, CLIP Score, VideoAlign 等）都
 
 > 源码位置：`fastvideo/train_grpo_hunyuan.py` L57-96（Flux / Wan / Qwen 等变体结构一致）
 
-这是 GRPO 训练的"原子操作"——在标准 Flow Matching ODE 步进基础上，注入 SDE 随机项实现"探索"，并计算该动作的对数概率 $\log\pi$。
+这是 GRPO 训练的"原子操作"——在标准 Flow Matching ODE 步进基础上，注入 SDE 随机项实现"探索"，并计算该动作的对数概率 $\log\pi$。代码中每一行对应的数学公式如下：
+
+**公式 ①：ODE 步进**（Euler 离散化，注意 $\Delta\sigma < 0$）
+
+$$x_{t-\Delta t} = x_t + \Delta\sigma \cdot v_\theta$$
+
+**公式 ②：Tweedie 反推干净样本**
+
+$$\hat{x}_0 = x_t - t \cdot v_\theta$$
+
+**公式 ③：Score Function**（由 Tweedie 公式推得）
+
+$$\nabla_{x_t}\log p(x_t|x_0) = -\frac{x_t - (1-t)\hat{x}_0}{t^2}$$
+
+**公式 ④：Langevin 修正**（将 Score 纠偏叠加到 ODE 均值上）
+
+$$\mu = x_{t-\Delta t}^{\text{ODE}} + \tfrac{1}{2}\eta^2 \cdot \nabla_{x_t}\log p_t \cdot \Delta t$$
+
+**公式 ⑤：SDE 采样**（在修正后的均值上加噪声）
+
+$$x_{t-\Delta t} = \mu + \eta\sqrt{\Delta t} \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)$$
+
+**公式 ⑥：高斯对数概率**（完整形式，含归一化常数）
+
+$$\log p(x_{t-\Delta t}|x_t) = -\frac{\|x_{t-\Delta t} - \mu\|^2}{2(\eta\sqrt{\Delta t})^2} - \log(\eta\sqrt{\Delta t}) - \tfrac{1}{2}\log(2\pi)$$
 
 ```python
 # ===== 源码：fastvideo/train_grpo_hunyuan.py =====
@@ -146,24 +170,31 @@ import math, torch
 
 def flux_step(model_output, latents, eta, sigmas, index, prev_sample, grpo, sde_solver):
     sigma = sigmas[index]
-    dsigma = sigmas[index + 1] - sigma                   # Δσ（负值，σ 从 1→0 递减）
-    prev_sample_mean = latents + dsigma * model_output    # ODE 步进：x_{t+1} = x_t + Δσ·v_θ
-    pred_original_sample = latents - sigma * model_output # 预测干净样本 x̂₀
+    dsigma = sigmas[index + 1] - sigma                   # Δσ < 0（σ 从 1→0 递减）
 
-    delta_t = sigma - sigmas[index + 1]                   # 正的时间增量
-    std_dev_t = eta * math.sqrt(delta_t)                  # SDE 噪声标准差（η 控制探索强度）
+    # 公式 ①  ODE 步进：x_{t-Δt} = x_t + Δσ·v_θ
+    prev_sample_mean = latents + dsigma * model_output
 
-    # SDE 修正项：用 score function 修正 ODE 方向
+    # 公式 ②  Tweedie：x̂₀ = x_t − t·v_θ
+    pred_original_sample = latents - sigma * model_output
+
+    delta_t = sigma - sigmas[index + 1]                   # 正的时间增量 Δt
+    std_dev_t = eta * math.sqrt(delta_t)                  # 噪声标准差 = η√Δt
+
+    # 公式 ③④  Score Function + Langevin 修正
     if sde_solver:
+        # 公式 ③  Score = −(x_t − (1−t)·x̂₀) / t²
         score_estimate = -(latents - pred_original_sample * (1 - sigma)) / sigma**2
+        # 公式 ④  μ = ODE结果 + ½η²·Score·Δt
+        #   注意：log_term·dsigma = (−½η²·Score)·(−Δt) = +½η²·Score·Δt
         log_term = -0.5 * eta**2 * score_estimate
         prev_sample_mean = prev_sample_mean + log_term * dsigma
 
-    # 推理/rollout 阶段：prev_sample=None → 显式加噪采样
+    # 公式 ⑤  SDE 采样：x_{t-Δt} = μ + η√Δt · ε
     if grpo and prev_sample is None:
         prev_sample = prev_sample_mean + torch.randn_like(prev_sample_mean) * std_dev_t
 
-    # GRPO 核心：计算该动作的高斯对数概率
+    # 公式 ⑥  高斯对数概率：log p = −‖x−μ‖²/(2σ²) − log σ − ½log(2π)
     if grpo:
         log_prob = (
             -((prev_sample.detach().float() - prev_sample_mean.float()) ** 2)
@@ -186,12 +217,29 @@ def flux_step(model_output, latents, eta, sigmas, index, prev_sample, grpo, sde_
 
 > 源码位置：`fastvideo/train_grpo_hunyuan.py` L370-477（`train_one_step` 函数内部）
 
-DanceGRPO 的核心创新：**VQ（画质）和 MQ（运动）各自独立做组内标准化**，避免某个维度主导训练。
+DanceGRPO 的核心创新：**VQ（画质）和 MQ（运动）各自独立做组内标准化**，避免某个维度主导训练。代码对应的公式如下：
+
+**公式 ⑦：分维度组内标准化（GRPO 优势）**
+
+$$\hat{A}_i^{(d)} = \frac{r_i^{(d)} - \bar{r}_{\text{group}}^{(d)}}{\sigma_{\text{group}}^{(d)} + \epsilon}, \quad d \in \{\text{VQ}, \text{MQ}\}$$
+
+**公式 ⑧：重要性采样比**
+
+$$\rho = \frac{\pi_\theta(a|s)}{\pi_{\text{old}}(a|s)} = \exp\left(\log\pi_\theta - \log\pi_{\text{old}}\right)$$
+
+**公式 ⑨：PPO Clip Loss（分维度独立计算）**
+
+$$L^{(d)} = \mathbb{E}\left[\max\left(-\hat{A}^{(d)} \cdot \rho, \;\; -\hat{A}^{(d)} \cdot \text{clip}(\rho, 1{-}\epsilon, 1{+}\epsilon)\right)\right]$$
+
+**公式 ⑩：加权组合总损失**
+
+$$L = \alpha_{\text{VQ}} \cdot L^{(\text{VQ})} + \alpha_{\text{MQ}} \cdot L^{(\text{MQ})}$$
 
 ```python
 # ===== 源码：fastvideo/train_grpo_hunyuan.py (train_one_step 内部) =====
 
-# ── 第一步：VQ / MQ 分别组内标准化 ─────────────────────────────
+# ── 公式 ⑦：VQ / MQ 分别组内标准化 ────────────────────────────
+#    Â_i^(d) = (r_i^(d) − r̄_group^(d)) / (σ_group^(d) + ε)
 n = len(vq_rewards) // num_generations           # 提示词组数
 vq_advantages = torch.zeros_like(vq_rewards)
 mq_advantages = torch.zeros_like(mq_rewards)
@@ -206,20 +254,23 @@ for i in range(n):
     group_mq = mq_rewards[s:e]                   # 同一提示词下 G 个视频的运动分
     mq_advantages[s:e] = (group_mq - group_mq.mean()) / (group_mq.std() + 1e-8)
 
-# ── 第二步：分别计算 PPO clip loss，再加权组合 ──────────────────
-ratio = torch.exp(new_log_probs - old_log_probs) # 策略概率比 π_θ/π_old
+# ── 公式 ⑧：重要性采样比 ρ = π_θ / π_old ─────────────────────
+ratio = torch.exp(new_log_probs - old_log_probs)
 
+# ── 公式 ⑨：PPO clip loss（VQ 维度）──────────────────────────
 vq_advantages = torch.clamp(vq_advantages, -adv_clip_max, adv_clip_max)
 vq_unclipped_loss = -vq_advantages * ratio
 vq_clipped_loss   = -vq_advantages * torch.clamp(ratio, 1-clip_range, 1+clip_range)
 vq_loss = torch.mean(torch.maximum(vq_unclipped_loss, vq_clipped_loss))
 
+# ── 公式 ⑨：PPO clip loss（MQ 维度）──────────────────────────
 mq_advantages = torch.clamp(mq_advantages, -adv_clip_max, adv_clip_max)
 mq_unclipped_loss = -mq_advantages * ratio
 mq_clipped_loss   = -mq_advantages * torch.clamp(ratio, 1-clip_range, 1+clip_range)
 mq_loss = torch.mean(torch.maximum(mq_unclipped_loss, mq_clipped_loss))
 
-final_loss = vq_coef * vq_loss + mq_coef * mq_loss  # 加权组合总损失
+# ── 公式 ⑩：加权组合总损失 ────────────────────────────────────
+final_loss = vq_coef * vq_loss + mq_coef * mq_loss
 ```
 
 为什么不直接 `vq_coef * vq_reward + mq_coef * mq_reward` 合并后再标准化？因为两个维度的**尺度和分布不同**——VQ 分数通常较大，MQ 较小。如果合并后标准化，画质会淹没运动。分别标准化后，每个维度都在"同组中排第几"的公平尺度上竞争。
@@ -230,31 +281,41 @@ final_loss = vq_coef * vq_loss + mq_coef * mq_loss  # 加权组合总损失
 
 生成视频时走完全部 T 步去噪，但**训练时只在随机抽样的部分步上反向传播**——这是 DanceGRPO 解决视频显存爆炸的关键。
 
+**背景**：完整的 GRPO 策略梯度需要对轨迹的所有 $T$ 步求和：
+
+$$\nabla_\theta L = \sum_{k=1}^{T} \nabla_\theta \log\pi_\theta(a_k | s_k) \cdot \hat{A}$$
+
+但视频生成中 $T$ 步 × 帧数 × 分辨率的计算图会撑爆显存。DanceGRPO 的做法是**随机抽样 $K \ll T$ 步**，用无偏子集估计替代全部求和：
+
+$$\nabla_\theta L \approx \frac{T}{K}\sum_{k \in \mathcal{S}} \nabla_\theta \log\pi_\theta(a_k | s_k) \cdot \hat{A}, \quad |\mathcal{S}| = K$$
+
 ```python
 # ===== 源码：fastvideo/train_grpo_hunyuan.py (train_one_step 内部) =====
 
-# ── 随机打乱时间步顺序（每个样本独立打乱）────────────────────
+# ── 随机抽样：从 T 步中无放回抽取 K 步 ───────────────────────
+# 技巧：先打乱顺序，再只取前 K 步 = 等效于随机不重复抽样
 perms = torch.stack(
     [torch.randperm(len(samples["timesteps"][0])) for _ in range(batch_size)]
 ).to(device)
+# 对 latents、next_latents、log_probs 按打乱顺序重排
 for key in ["timesteps", "latents", "next_latents", "log_probs"]:
     samples[key] = samples[key][torch.arange(batch_size).to(device)[:, None], perms]
 
-# ── 只训练 timestep_fraction 比例的时间步 ──────────────────────
+# K = T × timestep_fraction（如 50步 × 0.2 = 只训练 10 步）
 train_timesteps = int(num_total_steps * args.timestep_fraction)
 
 for i, sample in enumerate(samples_batched_list):       # 遍历每个样本
-    for t in range(train_timesteps):                     # 只取前 train_timesteps 步
-        new_log_probs = grpo_one_step(                   # 用当前模型重算 log_prob
-            sample["latents"][:, t],
-            sample["next_latents"][:, t],
+    for t in range(train_timesteps):                     # 只遍历抽中的 K 步
+        # 公式 ⑥  用当前模型重算该步的 log π_θ（内部调用 flux_step，见步骤 1）
+        new_log_probs = grpo_one_step(
+            sample["latents"][:, t],                     # 该步输入 x_t
+            sample["next_latents"][:, t],                # 该步输出 x_{t-Δt}（推理时已记录）
             ..., transformer, sigma_schedule,
         )
+        # 公式 ⑧⑨⑩  计算 ratio → 分维度 clip loss → 加权组合（详见步骤 2）
         ratio = torch.exp(new_log_probs - sample["log_probs"][:, t])
-
-        # ... 计算 VQ/MQ 分项 clip loss（同步骤 2）...
-        final_loss = vq_coef * vq_loss + mq_coef * mq_loss
-        final_loss.backward()                            # 仅对抽样时间步反传
+        final_loss = compute_multidim_clip_loss(ratio, vq_advantages, mq_advantages)
+        final_loss.backward()                            # 每步独立反传，立即释放计算图
 
     if (i + 1) % gradient_accumulation_steps == 0:       # 梯度累积后统一更新
         grad_norm = transformer.clip_grad_norm_(max_grad_norm)
@@ -262,7 +323,11 @@ for i, sample in enumerate(samples_batched_list):       # 遍历每个样本
         optimizer.zero_grad()
 ```
 
-这里的关键技巧是：先用 `torch.randperm` 打乱全部 T 步的顺序，再只取前 `train_timesteps = T × timestep_fraction` 步——**等效于从 T 步中随机不重复抽样**。由于打乱是每个样本独立进行的，不同样本训练的时间步组合也不同，进一步增加了梯度估计的多样性。
+**为什么这样有效？**
+
+- `torch.randperm` 为每个样本**独立打乱** T 步顺序，再只取前 K 步 → 等效于无放回随机抽样
+- 不同样本抽中的时间步组合不同 → 梯度估计的多样性更高
+- 每步单独 `.backward()` 后立即释放计算图 → 显存只需保持 1 步的图，而非 T 步
 
 > 参考资料：
 >

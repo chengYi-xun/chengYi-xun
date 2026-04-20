@@ -112,7 +112,68 @@ $$
 
 $$x_{t-\Delta t} = \underbrace{(x_t - \Delta t \cdot v_\theta)}_{\text{ODE 漂移}} + \underbrace{\tfrac{1}{2}g^2 \cdot \nabla_{x_t}\log p_t(x_t) \cdot \Delta t}_{\text{Score 纠偏}} + \underbrace{g\sqrt{\Delta t}\cdot\epsilon}_{\text{随机探索}}$$
 
-第一项是原始 ODE 的确定性去噪；第三项是为 RL 注入的随机噪声；第二项就是 Score 纠偏——它的方向指向数据高密度区域，恰好抵消噪声带来的分布偏移。**那么，核心问题变成了：如何高效计算这个 $\nabla_{x_t}\log p_t(x_t)$？这就用到了特威迪公式（Tweedie's Formula）：**
+第一项是原始 ODE 的确定性去噪；第三项是为 RL 注入的随机噪声；第二项就是 Score 纠偏——它的方向指向数据高密度区域，恰好抵消噪声带来的分布偏移。
+
+{% note warning no-icon %}
+**关键问题：Score 纠偏和随机噪声之间是什么关系？**
+
+直觉上会产生一个疑问：噪声 $\epsilon$ 是随机的（每个样本不同），那纠偏是否也应该依赖于具体加了什么噪声？答案是：**Score 不纠正某个具体的 $\epsilon$，而是提供一个位置相关的"恢复力场"。**
+
+类比：想象一群粒子在山谷中随机游走。噪声 = 每个粒子随机晃动的方向（每人不同）；Score = 山谷壁给的重力（只取决于你站在哪里，不关心你怎么晃过来的）。山谷壁不需要知道你具体往哪个方向晃了——它只需要把所有偏离谷底的人往回拉。
+
+数学上，通过 **Fokker-Planck 方程**可以严格证明这一点。
+
+**预备知识：Fokker-Planck 方程是什么？**
+
+想象你同时释放 100 万个粒子，每个都独立遵循相同的 SDE $dx = \mu\,d\tau + \sigma\,dW$。在任意时刻 $\tau$，这些粒子散布在空间中形成一团"概率云"。$p(x, \tau)$ 就是这个云的密度——描述在位置 $x$ 附近找到粒子的概率。
+
+Fokker-Planck 方程告诉我们这个密度如何随时间演化，它由两个物理效应叠加而成：
+
+$$\frac{\partial p}{\partial \tau} = \underbrace{-\nabla\cdot(\mu\, p)}_{\text{漂移搬运概率（连续性方程）}} + \underbrace{\frac{1}{2}\sigma^2\nabla^2 p}_{\text{噪声摊平概率（热方程）}}$$
+
+- **第一项**来自确定性漂移 $\mu$：如同流体力学中的质量守恒，$\mu \cdot p$ 是"概率流"，$\nabla\cdot(\mu p)$ 是某处的净流出量。流出多于流入 → 密度下降 → 需要负号。
+- **第二项**来自随机噪声 $\sigma\,dW$：噪声让粒子扩散（从密集处散开），其效果等价于热传导——热量从高温（高密度）流向低温（低密度）。$\nabla^2 p$ 度量局部密度的"凹凸程度"，系数 $\frac{1}{2}\sigma^2$ 来自维纳过程的方差性质 $\text{Var}(\sigma\,dW) = \sigma^2\,d\tau$。
+
+**若没有噪声**（$\sigma = 0$），FP 方程退化为纯漂移的 Liouville 方程 $\partial_\tau p = -\nabla\cdot(\mu\,p)$。
+
+以下是利用 FP 方程的完整证明：
+
+**目标**：证明 SDE 采样与 ODE 采样产生相同的边缘分布 $p_t(x)$。
+
+**Step 1. 写出两者的分布演化方程。** 设反向时间变量 $\tau$（$\tau$ 递增时实际时间 $t$ 递减）。
+
+纯 ODE（$x_{\text{new}} = x - v_\theta \Delta t$）的 Liouville 方程（FP 方程中 $\sigma=0$ 的特例）：
+
+$$\frac{\partial p}{\partial \tau} = \nabla \cdot (v_\theta \cdot p)$$
+
+SDE（漂移 $\mu = -v_\theta + \frac{1}{2}g^2\nabla\log p_t$，扩散 $\sigma = g$）的 Fokker-Planck 方程：
+
+$$\frac{\partial p}{\partial \tau} = -\nabla\cdot(\mu\, p) + \frac{1}{2}\sigma^2\nabla^2 p$$
+
+**Step 2. 展开 SDE 的 Fokker-Planck 方程：**
+
+$$= -\nabla\cdot\left[\left(-v_\theta + \tfrac{1}{2}g^2\nabla\log p_t\right)p\right] + \tfrac{1}{2}g^2\nabla^2 p$$
+
+$$= \underbrace{\nabla\cdot(v_\theta\, p)}_{\text{ODE 贡献}} \;-\; \underbrace{\tfrac{1}{2}g^2\nabla\cdot\left[(\nabla\log p_t)\,p\right]}_{\text{Score 项贡献}} \;+\; \underbrace{\tfrac{1}{2}g^2\nabla^2 p}_{\text{噪声扩散贡献}}$$
+
+**Step 3. 利用恒等式 $(\nabla\log p_t)\cdot p_t = \nabla p_t$**（因为 $\nabla\log p = \nabla p / p$）：
+
+$$\tfrac{1}{2}g^2\nabla\cdot[(\nabla\log p_t)\,p_t] = \tfrac{1}{2}g^2\nabla\cdot(\nabla p_t) = \tfrac{1}{2}g^2\nabla^2 p_t$$
+
+**Step 4. Score 项与噪声项完美抵消：**
+
+$$\frac{\partial p}{\partial \tau} = \nabla\cdot(v_\theta p) - \cancel{\tfrac{1}{2}g^2\nabla^2 p_t} + \cancel{\tfrac{1}{2}g^2\nabla^2 p_t} = \nabla\cdot(v_\theta\, p)$$
+
+这与纯 ODE 的 Liouville 方程完全相同。$\blacksquare$
+
+**结论**：Score 纠偏项（$\frac{1}{2}g^2 \nabla\log p_t$）与噪声扩散效应（方差 $g^2\Delta t$）在 Fokker-Planck 方程中逐项对消，使 SDE 的分布演化等价于纯 ODE。这就是为什么 Score 系数恰好是 $\frac{1}{2}g^2$：它精确匹配噪声的统计效应。
+
+- 个体样本：轨迹因 $\epsilon$ 不同而各异（这正是 RL "探索"的意义）
+- 统计分布：所有样本构成的整体分布始终与 ODE 保持一致（"边缘分布不变"）
+
+{% endnote %}
+
+**那么，核心问题变成了：如何高效计算这个 $\nabla_{x_t}\log p_t(x_t)$？这就用到了特威迪公式（Tweedie's Formula）：**
 
 特威迪公式（Tweedie's Formula）证明了一个深刻的结论：**只要你能预测出当前的干净图像 $\hat{x}_0$，就能直接算出当前的 Score。**
 
@@ -209,7 +270,18 @@ $$\mathrm{d}x_t = \left[ f(x_t, t) - g(t)^2 \nabla_{x_t} \log p_t(x_t) \right] \
 
 下面将上述 SDE 理论逐步具体化为离散实现公式。设 $t$ 为当前时间步，$v_\theta = v_\theta(x_t, t, c)$ 为模型预测速度场，$g$ 为 SDE 扩散系数（控制探索噪声强度），$\Delta t = t - t_{\text{next}} > 0$。
 
-> **符号对照**：官方代码 `sd3_sde_with_logprob.py` 中，`sigma` = 时间 $t$，`std_dev_t` = 扩散系数 $g(t) = \sqrt{t/(1-t)} \cdot \text{noise\_level}$（随时间自适应），`model_output` = 速度 $v_\theta$，`dt` = $-\Delta t$（符号相反）。下文伪代码中统一使用 `t_now` = $t$，`g` = $g$（简化为常数），`velocity` = $v_\theta$，`dt` = $\Delta t > 0$。其中 `noise_level` 是控制探索强度的超参数（默认 0.7）。
+{% note info no-icon %}
+**符号对照：官方代码 vs 伪代码**
+
+官方代码 `sd3_sde_with_logprob.py` 中：
+
+- `sigma` → 时间 $t$（伪代码：`t_now`）
+- `std_dev_t` → 扩散系数 $g(t)$（伪代码：`g`，简化为常数）
+- `model_output` → 速度场 $v_\theta$（伪代码：`velocity`）
+- `dt` → $-\Delta t$，符号相反（伪代码：`dt` $= \Delta t > 0$）
+
+官方代码中 $g(t)$ 随时间自适应：$g(t) = \sqrt{t/(1-t)} \cdot \eta$，其中 $\eta$ 对应代码中的 `noise_level`（默认 0.7，控制探索强度）。伪代码为简化起见将 $g$ 视为常数。
+{% endnote %}
 
 **公式 ①：Tweedie 反推干净样本**
 
