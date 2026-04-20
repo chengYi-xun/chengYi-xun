@@ -19,7 +19,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/24-superflow/)
 >
-> ➡️ 下一篇：[笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](/chengYi-xun/posts/26-memory-bank/)
+> ➡️ 下一篇：[笔记｜多模态融合（一）：VGGT——用一个 Transformer 完成所有 3D 视觉任务](/chengYi-xun/posts/27-vggt/)
 >
 > 论文：[DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（arXiv:2505.07818）
 >

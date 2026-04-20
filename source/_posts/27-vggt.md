@@ -18,7 +18,7 @@ series: Multi-modal Fusion
 
 > CVPR 2025 Best Paper Award
 >
-> ⬅️ 上一篇：[笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](/chengYi-xun/posts/26-memory-bank/)
+> ⬅️ 上一篇：[笔记｜生成模型（二十四）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/25-video-grpo/)
 >
 > ➡️ 下一篇：[笔记｜Vision Transformers Need Registers：用 Register Tokens 治愈 ViT 的"注意力伪影"](/chengYi-xun/posts/28-register-tokens/)
 >

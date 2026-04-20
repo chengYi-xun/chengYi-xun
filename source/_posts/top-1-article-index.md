@@ -52,10 +52,6 @@ tags:
 23. [笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](../24-superflow)
 24. [笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](../25-video-grpo)
 
-## LLM 记忆与对齐
-
-25. [笔记｜MemoryBank：用艾宾浩斯遗忘曲线赋予 LLM 长期记忆](../26-memory-bank)
-
 # 多模态融合
 
 1. [笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](../29-multimodal-basics)
