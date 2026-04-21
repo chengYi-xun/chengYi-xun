@@ -40,7 +40,7 @@ $$
 \text{完整状态} = (\underbrace{h_t}_{\text{确定性}}, \underbrace{z_t}_{\text{随机性}})
 $$
 
-![RSSM Architecture](/img/rssm_architecture.png)
+![RSSM 架构：确定性路径与随机路径并行建模状态转移（Hafner et al., ICML 2019）](/chengYi-xun/img/rssm_architecture.png)
 
 ### 1.2 RSSM 的四个方程
 
@@ -81,7 +81,7 @@ $$
 
 ## 2. Dreamer v1：想象中的策略梯度
 
-![Dreamer：从经验学习动力学，并在想象中学习行为（Figure 3, Hafner et al., ICLR 2020）](/img/dreamer_imagination.png)
+![Dreamer：从经验学习动力学，并在想象中学习行为（Figure 3, Hafner et al., ICLR 2020）](/chengYi-xun/img/dreamer_imagination.png)
 
 ### 2.1 想象轨迹
 

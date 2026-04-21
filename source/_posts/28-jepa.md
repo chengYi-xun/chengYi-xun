@@ -12,23 +12,13 @@ series: "世界模型"
 mathjax: true
 ---
 
-> **核心论文**：
+> **核心论文**：I-JEPA (arXiv:2301.08243, ICCV 2023)、V-JEPA (arXiv:2404.08471, 2024)、V-JEPA 2 (arXiv:2506.09985, 2025)
+>
+> **代码**：[facebookresearch/ijepa](https://github.com/facebookresearch/ijepa) · [facebookresearch/jepa](https://github.com/facebookresearch/jepa) | **前置知识**：[上一篇：Dreamer 系列](/chengYi-xun/posts/27-dreamer/)
 >
 > ⬅️ 上一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/27-dreamer/)
 >
 > ➡️ 下一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/29-video-world-model/)
-
->
-> - I-JEPA: arXiv:2301.08243 (ICCV 2023)
->
-> - V-JEPA: arXiv:2404.08471 (2024)
->
-> - V-JEPA 2: arXiv:2506.09985 (2025)
->
-> **代码**：[facebookresearch/ijepa](https://github.com/facebookresearch/ijepa) · [facebookresearch/jepa](https://github.com/facebookresearch/jepa)
-> **前置知识**：[上一篇：Dreamer 系列](posts/27-dreamer/)
-
----
 
 ## 0. 预测每片树叶的飘动是愚蠢的
 
@@ -38,11 +28,9 @@ mathjax: true
 
 Dreamer 和 Sora 都在某种程度上试图"重建"观测——前者通过解码器重建图像训练世界模型，后者直接生成视频。JEPA 走了一条完全不同的路：**丢弃不可预测的细节，只在嵌入空间中预测。**
 
----
-
 ## 1. LeCun 的认知架构提案
 
-![Generative vs Contrastive vs JEPA](/img/jepa_vs_generative.png)
+![生成式 vs 对比式 vs JEPA 三种学习架构对比（LeCun, 2022）](/chengYi-xun/img/jepa_vs_generative.png)
 
 ### 1.1 三种学习架构
 
@@ -114,8 +102,6 @@ JEPA 面临的最大风险是**表征崩塌（Representation Collapse）**——
 
 这表明，预测派（JEPA）和生成派（基于 ELBO 的模型）在底层数学结构上正在走向统一。
 
----
-
 ## 2. I-JEPA：图像 JEPA
 
 ### 2.1 架构
@@ -132,7 +118,7 @@ I-JEPA 处理图像：遮挡部分 patch，从可见 patch 预测被遮挡 patch
 
 ### 2.2 掩码策略
 
-![I-JEPA 上下文与目标块掩码示例（Assran et al., 2023, Fig. 4）](/img/ijepa_masking.png)
+![I-JEPA 上下文与目标块掩码示例（Assran et al., 2023, Fig. 4）](/chengYi-xun/img/ijepa_masking.png)
 
 I-JEPA 的掩码策略强调**语义级别**而非纹理级别：
 
@@ -228,8 +214,6 @@ class IJEPA(nn.Module):
         return loss / len(target_masks)
 ```
 
----
-
 ## 3. V-JEPA：视频 JEPA
 
 ### 3.1 从图像到视频
@@ -285,8 +269,6 @@ $$
 \mathcal{L} = \frac{1}{|\mathcal{T}|} \sum_{j \in \mathcal{T}} \|\hat{s}_j - \text{sg}(s_j)\|_2^2
 $$
 
----
-
 ## 4. V-JEPA 2：走向世界模型
 
 ### 4.1 从表征到规划
@@ -329,8 +311,6 @@ V-JEPA 2.1（2026）进一步增强了稠密预测能力：
 
 - **统一图像/视频 tokenizer**
 
----
-
 ## 5. JEPA vs 生成式世界模型的深层分析
 
 ### 5.1 损失景观的差异
@@ -371,8 +351,6 @@ $$
 | 仿真数据生成 | ✓ | ✗ |
 | 机器人规划 | ✓（可渲染） | ✓（更高效） |
 | 物理推理 | 待定 | 待定 |
-
----
 
 ## 6. 总结
 
