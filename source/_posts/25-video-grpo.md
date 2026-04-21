@@ -19,7 +19,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/24-superflow/)
 >
-> ➡️ 下一篇：[笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](/chengYi-xun/posts/29-multimodal-basics/)
+> ➡️ 下一篇：[笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](/chengYi-xun/posts/26-world-model-basics/)
 >
 > 论文：[DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（arXiv:2505.07818）
 >

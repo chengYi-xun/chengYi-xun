@@ -20,12 +20,12 @@ mathjax: true
 > - Vista: arXiv:2405.17398 (NeurIPS 2024)
 > - OccWorld: arXiv:2311.16038 (CVPR 2024)
 >
-> ⬅️ 上一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)
+> ⬅️ 上一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/30-physics-world-model/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/41-world-model-frontier/)
+> ➡️ 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/32-world-model-frontier/)
 
 >
-> **前置知识**：[上一篇：物理化世界模型](posts/39-physics-world-model/)
+> **前置知识**：[上一篇：物理化世界模型](posts/30-physics-world-model/)
 
 ---
 
@@ -344,4 +344,4 @@ $$
 > 4. Zheng, W., ... & Lu, J. (2024). *OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving*. CVPR 2024.
 > 5. (2025). *Beyond Simulation: Benchmarking World Models for Planning and Causality in Autonomous Driving*. arXiv:2508.01922. (关于世界模型因果性与反事实推理的最新研究)
 
-> 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/41-world-model-frontier/)
+> 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/32-world-model-frontier/)

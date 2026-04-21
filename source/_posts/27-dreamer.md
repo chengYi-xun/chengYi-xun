@@ -14,9 +14,9 @@ mathjax: true
 
 > **核心论文**：
 >
-> ⬅️ 上一篇：[笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](/chengYi-xun/posts/35-world-model-basics/)
+> ⬅️ 上一篇：[笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](/chengYi-xun/posts/26-world-model-basics/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)
+> ➡️ 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/28-jepa/)
 
 >
 > - Dreamer v1: arXiv:1912.01603 (ICLR 2020)
@@ -27,7 +27,7 @@ mathjax: true
 >
 > **代码**：[danijar/dreamerv3](https://github.com/danijar/dreamerv3)
 >
-> **前置知识**：[上一篇：世界模型基础](posts/35-world-model-basics/)
+> **前置知识**：[上一篇：世界模型基础](posts/26-world-model-basics/)
 
 ---
 
@@ -520,4 +520,4 @@ Dreamer 系列代表了"在潜空间想象+训练策略"的技术路线。但 Le
 > 6. Wu, P., ... & Abbeel, P. (2022). *DayDreamer: World Models for Physical Robot Learning*. CoRL 2022.
 > 7. (2025). *R2-Dreamer: Redundancy-Reduced World Models without Decoders or Augmentation*. ICLR 2025.
 
-> 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)
+> 下一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/28-jepa/)

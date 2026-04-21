@@ -15,9 +15,9 @@ mathjax: true
 
 > **核心论文**：
 >
-> ⬅️ 上一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/38-video-world-model/)
+> ⬅️ 上一篇：[笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](/chengYi-xun/posts/29-video-world-model/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/40-driving-world-model/)
+> ➡️ 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/31-driving-world-model/)
 
 >
 > - PhysDreamer: arXiv:2404.13026 (ECCV 2024)
@@ -29,7 +29,7 @@ mathjax: true
 > - NewtonRewards: arXiv:2512.00425 (2025)
 >
 > **代码**：[stevenlsw/physgen](https://github.com/stevenlsw/physgen) · [pandayuanyu/NewtonGen](https://github.com/pandayuanyu/NewtonGen)
-> **前置知识**：[上一篇：视频生成世界模型](posts/38-video-world-model/)
+> **前置知识**：[上一篇：视频生成世界模型](posts/29-video-world-model/)
 
 ---
 
@@ -340,4 +340,4 @@ $$
 > 5. Kang, G., et al. (2025). *How Far Is Video Generation from World Model: A Physical Law Perspective*. ICML 2025.
 > 6. (2025). *MORPHEUS: A Physics-Informed Benchmark for Video Generation*. arXiv:2504.02918.
 
-> 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/40-driving-world-model/)
+> 下一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/31-driving-world-model/)

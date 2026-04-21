@@ -14,14 +14,14 @@ mathjax: true
 ---
 
 > **前置知识**：本文是世界模型系列的终篇。建议先阅读前六篇。
-> - [（一）世界模型基础](posts/35-world-model-basics/)
-> - [（二）Dreamer 系列](posts/36-dreamer/)
-> - [（三）JEPA](posts/37-jepa/)
-> - [（四）视频生成世界模型](posts/38-video-world-model/)
-> - [（五）物理化世界模型](posts/39-physics-world-model/)
-> - [（六）自动驾驶世界模型](posts/40-driving-world-model/)
+> - [（一）世界模型基础](posts/26-world-model-basics/)
+> - [（二）Dreamer 系列](posts/27-dreamer/)
+> - [（三）JEPA](posts/28-jepa/)
+> - [（四）视频生成世界模型](posts/29-video-world-model/)
+> - [（五）物理化世界模型](posts/30-physics-world-model/)
+> - [（六）自动驾驶世界模型](posts/31-driving-world-model/)
 >
-> ⬅️ 上一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/40-driving-world-model/)
+> ⬅️ 上一篇：[笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](/chengYi-xun/posts/31-driving-world-model/)
 
 
 ---

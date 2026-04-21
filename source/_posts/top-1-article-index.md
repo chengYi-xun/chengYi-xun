@@ -52,36 +52,17 @@ tags:
 23. [笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](../24-superflow)
 24. [笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](../25-video-grpo)
 
-# 多模态融合
-
-1. [笔记｜多模态融合（一）：从特征拼接到注意力融合——多模态学习基础](../29-multimodal-basics)
-2. [笔记｜多模态融合（二）：CLIP——对比学习连接视觉与语言](../30-clip)
-3. [笔记｜多模态融合（三）：从 BLIP 到 BLIP-2——Q-Former 与交叉注意力的艺术](../31-blip2-qformer)
-4. [笔记｜多模态融合（四）：LLaVA——用一层 MLP 让大模型"看懂"图片](../32-llava)
-5. [笔记｜多模态融合（五）：原生多模态——从 Flamingo 到 Chameleon](../33-native-multimodal)
-6. [笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](../34-multimodal-frontier)
-
 # 世界模型
 
-1. [笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](../35-world-model-basics)
-2. [笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](../36-dreamer)
-3. [笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](../37-jepa)
-4. [笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](../38-video-world-model)
-5. [笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](../39-physics-world-model)
-6. [笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](../40-driving-world-model)
-7. [笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](../41-world-model-frontier)
+1. [笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习](../26-world-model-basics)
+2. [笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](../27-dreamer)
+3. [笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](../28-jepa)
+4. [笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos](../29-video-world-model)
+5. [笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](../30-physics-world-model)
+6. [笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测](../31-driving-world-model)
+7. [笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](../32-world-model-frontier)
 
 # 杂谈
 
 1. [杂谈｜写作的目的](../5-some_think)
 
-<!-- # 
-## 基础理论
-
-## GAN
-
-## 扩散架构
-
-## Score Matching
-
-## Flow Matching -->

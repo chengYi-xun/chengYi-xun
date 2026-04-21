@@ -16,9 +16,9 @@ mathjax: true
 >
 > **核心论文**：*World Models*（Ha & Schmidhuber, 2018, arXiv:1803.10122）
 >
-> ⬅️ 上一篇：[笔记｜多模态融合（六）：2026 前沿——InternVL、Qwen-VL、Mamba 与多模态的未来](/chengYi-xun/posts/34-multimodal-frontier/)
+> ⬅️ 上一篇：[笔记｜生成模型（二十四）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/25-video-grpo/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/36-dreamer/)
+> ➡️ 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/27-dreamer/)
 
 
 ---
@@ -533,4 +533,4 @@ $$
 > 4. LeCun, Y. (2022). *A Path Towards Autonomous Machine Intelligence*. OpenReview.
 > 5. (2024). *Sora and V-JEPA Have Not Learned The Complete Real World Model -- A Philosophical Analysis of Video AIs*. arXiv.
 
-> 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/36-dreamer/)
+> 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/27-dreamer/)

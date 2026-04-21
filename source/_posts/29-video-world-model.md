@@ -15,9 +15,9 @@ mathjax: true
 
 > **核心论文**：
 >
-> ⬅️ 上一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/37-jepa/)
+> ⬅️ 上一篇：[笔记｜世界模型（三）：JEPA——在嵌入空间预测世界](/chengYi-xun/posts/28-jepa/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)
+> ➡️ 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/30-physics-world-model/)
 
 >
 > - Genie: arXiv:2402.15391 (ICML 2024)
@@ -26,7 +26,7 @@ mathjax: true
 >
 > - UniSim: arXiv:2310.06114 (ICLR 2024)
 >
-> **前置知识**：[上一篇：JEPA](posts/37-jepa/)
+> **前置知识**：[上一篇：JEPA](posts/28-jepa/)
 
 ---
 
@@ -349,4 +349,4 @@ $$
 > 4. Yang, M., ... & Levine, S. (2024). *Learning Interactive Real-World Simulators*. ICLR 2024.
 > 5. (2024). *How Far is Video Generation from World Model: A Physical Law Perspective*. arXiv:2411.02385. (关于视频生成模型物理泛化能力的实证分析)
 
-> 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/39-physics-world-model/)
+> 下一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/30-physics-world-model/)
