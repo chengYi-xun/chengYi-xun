@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十六）：奖励模型——RLHF 的隐藏引擎
+title: 笔记｜强化学习（十一）：奖励模型——RLHF 的隐藏引擎
 date: 2026-04-05 18:00:00
 cover: false
 mathjax: true
@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 在前面的 RL 系列中，我们详细讨论了 PPO、DPO、GRPO 等策略优化算法——它们都在回答"如何根据奖励信号更新策略"。但一个更基本的问题被忽略了：**奖励信号本身从何而来？** 本文专门讨论奖励模型（Reward Model, RM），它是 RLHF 管线中真正将人类偏好转化为可优化信号的核心组件。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十五）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> ⬅️ 上一篇：[笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
 
 # 1. 为什么需要奖励模型？
 

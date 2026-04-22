@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十四）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架
+title: 笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架
 date: 2026-04-05 16:00:00
 cover: false
 mathjax: true
@@ -17,9 +17,9 @@ series: Diffusion Models theory
 > 
 > 相比图像，视频多了"时间"这个维度，这让强化学习的难度呈指数级上升。本文将通俗地解释 DanceGRPO 是如何利用 **GRPO（组相对策略优化）** 巧妙解决这些难题，为视频生成提供了一条稳定且可扩展的优化路径。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)
+> ⬅️ 上一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十五）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> ➡️ 下一篇：[笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
 >
 > 论文：[DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（arXiv:2505.07818）
 >
@@ -103,7 +103,7 @@ $$\hat{x}_0 = x_t - t \cdot v_\theta$$
 
 如果盲目地加入随机噪声，生成的轨迹就会偏离真实视频的流形（Manifold）。因此我们需要一个“指南针”来纠正这种偏离，这个指南针就是 **Score Function（分数函数 $\nabla_{x_t} \log p_t(x_t)$）**。
 
-*(注：关于 SDE 采样的严谨数学推导（包括特威迪公式、Anderson 定理与 Langevin Dynamics），我们在前一篇图像生成 RL 笔记中已经做了极其详细的推导与代码映射，强烈建议回顾：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用](/chengYi-xun/posts/55-flow-grpo/)*。
+*(注：关于 SDE 采样的严谨数学推导（包括特威迪公式、Anderson 定理与 Langevin Dynamics），我们在前一篇图像生成 RL 笔记中已经做了极其详细的推导与代码映射，强烈建议回顾：[笔记｜强化学习（五）：Flow-GRPO 与图像生成应用](/chengYi-xun/posts/55-flow-grpo/)*。
 
 简单来说，预测 $\hat{x}_0$ 的根本目的，是为了通过特威迪公式（Tweedie's Formula）计算出 Score（重力传感器），进而用它来抵消 SDE 随机探索带来的偏航风险，确保模型在“瞎溜达”探索高分动作的同时，依然能被拉回正确的生成轨道上。
 

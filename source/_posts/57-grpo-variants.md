@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT
+title: 笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT
 date: 2026-04-05 12:00:00
 cover: false
 mathjax: true
@@ -14,9 +14,9 @@ series: Diffusion Models theory
 
 > 本文为 RL 系列第七篇。上一篇介绍了 DAPO 的四大工程改进。本文从理论角度出发，剖析 GRPO 的数学本质：为什么 GRPO 其实是在做 DPO？为什么 2 个 rollout 就够了？如何从 KL 散度推广到任意 f-散度？最后介绍融合了 GRPO 和 DPO 优势的 GIFT 算法。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](/chengYi-xun/posts/56-dapo/)
+> ⬅️ 上一篇：[笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](/chengYi-xun/posts/56-dapo/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)
+> ➡️ 下一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)
 
 >
 > 论文：
@@ -55,7 +55,7 @@ series: Diffusion Models theory
 
 - 错误回答：$\hat{A}_i = \frac{0 - 0.5}{0.5} = -1$（抑制）
 
-**梯度信号的本质是什么？** 先回顾 GRPO 的完整目标函数（token 级推导见[第十九篇](/chengYi-xun/posts/54-grpo/)；DAPO 对归一化方式的改进见[第二十一篇](/chengYi-xun/posts/56-dapo/)）。为简洁起见，此处将 token 级操作收缩为序列级记号：
+**梯度信号的本质是什么？** 先回顾 GRPO 的完整目标函数（token 级推导见[第四篇](/chengYi-xun/posts/54-grpo/)；DAPO 对归一化方式的改进见[第六篇](/chengYi-xun/posts/56-dapo/)）。为简洁起见，此处将 token 级操作收缩为序列级记号：
 
 $$
 \mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{q \sim \mathcal{Q},\, \{o_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}(\cdot|q)} \left[ \frac{1}{G} \sum_{i=1}^G \frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \left( \min \left( \rho_{i,t}(\theta)\, \hat{A}_i,\; \text{clip}(\rho_{i,t}(\theta),\, 1-\varepsilon,\, 1+\varepsilon)\, \hat{A}_i \right) - \beta\, \hat{D}_{\text{KL}}^{(i,t)} \right) \right]
@@ -69,7 +69,7 @@ $$
 - $\hat{D}_{\text{KL}}^{(i,t)}$　——token 级 KL 散度近似估计
 - $\frac{1}{|o_i|}$　——按回答长度归一化，使每条回答权重均为 $\frac{1}{G}$
 
-> **关于 GRPO 与 DAPO 的归一化差异**：GRPO 的损失聚合为 $\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$——**先对每条回答的 token 求平均，再对 $G$ 条回答求平均**，每条回答无论长短权重都是 $\frac{1}{G}$。DAPO 将此改为 $\frac{1}{\sum_i |o_i|}\sum_i \sum_t L_{i,t}$——**直接对全组所有 token 取平均**，使每个 token 而非每条回答等权贡献梯度。这一归一化方式的改变是 DAPO 的四大改进之一，详见[第二十一篇](/chengYi-xun/posts/56-dapo/)。
+> **关于 GRPO 与 DAPO 的归一化差异**：GRPO 的损失聚合为 $\frac{1}{G}\sum_i \frac{1}{|o_i|}\sum_t L_{i,t}$——**先对每条回答的 token 求平均，再对 $G$ 条回答求平均**，每条回答无论长短权重都是 $\frac{1}{G}$。DAPO 将此改为 $\frac{1}{\sum_i |o_i|}\sum_i \sum_t L_{i,t}$——**直接对全组所有 token 取平均**，使每个 token 而非每条回答等权贡献梯度。这一归一化方式的改变是 DAPO 的四大改进之一，详见[第六篇](/chengYi-xun/posts/56-dapo/)。
 
 为便于分析本节的核心论证（对比学习结构），我们暂时忽略裁剪操作（`clip` 和 `min`）和 KL 惩罚项（$- \beta \hat{D}_{\text{KL}}$）。在这些简化下，目标函数退化为最基础的重要度采样（Importance Sampling）形式：
 
@@ -991,4 +991,4 @@ for step in range(total_steps):
 > 8. [f-PO: Generalizing Preference Optimization with f-divergence Minimization](https://arxiv.org/abs/2410.21662)
 > 9. [f-GAN: Training Generative Neural Samplers using Variational Divergence Minimization](https://arxiv.org/abs/1606.00709)
 
-> 下一篇：[笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/58-superflow/)
+> 下一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/58-superflow/)

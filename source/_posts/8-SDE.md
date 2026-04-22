@@ -99,7 +99,7 @@ $$
 
 **直觉理解**：逆向 SDE 相比前向多出了绿色的 $-g^2(t)\nabla_x\log p_t(x)$ 项——这就是 **Score Function**。在前向过程中，$g(t)\mathrm{d}w$ 不断注入噪声让分布发散；在逆向过程中，Score 项扮演"纠偏力"，将发散的分布重新拉回数据流形，实现从噪声到数据的生成。
 
-**简明推导**：将前向 SDE 离散化后，$x_{t+\Delta t} | x_t \sim \mathcal{N}(x_t + f\Delta t, \; g^2\Delta t \cdot I)$。利用贝叶斯公式求逆向分布 $p(x_t | x_{t+\Delta t})$，再对 $\log p(x_t)$ 做一阶泰勒展开并配方，可以得到逆向分布的均值中自然出现 $-g^2 \nabla_x \log p_t$ 项。当 $\Delta t \to 0$ 时即得到上式。完整的离散化推导可参见[笔记｜生成模型（二十）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/) 中 Anderson 定理部分。
+**简明推导**：将前向 SDE 离散化后，$x_{t+\Delta t} | x_t \sim \mathcal{N}(x_t + f\Delta t, \; g^2\Delta t \cdot I)$。利用贝叶斯公式求逆向分布 $p(x_t | x_{t+\Delta t})$，再对 $\log p(x_t)$ 做一阶泰勒展开并配方，可以得到逆向分布的均值中自然出现 $-g^2 \nabla_x \log p_t$ 项。当 $\Delta t \to 0$ 时即得到上式。完整的离散化推导可参见[笔记｜强化学习（五）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/) 中 Anderson 定理部分。
 
 上式的核心启示是：**无论前向 SDE 的形式如何，逆向过程的学习目标都归结为同一件事——用网络学习分布的 Score Function $\nabla_x\log p_t(x)$。**
 
@@ -198,7 +198,7 @@ $$
 
 $$\nabla_{x_t}\log p(x_t | x_0) = -\frac{x_t - \hat{\mu}_t}{\sigma_t^2}$$
 
-其中 $\hat{\mu}_t$ 由模型预测的 $\hat{x}_0$ 确定。这意味着**去噪模型天然就包含了 Score 信息**，不需要单独的 Score 网络。这一思路在后续的 Flow Matching 和 Flow-GRPO 中被广泛使用——速度场模型 $v_\theta$ 可以反推 $\hat{x}_0$，进而获得 Score（详见[笔记｜生成模型（二十）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/) 中 Tweedie 公式推导）。
+其中 $\hat{\mu}_t$ 由模型预测的 $\hat{x}_0$ 确定。这意味着**去噪模型天然就包含了 Score 信息**，不需要单独的 Score 网络。这一思路在后续的 Flow Matching 和 Flow-GRPO 中被广泛使用——速度场模型 $v_\theta$ 可以反推 $\hat{x}_0$，进而获得 Score（详见[笔记｜强化学习（五）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/) 中 Tweedie 公式推导）。
 
 # 讨论
 
@@ -264,7 +264,7 @@ $$\mathrm{d}x = \left[f(x,t) - \frac{1}{2}g^2(t)\nabla_x\log p_t(x)\right]\mathr
 
 $$\mathrm{d}x = \left[v_\theta(x,t) - \frac{1}{2}g^2(t)\nabla_x\log p_t(x)\right]\mathrm{d}t + g(t)\mathrm{d}\bar{w}$$
 
-这种 ODE→SDE 转换在后续的 **Flow-GRPO** 框架中至关重要——它让确定性的 Flow Matching 模型获得了随机采样能力，为强化学习的"探索"提供了基础（详见[笔记｜生成模型（二十）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/)）。
+这种 ODE→SDE 转换在后续的 **Flow-GRPO** 框架中至关重要——它让确定性的 Flow Matching 模型获得了随机采样能力，为强化学习的"探索"提供了基础（详见[笔记｜强化学习（五）：Flow-GRPO](/chengYi-xun/posts/55-flow-grpo/)）。
 
 两者关系如下图所示，ODE 概率流比 SDE 更平滑，但两者最终得到的分布相同：
 

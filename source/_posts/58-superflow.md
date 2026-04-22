@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）
+title: 笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）
 date: 2026-04-05 14:00:00
 cover: false
 mathjax: true
@@ -16,11 +16,11 @@ tags:
 series: Diffusion Models theory
 ---
 
-> 本文为 RL 系列的图像生成篇。在第 20 篇中我们介绍了 Flow-GRPO，将 GRPO 应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进 SuperFlow，以及 2026 年图像/视频生成 RL 的统一框架生态，最后回顾整个系列的完整技术脉络。
+> 本文为 RL 系列的图像生成篇。在第五篇中我们介绍了 Flow-GRPO，将 GRPO 应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进 SuperFlow，以及 2026 年图像/视频生成 RL 的统一框架生态，最后回顾整个系列的完整技术脉络。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
+> ⬅️ 上一篇：[笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> ➡️ 下一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
 
 >
 > 论文：[SuperFlow: Training Flow Matching Models with RL on the Fly](https://arxiv.org/abs/2512.17951)（2025.12, revised 2026.01）
@@ -312,7 +312,7 @@ TRL v1.0 的三阶段流水线（SFT → Reward Modeling → Alignment）支持 
 
 至此，从 REINFORCE 到 SuperFlow 的完整技术旅程告一段落。全部方法的横向对比（核心机制、优缺点、选型决策树）请见独立总结篇：
 
-> [笔记｜生成模型（二十五）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> [笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
 
 ---
 
@@ -323,4 +323,4 @@ TRL v1.0 的三阶段流水线（SFT → Reward Modeling → Alignment）支持 
 > 3. [GenRL: Scalable RL for Generative Models](https://github.com/ModelTC/GenRL)
 > 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
 
-> 下一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> 下一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)

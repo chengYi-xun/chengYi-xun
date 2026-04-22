@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解
+title: 笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解
 date: 2025-08-19 10:00:00
 cover: false
 mathjax: true
@@ -14,9 +14,9 @@ series: Diffusion Models theory
 
 > 本文为系列第四篇。在了解了 PPO 的显存痛点和 DPO 的离线局限性后，我们终于迎来了目前大模型在线 RL 的最前沿破局者——GRPO（Group Relative Policy Optimization）。本文将详细推导 GRPO 的核心思想，看它是如何优雅地丢弃 Critic 网络，实现高效的在线强化学习的。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
+> ⬅️ 上一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)
+> ➡️ 下一篇：[笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)
 
 
 # 在线 RL 的不可替代性与 Critic 的累赘
@@ -310,7 +310,7 @@ $$
 
 - $\hat{D}_{\text{KL}}^{(i,t)}$ 是 token 级 KL 散度近似估计（采用 $e^{\log u} - \log u - 1$ 形式，其中 $u = \pi_{\text{ref}} / \pi_\theta$，详见下文），并非严格的 $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ 积分定义。
 
-- $\frac{1}{|o_i|}$ 对每条回答按长度归一化（per-response normalization）：先对 token 求平均，再对 $G$ 条回答平均。这意味着不论回答长短，每条回答的权重都是 $\frac{1}{G}$。后续 DAPO 论文将此聚合方式改为按 token 归一化（$\frac{1}{\sum_i |o_i|}\sum_i\sum_t$，使每个 token 等权），详见[第二十一篇](/chengYi-xun/posts/56-dapo/)。
+- $\frac{1}{|o_i|}$ 对每条回答按长度归一化（per-response normalization）：先对 token 求平均，再对 $G$ 条回答平均。这意味着不论回答长短，每条回答的权重都是 $\frac{1}{G}$。后续 DAPO 论文将此聚合方式改为按 token 归一化（$\frac{1}{\sum_i |o_i|}\sum_i\sum_t$，使每个 token 等权），详见[第六篇](/chengYi-xun/posts/56-dapo/)。
 
 > **注**：上式使用 token 级记号 $\rho_{i,t}$，与 DeepSeekMath 原论文（arXiv:2402.03300）从 PPO 继承的 $\frac{1}{|o|}\sum_t$ 结构一致。**GRPO 的所有计算**（IS ratio、裁剪、KL）**均在 token 级逐位执行**——此处"序列级"仅指**聚合方式**（每条回答等权），不是计算粒度。DAPO 改变的是聚合方式（从 per-response 到 per-token），而非引入 token 级计算。
 
@@ -570,4 +570,4 @@ GRPO 证明了在生成式大模型时代，简单的经验统计（组内均值
 > 1. Shao, Z., Wang, P., Zhu, Q., Hao, K., Bugliarello, B., ... & Liu, Y. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models*. arXiv:2402.03300.
 > 2. Ahmadian, A., Cremer, C., Gallé, M., Fadaee, S., ... & Vulić, A. (2024). *Back to Basics: Revisiting REINFORCE Style Optimization for Learning from Human Feedback in LLMs*. arXiv:2402.14740.
 
-> 下一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)
+> 下一篇：[笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)

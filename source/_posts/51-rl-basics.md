@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（十六）：强化学习基础与策略梯度
+title: 笔记｜强化学习（一）：强化学习基础与策略梯度
 date: 2025-08-16 10:00:00
 cover: false
 mathjax: true
@@ -16,7 +16,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜生成模型（十五）：Flux 架构解析](/chengYi-xun/posts/15-flux/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/52-trpo-ppo/)
+> ➡️ 下一篇：[笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/52-trpo-ppo/)
 
 
 # 强化学习基础概念：从"训狗"说起
@@ -842,4 +842,4 @@ def compute_gae(rewards, values, gamma=0.99, lam=0.95, dones=None):
 > 4. [Policy Gradient Algorithms — Lil'Log](https://lilianweng.github.io/posts/2018-04-08-policy-gradient/)
 > 5. [Actor-Critic Methods, A2C and GAE](https://avandekleut.github.io/a2c/)
 
-> 下一篇：[笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/52-trpo-ppo/)
+> 下一篇：[笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/52-trpo-ppo/)

@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十五）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow
+title: 笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow
 date: 2026-04-05 17:00:00
 cover: false
 mathjax: true
@@ -14,23 +14,23 @@ series: Diffusion Models theory
 
 > 本文是强化学习系列的总结篇。经过前面九篇文章的旅程——从策略梯度基础、PPO、DPO、GRPO，到 DAPO、Flow-GRPO、SuperFlow 和 DanceGRPO——我们已经接触了十余种方法。本文将它们放在同一张桌上做横向对比，帮助读者在实际选型中快速定位最适合自己场景的算法。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> ⬅️ 上一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十六）：奖励模型——RLHF 的隐藏引擎](/chengYi-xun/posts/61-reward-model/)
+> ➡️ 下一篇：[笔记｜强化学习（十一）：奖励模型——RLHF 的隐藏引擎](/chengYi-xun/posts/61-reward-model/)
 
 # 回顾：从 REINFORCE 到 SuperFlow 的技术脉络
 
 | 篇章 | 主题 | 核心贡献 | 解决的问题 |
 |:---:|:---|:---|:---|
-| 十六 | REINFORCE → Actor-Critic | 策略梯度基础 | 如何用梯度优化策略 |
-| 十七 | TRPO → PPO | 裁剪 surrogate 目标 | 策略更新步长控制 |
-| 十八 | DPO | 隐式奖励 + 偏好对 | 绕过奖励模型和 RL |
-| 十九 | GRPO | 组内相对优势 | 去除 Critic，适配大模型 |
-| 二十 | Flow-GRPO | 连续动作空间的 GRPO | 将 RL 引入图像生成 |
-| 二十一 | DAPO | 4 项工程改进 | 大规模推理 RL 的稳定性 |
-| 二十二 | 2-GRPO / f-GRPO / GIFT | GRPO 的三重理论视角 | 效率、散度选择、训练稳定性 |
-| 二十三 | SuperFlow | 步级优势 + 动态采样 | 图像 RL 的信用分配和效率 |
-| 二十四 | DanceGRPO | 多维度奖励 + 视频 RL | 视频生成的质量-运动平衡 |
+| 一 | REINFORCE → Actor-Critic | 策略梯度基础 | 如何用梯度优化策略 |
+| 二 | TRPO → PPO | 裁剪 surrogate 目标 | 策略更新步长控制 |
+| 三 | DPO | 隐式奖励 + 偏好对 | 绕过奖励模型和 RL |
+| 四 | GRPO | 组内相对优势 | 去除 Critic，适配大模型 |
+| 五 | Flow-GRPO | 连续动作空间的 GRPO | 将 RL 引入图像生成 |
+| 六 | DAPO | 4 项工程改进 | 大规模推理 RL 的稳定性 |
+| 七 | 2-GRPO / f-GRPO / GIFT | GRPO 的三重理论视角 | 效率、散度选择、训练稳定性 |
+| 八 | SuperFlow | 步级优势 + 动态采样 | 图像 RL 的信用分配和效率 |
+| 九 | DanceGRPO | 多维度奖励 + 视频 RL | 视频生成的质量-运动平衡 |
 
 **一条清晰的演进主线**：
 
@@ -230,4 +230,4 @@ $$
 > 9. Ethayarajh, K. et al. (2024). *KTO: Model Alignment as Prospect Theoretic Optimization*. ICML 2024.
 > 10. Hong, J. et al. (2024). *ORPO: Monolithic Preference Optimization without Reference Model*. EMNLP 2024.
 
-> 下一篇：[笔记｜生成模型（二十六）：奖励模型——RLHF 的隐藏引擎](/chengYi-xun/posts/61-reward-model/)
+> 下一篇：[笔记｜强化学习（十一）：奖励模型——RLHF 的隐藏引擎](/chengYi-xun/posts/61-reward-model/)

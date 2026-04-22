@@ -13,11 +13,11 @@ tags:
 series: Diffusion Models theory
 ---
 
-> 本文为系列第十六篇。继 Stable Diffusion 3 之后，Black Forest Labs（由原 Stable Diffusion 核心团队创立）推出了 Flux 系列模型。Flux 同样采用了 Flow Matching 和 DiT 架构，但在细节设计上有着独特的创新，使其在图像质量和指令遵循上达到了目前的顶尖水平。本文将深入解析 Flux 的核心架构。
+> 本文为生成模型系列第十五篇。继 Stable Diffusion 3 之后，Black Forest Labs（由原 Stable Diffusion 核心团队创立）推出了 Flux 系列模型。Flux 同样采用了 Flow Matching 和 DiT 架构，但在细节设计上有着独特的创新，使其在图像质量和指令遵循上达到了目前的顶尖水平。本文将深入解析 Flux 的核心架构。
 >
 > ⬅️ 上一篇：[笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](/chengYi-xun/posts/14-sd3/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
+> ➡️ 下一篇：[笔记｜强化学习（一）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
 
 
 # Flux 整体架构概览
@@ -117,4 +117,4 @@ Flux 通过 Double Stream 和 Single Stream 的混合架构，结合 2D RoPE 和
 > 2. Su, J. (2021). *RoFormer: Enhanced Transformer with Rotary Position Embedding*. arXiv:2104.09864.
 > 3. Dehghani, C., Djolonga, J., Mustafa, B., Padigela, P., Heek, J., Gilmer, J., ... & Houlsby, N. (2023). *Scaling Vision Transformers to 22 Billion Parameters*. ICML 2023.
 
-> 下一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
+> 下一篇：[笔记｜强化学习（一）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)

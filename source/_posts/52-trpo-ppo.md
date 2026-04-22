@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)
+title: 笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)
 date: 2025-08-17 10:00:00
 cover: false
 mathjax: true
@@ -14,9 +14,9 @@ series: Diffusion Models theory
 
 > 本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic 架构。然而，包括 REINFORCE 在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从 TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning from Human Feedback，基于人类反馈的强化学习）的基石——PPO 算法。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（十六）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
+> ⬅️ 上一篇：[笔记｜强化学习（一）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
+> ➡️ 下一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
 
 
 # 关键概念回顾：Q 函数与优势函数
@@ -799,4 +799,4 @@ PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 
 > 4. [Trust Region Methods: From REINFORCE to TRPO to PPO](https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo)
 > 5. [Natural Gradient Descent — Agustinus Kristiadi](https://agustinus.kristia.de/blog/natural-gradient/)
 
-> 下一篇：[笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
+> 下一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)

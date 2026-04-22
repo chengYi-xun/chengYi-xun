@@ -45,17 +45,17 @@ tags:
 
 ## 强化学习
 
-51. [笔记｜生成模型（十六）：强化学习基础与策略梯度](../51-rl-basics)
-52. [笔记｜生成模型（十七）：信任区域与近端策略优化 (从 TRPO 到 PPO)](../52-trpo-ppo)
-53. [笔记｜生成模型（十八）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](../53-dpo)
-54. [笔记｜生成模型（十九）：大模型在线 RL 破局者：GRPO 算法详解](../54-grpo)
-55. [笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](../55-flow-grpo)
-56. [笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](../56-dapo)
-57. [笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](../57-grpo-variants)
-58. [笔记｜生成模型（二十三）：SuperFlow 与图像生成 RL 前沿（2026）](../58-superflow)
-59. [笔记｜生成模型（二十四）：DanceGRPO——视频生成的统一强化学习框架](../59-video-grpo)
-60. [笔记｜生成模型（二十五）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](../60-rl-alignment-comparison)
-61. [笔记｜生成模型（二十六）：奖励模型——RLHF 的隐藏引擎](../61-reward-model)
+51. [笔记｜强化学习（一）：强化学习基础与策略梯度](../51-rl-basics)
+52. [笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)](../52-trpo-ppo)
+53. [笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](../53-dpo)
+54. [笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解](../54-grpo)
+55. [笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](../55-flow-grpo)
+56. [笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](../56-dapo)
+57. [笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](../57-grpo-variants)
+58. [笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](../58-superflow)
+59. [笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](../59-video-grpo)
+60. [笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](../60-rl-alignment-comparison)
+61. [笔记｜强化学习（十一）：奖励模型——RLHF 的隐藏引擎](../61-reward-model)
 
 # 世界模型
 

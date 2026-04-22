@@ -1,5 +1,5 @@
 ---
-title: 笔记｜生成模型（二十一）：DAPO：从 GRPO 到大规模推理 RL 的工程实践
+title: 笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践
 date: 2026-04-05 10:00:00
 cover: false
 mathjax: true
@@ -17,9 +17,9 @@ series: Diffusion Models theory
 
 > 本文为 RL 系列的第六篇。在上几篇中我们推导了 GRPO（组相对策略优化，Group Relative Policy Optimization）的核心思想并将其应用于图像生成。本文将介绍 GRPO 的工程增强版——**DAPO**（解耦裁剪与动态采样策略优化，**D**ecoupled clip and dyn**A**mic sam**P**ling policy **O**ptimization），它是字节跳动 Seed 团队与清华 AIR 联合提出的大规模 LLM 强化学习算法，用 Qwen2.5-32B 基座模型在 AIME 2024 上达到 50 分（超过 DeepSeek-R1-Zero 的 47 分），且训练步数减少 50%。
 >
-> ⬅️ 上一篇：[笔记｜生成模型（二十）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)
+> ⬅️ 上一篇：[笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）](/chengYi-xun/posts/55-flow-grpo/)
 >
-> ➡️ 下一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
+> ➡️ 下一篇：[笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
 
 >
 > 论文：[DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)（2025.03）
@@ -520,4 +520,4 @@ DAPO 之后，强化学习领域仍在快速演进：
 > 3. [NVIDIA NeMo RL DAPO Guide](https://docs.nvidia.com/nemo/rl/latest/guides/dapo.html)
 > 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
 
-> 下一篇：[笔记｜生成模型（二十二）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
+> 下一篇：[笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
