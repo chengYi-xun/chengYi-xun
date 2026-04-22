@@ -13,7 +13,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜生成模型（三）：生成对抗理论](/chengYi-xun/posts/3-GAN-theory/)
 >
-> ➡️ 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)
+> ➡️ 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/some_think/)
 
 ## 自编码器（Autoencoder, AE） VS 变分自编码器（Variational Autoencoder，VAE）
 
@@ -463,4 +463,4 @@ for batch_idx, data in enumerate(train_loader):
 > 1. Kingma, D. P., & Welling, M. (2013). *Auto-Encoding Variational Bayes*. arXiv:1312.6114.
 > 2. Doersch, C. (2016). *Tutorial on Variational Autoencoders*. arXiv:1606.05908.
 
-> 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/5-some_think/)
+> 下一篇：[杂谈｜写作的目的](/chengYi-xun/posts/some_think/)
