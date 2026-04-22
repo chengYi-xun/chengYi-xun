@@ -200,38 +200,16 @@ Cosmos-Transfer1 支持多种**结构化控制条件**进行世界变换：
 核心用途：**Sim2Real**——将仿真器的结构化输出（深度、分割）转化为逼真的视频。
 
 ```python
-"""Conceptual Cosmos-Transfer1-style inference API."""
+model = CosmosTransfer.from_pretrained(...)   # 加载预训练的 Cosmos-Transfer1 模型
 
-from cosmos import CosmosTransfer
+conditions = {                                # 输入多种结构化条件
+    "depth": depth_map,                       #   深度图序列 (T, H, W)
+    "segmentation": seg_map,                  #   语义分割序列 (T, H, W)
+    "hdmap": hd_map,                          #   高精地图
+}
+weights = {"depth": 0.8, "seg": 0.5, "hdmap": 0.3}  # 各条件的权重
 
-
-def synthesize_video(depth_map, seg_map, hd_map, num_frames: int = 30):
-    """Generate video conditioned on structured maps.
-
-    Args:
-        depth_map: Depth sequence, shape (T, H, W).
-        seg_map: Segmentation sequence, shape (T, H, W).
-        hd_map: HD map tensor or raster for routing context.
-        num_frames: Number of output frames to synthesize.
-
-    Returns:
-        Generated video tensor from the pretrained transfer model.
-    """
-    model = CosmosTransfer.from_pretrained("nvidia/cosmos-transfer1")
-
-    conditions = {
-        "depth": depth_map,  # (T, H, W)
-        "segmentation": seg_map,  # (T, H, W)
-        "hdmap": hd_map,
-    }
-
-    weights = {"depth": 0.8, "segmentation": 0.5, "hdmap": 0.3}
-
-    return model.generate(
-        conditions,
-        weights=weights,
-        num_frames=num_frames,
-    )
+video = model.generate(conditions, weights)   # 多条件融合 → 生成逼真驾驶视频
 ```
 
 ## 4. UniSim：用视频模型替代仿真器
