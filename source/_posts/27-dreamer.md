@@ -119,7 +119,7 @@ $$
 
 Dreamer v1 的核心创新：**先学一个世界模型（RSSM），然后把 Actor-Critic 搬到世界模型内部训练**。世界模型跑在 GPU 上，一步"想象"只需要矩阵乘法，比真实环境快几个数量级。
 
-![Dreamer：从经验学习动力学，并在想象中学习行为（Figure 3, Hafner et al., ICLR 2020）](/chengYi-xun/img/dreamer_imagination.png)
+![Dreamer 的三个核心流程：学习世界模型 → 在想象中训练 Actor-Critic → 与环境交互（Hafner, Google Research Blog, 2020）](/chengYi-xun/img/dreamer_three_processes.png)
 
 Dreamer 的训练流程分为三个交替的阶段（对应上图）：
 

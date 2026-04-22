@@ -105,7 +105,7 @@ PhysGen（UIUC, 2024）走了一条不同的路——**先仿真后生成**：
 视频扩散细化
 ```
 
-![PhysGen 方法总览（论文 Fig. 2，arXiv:2409.18964）](/chengYi-xun/img/physgen_pipeline.png)
+![PhysGen 三阶段流程：感知 → 物理仿真 → 渲染与精修（PhysGen Project Page, ECCV 2024）](/chengYi-xun/img/physgen_method.png)
 
 ### 2.2 三阶段流程
 
