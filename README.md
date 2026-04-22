@@ -1,6 +1,6 @@
 # chengYi-xun 技术博客
 
-基于 [Hexo](https://hexo.io/) + [Butterfly](https://github.com/jerryc127/hexo-theme-butterfly) 主题的个人技术博客，系统记录生成式 AI、多模态融合与世界模型领域的学习笔记。
+基于 [Hexo](https://hexo.io/) + [Butterfly](https://github.com/jerryc127/hexo-theme-butterfly) 主题的个人技术博客，系统记录生成式 AI、强化学习对齐与世界模型领域的学习笔记。
 
 **在线地址**：[https://chengyi-xun.github.io/chengYi-xun/](https://chengyi-xun.github.io/chengYi-xun/)
 
@@ -8,7 +8,7 @@
 
 ## 内容目录
 
-### 生成式人工智能（24 篇）
+### 生成模型（15 篇）
 
 从概率论基础出发，完整覆盖生成模型的理论演进与代码实现：
 
@@ -18,15 +18,18 @@
 | 扩散模型 | DDPM → DDIM → Score-Based → SDE 统一框架 | 4 |
 | 条件生成 | Classifier Guidance / Classifier-Free Guidance | 2 |
 | 架构演进 | UiT/DiT、Normalizing Flow、Flow Matching、SD3 (MMDiT)、Flux | 5 |
-| 强化学习与对齐 | REINFORCE → PPO → DPO → GRPO → DAPO → Flow-GRPO → DanceGRPO | 9 |
 
-### 多模态融合（6 篇）
+### 强化学习与对齐（11 篇）
 
-从早期特征拼接到 2026 前沿，系统讲解多模态学习：
+从策略梯度基础到图像/视频生成 RL 前沿，覆盖 LLM 对齐的完整技术栈：
 
-- 三级融合框架（早期 / 中期 / 晚期）的数学推导与代码实现
-- CLIP、BLIP-2 (Q-Former)、LLaVA、Flamingo、Chameleon
-- MMDiT、InternVL、Qwen-VL、Mamba 多模态
+| 模块 | 内容 | 篇数 |
+|------|------|------|
+| RL 基础 | REINFORCE、Actor-Critic、TRPO → PPO | 2 |
+| 偏好优化 | DPO（离线）、GRPO（在线无 Critic） | 2 |
+| 工程实践 | DAPO、2-GRPO / f-GRPO / GIFT | 2 |
+| 视觉生成 RL | Flow-GRPO、SuperFlow、DanceGRPO | 3 |
+| 总结与评测 | 全方法对比、奖励模型（Reward Model）专题 | 2 |
 
 ### 世界模型（7 篇）
 
@@ -40,8 +43,7 @@
 
 ### 杂谈
 
-- VGGT 3D 视觉统一 Transformer
-- Vision Transformers Need Registers
+- 写作的目的
 
 ---
 
