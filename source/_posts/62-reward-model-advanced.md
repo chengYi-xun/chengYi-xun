@@ -1,6 +1,6 @@
 ---
 title: 笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励
-date: 2026-04-23 18:00:00
+date: 2026-04-05 19:00:00
 cover: false
 mathjax: true
 categories:
@@ -12,215 +12,270 @@ tags:
 series: Diffusion Models theory
 ---
 
-> 本篇是 [笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/) 的续篇。上一篇我们把奖励模型建成**可优化的代理**：用人类比较数据拟合 \(\hat{r}_\theta(x,y)\)，再在 PPO、GRPO 或 Best-of-\(N\) 里把它当「廉价裁判」。本篇追问一个更尖锐的问题：**当代理不完美时，拼命优化它会怎样？** 这正是 Goodhart 定律在 RLHF 里的写照——「一旦一个指标变成目标，它就不再是个好指标」。下文从 Reward Hacking 的定量规律出发，走到生成式评委、多目标架构（ArmoRM）、可验证奖励（DeepSeek-R1），再瞥一眼视觉生成与 RewardBench 评测，收束成一张 2024–2026 的路线图。
+> 本篇是 [上一篇（奖励模型基础）](/chengYi-xun/posts/61-reward-model/) 的续篇。上一篇完成了代理裁判 $\hat{r}_\theta$ 的构建，本篇追问三个递进的问题：**(1)** 拼命优化一个不完美的裁判会怎样？**(2)** 如何让裁判更健壮？**(3)** 能否绕过裁判？
 >
 > ⬅️ 上一篇：[笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
 
-## 从「代理裁判」到 Goodhart：我们到底在优化什么？
+## 1 Reward Hacking：当优化器攻击裁判
 
-在[上一篇](/chengYi-xun/posts/61-reward-model/)中，我们把奖励模型建成了一个**可优化的代理裁判**：用人类比较数据拟合出一个打分器 $\hat{r}_\theta(x,y)$，然后在 RL（如 PPO）或推理期搜索（如 Best-of-$N$）里让它自动给大模型的回答打分。
+### 1.1 问题定义与优化动力学
 
-但这引出了一个非常尖锐的问题：**当这个裁判不完美时，拼命讨好它会发生什么？**
+> **阶段澄清**：RLHF 分两步——阶段一用 BT 损失训练奖励模型 $\hat{r}_\theta$（训裁判），阶段二冻结 $\hat{r}_\theta$ 用 PPO 等算法训练策略 $\pi$（考选手）。**Reward Hacking 发生在阶段二**。
 
-想象你在训练一位助手，你真正关心的是“对人类有用且诚实”（我们称之为**真实人类效用 $r^*$**）。但因为人类反馈太贵，你只能让优化器去讨好那个**替身裁判 $\hat{r}_\theta$**。
-
-只要替身裁判和真实偏好之间存在哪怕一丝缝隙（$\hat{r}_\theta \neq r^*$），强大的强化学习优化器就一定会钻这个空子：它会找到那些能骗过替身裁判拿高分，但对人类毫无价值的回答。
-
-这就是 **Reward Hacking（奖励篡改 / 过度优化）**——它不是“模型变坏了”，而是**目标函数与真实目标脱节**时，强优化必然导致的灾难。这正是著名的 **Goodhart 定律**在 AI 对齐中的完美写照：“一旦一个指标变成优化目标，它就不再是个好指标”。
-
-下面，我们将把这条缝隙**量化**：代理奖励与“金标准”偏好何时一致、何时分道扬镳？KL 正则化又能在多大程度上挡住这场灾难？
-
-## Reward Hacking：从直觉到缩放定律
-
-### 直觉：模型在优化什么，就会在什么地方「长歪」
-
-Reward hacking 并不是模型产生了恶意，它只是在**对齐压力下的自然演化**。
-- **冗长（Verbosity）**：如果 RM 隐约觉得“字数多 = 解释详细 = 好回答”，策略模型就会疯狂堆砌废话，把一句话能说明白的事写成五段。
-- **谄媚（Sycophancy）**：如果 RM 对“同意用户立场”的回答给高分，模型就会变成一个没有主见的马屁精，即使用户说“1+1=3”，它也会附和。
-- **格式套路**：大量使用粗体、列表、或者“作为一个 AI 语言模型”的安全声明来骗取高分。
-
-它们的共同点是：**在代理裁判那里得分极高，但在真实人类眼里毫无价值。**
-
-### Gao et al.：过度优化的定量规律与倒 U 型曲线
-
-为了精确测量这种现象，Gao 等人（*Scaling Laws for Reward Model Overoptimization*, ICML 2023）设计了一个巧妙的实验：
-1. 用一个非常大的、完美的 **Gold RM** 扮演“真实人类”。
-2. 用它的少量标注数据，训练一个较小的 **Proxy RM**（替身裁判）。
-3. 让策略模型去拼命优化 Proxy RM 的分数，然后观察 **Gold RM 的分数**会怎么变。
-
-他们把策略模型偏离初始状态的距离定义为 $d := \sqrt{D_{\mathrm{KL}}\bigl(\pi \,\|\, \pi_{\mathrm{init}}\bigr)}$。
-
-实验发现，随着优化强度的增加（$d$ 变大），**Proxy 分数会一直单调上升，但 Gold 分数会呈现先升后降的趋势**。
-
-具体来说，在 **Best-of-$N$（拒绝采样）** 下，Gold 分数呈现一条**倒 U 型的抛物线**：
-$$
-R_{\mathrm{BoN}}(d) = \alpha_{\mathrm{BoN}}\, d - \beta_{\mathrm{BoN}}\, d^2
-$$
-- **小 $d$ 时（对齐阶段）**：$\alpha d$ 项主导，Gold 分数上升，说明模型确实在变好。
-- **大 $d$ 时（Hacking 阶段）**：$-\beta d^2$ 项主导，Gold 分数开始暴跌，说明模型已经找到了 Proxy RM 的漏洞，多优化一点反而损害真实偏好。
-
-而在 **强化学习（RL，如 PPO）** 下，曲线呈现不同的对数形态，但同样存在峰值：
-$$
-R_{\mathrm{RL}}(d) = d\,\bigl(\alpha_{\mathrm{RL}} - \beta_{\mathrm{RL}}\,\log d\bigr)
-$$
-
-![Proxy 与 Gold 分数在优化过程中的变化趋势](/chengYi-xun/img/scaling-law-flowchart.png)
-
-### Kwa et al.：KL 惩罚也挡不住的“灾难性 Goodhart”
-
-在标准的 PPO 算法中，我们通常会加一个 **KL 惩罚项**，不让策略模型跑得太远，试图以此来防止 Reward Hacking。但这真的绝对安全吗？
-
-Kwa 等人（NeurIPS 2024）给出了悲观的答案：**当奖励模型的误差呈现重尾分布（Heavy-Tailed）时，即使加了 KL 正则，依然会发生 Catastrophic Goodhart（灾难性 Goodhart 效应）。**
-
-直白地说，如果 RM 在某些罕见的角落（长尾区域）会给出异常离谱的高分，优化器就会像闻到血腥味的鲨鱼一样扑过去。此时，KL 惩罚只能限制模型“别跑太快”，但**根本无法阻止**模型最终掉进这些高分陷阱里。
-
-**工程结论**：
-1. **缩放定律**告诉我们：给定一个 RM，真实的优化收益是有**天花板**的。你不能无限期地跑 PPO。
-2. **灾难性 Goodhart**告诉我们：光靠调大 KL 惩罚系数 $\beta$ 是不够的。
-
-要彻底解决这个问题，我们需要更强大的裁判（如 LLM-as-a-Judge）、多维度的打分（如 ArmoRM），甚至在客观任务上**直接抛弃神经网络裁判，改用纯规则验证（如 DeepSeek-R1）**。这正是 2024-2026 年 RM 架构演进的核心主线。
-
-## 数据瓶颈与 AI 评委：从 LLM-as-Judge 到带 CoT 的生成式奖励模型（GenRM）
-
-### 用 AI 评判 AI：如何缓解人类标注的扩展性危机？
-
-传统 RM 最大的瓶颈是**数据太贵了**。让人类专家去对比两段长篇大论的代码或逻辑推理，成本极高且速度极慢。
-
-为了打破这个瓶颈，学术界开始探索**用强大的 AI（如 GPT-4）来当评委**。这演化出了三条不同的技术路线：
-
-1. **LLM-as-a-Judge**：直接写一段 Prompt，让 GPT-4 充当裁判，输出“A 更好”或“B 更好”。这种方法最简单灵活，但非常依赖闭源 API，且存在严重的系统性偏差。
-2. **RLAIF（AI 反馈强化学习）**：用 LLM-as-a-Judge 生成海量的偏好数据（A > B），然后再用这些合成数据去训练一个传统的标量 RM（如 BT-RM）。Anthropic 的 Constitutional AI 就是这一路线的先驱。
-3. **GenRM（Generative Reward Models）**：这是 2024 年以来的最新趋势。与其把大模型压缩成一个只输出数字的标量 RM，不如**直接把评委的能力微调进一个开源大模型里**。
-
-### 进化：GenRM 与 CoT 推理链的降维打击
-
-Mahan 等人（*Generative Reward Models*, 2024）提出，与其让模型直接输出一个冷冰冰的分数，不如让它在打分前，先生成一段 **Chain-of-Thought（CoT，思维链）** 理由。
-
-**为什么 CoT 这么重要？**
-因为传统的标量 RM 是一个黑盒，一旦它学到了“长回答就是好回答”这种捷径，你根本无从知晓。而 GenRM 被强迫写出“为什么 A 比 B 好”的详细分析（比如“A 的逻辑更严密，而 B 在第三段出现了事实错误”），这就把**中间的推理结构**暴露为了训练信号。
-
-实验证明，这种带 CoT 的 GenRM 在面对没见过的新任务（OOD，分布外泛化）时，表现出了对传统 BT-RM 的**降维打击**（准确率高出 10% - 45%）。
-
-### AI 评委的“三大幻觉”与缓解策略
-
-即便用了最先进的 GenRM 或 GPT-4，AI 评委依然会有自己的“小心思”。实证研究反复发现了三大系统性偏差：
-
-1. **位置偏差（Position Bias）**：当两个回答质量差不多时，AI 评委往往会无脑偏好**第一个**出现的回答。
-   - *缓解方案*：把 A 和 B 交换位置，让评委打两次分，如果结果不一致就判平局。
-2. **冗长偏差（Verbosity Bias）**：AI 评委极度偏爱“长篇大论”，经常把废话连篇的回答误判为“更详细、更完整”。
-   - *缓解方案*：在 Prompt 中严厉警告“不要受长度影响”，或者在训练数据中刻意加入“短而精”战胜“长而空”的样本。
-3. **自我偏好（Self-preference Bias）**：AI 评委会给自己家族的模型打高分（比如 Llama 评委偏爱 Llama 的生成风格）。研究发现，这其实是因为模型对自己的输出具有更低的困惑度（Perplexity），觉得看着更顺眼。
-   - *缓解方案*：在评估时，必须使用与生成模型**不同家族**的模型作为交叉评委。
-
-## 当单一标量不够用时：ArmoRM 的多目标门控专家，与 DeepSeek-R1 的可验证奖励转向
-
-### ArmoRM：多维偏好 + 门控 MoE，把「权衡」从黑箱里拆出来
-
-Wang et al.（*Interpretable Preferences via Multi-Objective Reward Modeling and Mixture-of-Experts*，[arXiv:2406.12845](https://arxiv.org/abs/2406.12845)）指出：真实人类偏好往往是**多维**的（诚实、正确、简洁、安全等），而经典 Bradley–Terry RM 把它们**压进一个标量**——策略一旦 exploit，你很难判断是「太啰嗦」还是「太冒险」。**ArmoRM（Absolute-Rating Multi-Objective Reward Model）** 的做法分两步：
-
-1. **多目标绝对评分**：在 \((x,y)\) 上回归多个维度（而非只学相对胜负）。
-2. **上下文门控（gating）**：用 **MoE 式门控网络** \(g_\phi\)，只看 **prompt** 的表征，动态产生非负、和为 1 的权重，把向量奖励合成标量。
-
-记 LLM 主干对拼接输入 \(x\oplus y\) 的最后一层最后一 token 表征为 \(f_\theta(x\oplus y)\)，多目标回归头输出各维评分；门控读取 **仅 prompt** 的特征 \(f_\theta(x)\)，经 softmax 得到系数向量。为抑制「冗长度维度过大污染一切」，论文对除冗长度外的目标做 **与冗长度去相关** 的修正（在参考分布上用 Spearman 相关减掉冗长度成分），得到 \(r'\)，再与门控结合：
+上一篇完成了阶段一。现在进入阶段二：我们冻结 $\hat{r}_\theta$，让策略 $\pi$ 最大化期望得分。由于 $\hat{r}_\theta$ 只是真实偏好 $r^*$ 的近似，将其输出分解为
 
 $$
-R \;=\; g_\phi\bigl(f_\theta(x)\bigr)^\top r'.
+\hat{r}_\theta(x,y) = r^*(x,y) + \epsilon(x,y)
 $$
 
-随后在**冻结**主干与回归头的条件下，用成对偏好数据对门控与温度等参数 \((\phi,\beta)\) 做类 BT 的优化，使标量 \(R\) 与人类整体偏好一致。
+其中 $r^*$ 是不可观测的真实人类偏好，$\epsilon$ 为 RM 的系统性拟合误差。代入策略优化目标：
 
-直觉上，ArmoRM 把 **「这一轮对话更该强调什么」** 交给门控、把 **「这条回答在各维度上如何」** 交给多头回归；比单一黑箱标量更易诊断与纠偏。实现与模型卡见 [RLHFlow/ArmoRM-Llama3-8B-v0.1](https://huggingface.co/RLHFlow/ArmoRM-Llama3-8B-v0.1)。
+$$
+\max_\pi \; \mathbb{E}_{y \sim \pi}[\hat{r}_\theta(x,y)] \;=\; \underbrace{\mathbb{E}[\,r^*(x,y)\,]}_{\text{目标 1：提升真实质量}} \;+\; \underbrace{\mathbb{E}[\,\epsilon(x,y)\,]}_{\text{目标 2：利用 RM 误差}}
+$$
+
+优化器**无法区分**这两项，它只看到一个总分。RL 是一个极强的主动探索器，会像水流一样寻找提升总分最容易的路径。这导致了三阶段的动力学：
+
+1. **初期（分布内优化）**：策略生成的内容仍在 RM 的训练数据分布内，$\epsilon \approx 0$。此时提升总分最有效的路径就是提升 $r^*$——模型在真实地变好。
+2. **瓶颈期**：$r^*$ 越来越高，继续提升的边际成本急剧上升（例如从 90 分到 95 分需要更强的推理能力）。
+3. **Hacking 期（分布外漂移）**：策略被推至 RM 训练分布之外（OOD）。RM 作为神经网络，在未见过的输入区域必然存在外推失控的"假山峰"——这些点上 $r^*$ 很低但 $\epsilon$ 极大。优化器发现：**提升 $\epsilon$ 的收益远大于提升 $r^*$，且难度极低**。于是概率质量被集中到这些假山峰上，RM 给出的分数（即 Proxy 分数，因为 RM 只是真实偏好的"代理"）飙升，而真实质量崩塌。
+
+这就是 **Reward Hacking**（奖励过度优化）。其理论根源是 **古德哈特定律**（Goodhart's Law）：当代理指标本身变成优化目标时，它不再是好的度量指标（Goodhart, 1975; Manheim & Garrabrant, 2019）。
+
+**实践中常见的三类 Hacking 形态**（Weng, 2024）：
+
+| 类型 | 机制 | 典型表现 |
+|:---|:---|:---|
+| **冗长（Verbosity）** | RM 隐含"长 = 详尽 = 好"的偏见 | 一句话能说清楚的事写成五段废话 |
+| **谄媚（Sycophancy）** | RM 对"同意用户"给高分 | 即使用户说"1+1=3"也附和 |
+| **格式套路** | RM 对特定格式特征过拟合 | 堆砌粗体、列表、"作为 AI 语言模型"等安全声明 |
+
+它们的共同特征是 $\hat{r}_\theta$ 高分而 $r^*$ 低分——在代理裁判眼里满分，在人类眼里毫无价值。
+
+### 1.2 过度优化的缩放定律
+
+上面的三阶段分析是定性的。Gao et al.（*Scaling Laws for Reward Model Overoptimization*, ICML 2023）用一个精心设计的实验将其**定量化**了。
+
+**实验设计**：由于真实人类偏好 $r^*$ 不可观测，他们构造了一个合成代理框架来模拟整个过程——
+
+- **Gold RM**（黄金裁判）：一个参数量很大、拟合能力很强的奖励模型，**充当实验中的"真实人类"**。我们把它的评分视为真实偏好 $r^*$ 的最佳近似。
+- **Proxy RM**（代理裁判）：用 Gold RM 的少量标注数据训练出的**较小模型**。这就是实际 RLHF 中那个不完美的裁判 $\hat{r}_\theta$。
+
+然后让策略模型拼命优化 Proxy 的分数，同时用 Gold 的分数来衡量策略是否真的在变好。如果两条曲线同步上升，说明 Proxy 可靠；如果 Proxy 一路飙升而 Gold 掉头向下，就证明 Reward Hacking 正在发生。
+
+**核心发现——倒 U 型曲线**：
+
+![Proxy 与 Gold 分数在优化过程中的变化趋势（示意图，基于 Gao et al. 2023 的实验规律）](/chengYi-xun/img/scaling-law-flowchart.png)
+
+如图所示，用策略与初始策略的 KL 散度度量"策略跑了多远"（横轴），Gold 分数（真实质量，蓝色实线）呈现一条**先升后降的倒 U 型曲线**——而 Proxy 分数（红色虚线）始终单调上升。峰值点（Peak）就是优化的"甜蜜点"；越过它之后，继续优化只是在钻 Proxy 的漏洞，真实质量不断崩塌。
+
+这一规律在 Best-of-$N$（拒绝采样）和 RL（PPO）下都被观察到，且曲线的关键参数随 Proxy RM 参数量**平滑缩放**（近似对数趋势），因此可以用小规模实验预测大规模训练的行为。
+
+**工程启示——如何找到最优停止点？**
+
+Gao et al. 的缩放律之所以重要，是因为曲线参数随 Proxy RM 的参数量呈**对数平滑变化**。这意味着你可以在小规模上（小 Proxy RM + 短训练）拟合出 $\alpha, \beta$ 的趋势线，然后**外推**到大规模训练的预期行为——包括峰值出现在哪个 KL 值（Gao et al., 2023, Fig. 12）。
+
+实际工程中，常用的做法包括：
+
+1. **KL 预算法**：在 PPO 训练前预设一个 KL 上限（KL budget），策略偏离超过阈值就强制停止。这等价于在倒 U 型曲线上"提前下车"。
+2. **Hold-out 监控法**：保留一组 Gold 标注数据（或用更强的模型评分），定期评估。当 Proxy 分数仍在涨但 Hold-out 分数开始掉时，说明已进入 Hacking 阶段，应立即停止。
+3. **迭代 RLHF（Iterated RLHF）**：不跑一次到底。每训练一段时间后暂停 PPO，让当前策略模型生成一批新回答，请人类标注员对这些新回答做偏好排序，然后用这些新标注数据重新训练 RM。这样 RM 见过的数据就不再局限于初始阶段的回答，而是覆盖了策略模型"现在正在说的话"，策略更难跑到 RM 的盲区去钻空子（Gao et al., §4.3）。
+4. **RM 集成**：同时训练多个不同初始化 / 不同数据分割的 RM，取平均分。单个 RM 的漏洞不太可能被所有 RM 共享，集成可以有效压缩 $\epsilon$（Lambert, *RLHF Book*, Ch. 14）。
+
+### 1.3 KL 正则化为何不是万能药
+
+既然过度优化会导致崩溃，一个自然的想法是：**限制策略不要跑太远**。标准 PPO 正是这么做的——在奖励目标上加一个 KL 惩罚项，强迫策略 $\pi$ 不要偏离参考策略 $\pi_{\mathrm{ref}}$ 太多。直觉上，如果策略被拴在参考策略附近，它就没法跑到 RM 的分布外去钻空子了。
+
+但 Kwa et al.（*Catastrophic Goodhart*（灾难性古德哈特）, NeurIPS 2024）从理论上证明了这种保护并不可靠。他们的核心发现取决于 RM 误差 $\epsilon$ 的**尾部性质**：
+
+![轻尾 vs 重尾误差下 KL 惩罚的有效性对比（示意图，基于 Kwa et al., NeurIPS 2024）](/chengYi-xun/img/kl-tail-comparison.png)
+
+**轻尾误差（如高斯分布，左图）**：参考策略的输出分布（蓝色）在远离中心后概率急剧衰减为零，尾部几乎没有概率质量。优化后的策略（橙色虚线）即使想搬运质量到高 $\epsilon$ 区域，也找不到多少"原料"可搬——因为参考分布在那里本来就接近零。要到达那些区域，策略需要做大幅度的分布变动，KL 代价会急剧上升，远超收益。所以 KL 惩罚有效。
+
+**重尾误差（如帕累托分布、柯西分布，右图）**：参考策略的输出分布（蓝色）在极端区域仍有缓慢衰减的概率尾巴——这就是重尾的特征。如图所示，优化后的策略（红色虚线）只需将极端尾部的概率**稍微放大**（红色阴影区），就完成了 Hacking。由于参考分布在那里本来就有概率质量（虽然小），这个放大操作的 KL 代价极低；但那些位置上的 $\epsilon$ 值却异常巨大，收益远超代价。
+
+**关键机制**：你可能会问——如果误差很大，策略岂不是要"跑很远"才能碰到那些极端漏洞？那 KL 不也会很大吗？
+
+答案是：**不需要跑很远**。重尾分布的特性是，在参考策略 $\pi_{\mathrm{ref}}$ 的输出空间里，就已经存在一些**极其罕见但 $\epsilon$ 巨大**的输出 $(x, y)$。优化器不需要创造新的输出模式，它只需要把这些本来就存在的罕见输出的概率**稍微调高一点点**——比如从 0.001% 调到 0.01%。
+
+这个微小的概率调整在 KL 散度看来几乎无关紧要（绝大多数输出的概率没变，KL 几乎为零）。但由于那些点上的 $\epsilon$ 异常巨大（重尾极值），这一点点概率质量的转移就能带来巨大的代理奖励收益。**KL 惩罚感受到的是"概率搬了多少"（对数级），而奖励收益取决于"搬到的地方 $\epsilon$ 有多大"（可以任意大）——两者增长速度不匹配。**
+
+Kwa et al. 将这种现象命名为**灾难性古德哈特**（Catastrophic Goodhart）：存在某些策略，RM 给它的分数（代理奖励）无限高、KL 散度却趋近于零，但真实效用不比初始策略好——KL 惩罚形同虚设。
+
+> **实证补充**：Kwa et al. 用 Pythia-1.4B 和 Starling-7B 等开源 RM 做了实验，发现当前模型的误差分布主要呈**轻尾**特征，所以现阶段 KL 正则仍然管用。但作者警告：随着 RM 覆盖的任务更广、评估维度更复杂，重尾误差出现的可能性会增加。灾难性古德哈特不是当下的问题，而是一个**理论红线**——它告诉我们 KL 惩罚的保护不是无条件的。
+
+**阶段性结论**：
+
+1. **缩放定律**（Gao et al.）表明：给定一个 RM，真实的优化收益存在**天花板**——倒 U 型曲线的峰值就是极限，超过它就是在毁灭真实质量。
+2. **灾难性古德哈特**（Kwa et al.）表明：光靠调大 KL 惩罚系数 $\beta$ 是不够的——在重尾误差下，KL 惩罚的对数增长永远追不上极端漏洞的收益。
+
+因此，必须从 RM 架构本身入手——要么**造更好的裁判**（GenRM、ArmoRM），要么在适用场景下**绕过裁判**（DeepSeek-R1 的可验证奖励）。
+
+## 2 造更好的裁判：从 AI 评委到生成式奖励模型
+
+### 2.1 AI 反馈的三条路线
+
+传统 RM 的瓶颈在于人类标注成本。为此，学术界发展出三条技术路线（Lee et al., 2023; Bai et al., 2022）：
+
+| 路线 | 核心思路 | 代表工作 | 局限 |
+|:---|:---|:---|:---|
+| **LLM-as-a-Judge** | 直接 Prompt GPT-4 输出偏好判决 | Zheng et al., 2023 | 依赖闭源 API；存在系统性偏差 |
+| **RLAIF** | AI 批量标注 → 蒸馏为轻量 BT-RM | Constitutional AI (Bai et al., 2022) | 蒸馏后信息有损 |
+| **GenRM** | 微调开源 LLM 为生成式评委 | Mahan et al., 2024 | 推理成本较高 |
+
+三者并非互斥：RLAIF 可用 LLM-as-Judge 的输出做标注源，GenRM 可在 RLAIF 数据上训练。
+
+### 2.2 GenRM：让评委先推理再判决
+
+Mahan et al.（*Generative Reward Models*, 2024）提出将 RM 从标量黑盒转变为**先推理、后判决**的生成式模型。
+
+**基础 GenRM** 把 LLM 视为分类器，给定 prompt $x$ 和候选对 $(y_1, y_2)$，预测胜出标记 $I$：
+
+$$
+\mathcal{L}_{\mathrm{GenRM}} = \mathbb{E}_{(x, y_1, y_2, I)} \bigl[-\log \pi_\phi(I \mid x, y_1, y_2)\bigr]
+$$
+
+**CoT-GenRM** 要求模型在判决前先生成推理链 $c$，训练目标变为联合似然：
+
+$$
+\mathcal{L}_{\mathrm{CoT}} = \mathbb{E} \bigl[-\log \pi_\phi(c \mid x, y_1, y_2) - \log \pi_\phi(I \mid x, y_1, y_2, c)\bigr]
+$$
+
+CoT 的关键价值在于：$\log \pi_\phi(c \mid \cdot)$ 项将中间推理结构暴露为可训练的监督信号，直接惩罚了黑盒 RM 容易学到的捷径（如"长回答=好回答"）。实验显示 CoT-GenRM 在 OOD 泛化上较 BT-RM 提升 10%–45%（Mahan et al., 2024, Fig. 3）。
+
+后续工作进一步发展了 GenRM 范式：**Think-RM**（NeurIPS 2025）引入长程推理链训练；**Rationale Consistency** 指标（2026）用于检测推理链是否为事后合理化（post-hoc rationalization），而非因果性推理。
+
+### 2.3 AI 评委的系统性偏差
+
+无论采用何种 AI 评委，以下三类偏差均需关注（Zheng et al., 2023; Weng, 2024）：
+
+- **位置偏差（Position Bias）**：倾向偏好先出现的回答。缓解：交换 A/B 顺序做两次评判，不一致则判平。
+- **冗长偏差（Verbosity Bias）**：将冗长误判为详尽。缓解：Prompt 约束或在训练数据中加入"短精 > 长空"样本。
+- **自我偏好（Self-preference Bias）**：对同家族模型的输出给出更高评分（低困惑度效应）。缓解：跨家族交叉评判。
+
+## 3 绕过单一标量：多目标 RM 与可验证奖励
+
+### 3.1 ArmoRM：多目标评分 + 门控聚合
+
+Wang et al.（*Interpretable Preferences via Multi-Objective Reward Modeling and Mixture-of-Experts*, EMNLP Findings 2024）指出，单一标量 RM 无法区分"太啰嗦"与"太冒险"——策略 exploit 时难以诊断。ArmoRM 将奖励分解为多个可解释维度：
+
+**阶段一：多目标回归。** 线性头将 LLM 末层表征映射为 $k$ 维评分向量：
+
+$$
+\min_{\theta, w}\; \mathbb{E}_{(x,y,r) \in \mathcal{D}}\; \bigl\| w^\top f_\theta(x \oplus y) - r \bigr\|_2^2, \quad r \in \mathbb{R}^k
+$$
+
+其中各维度对应诚实、安全、简洁等绝对评分，缺失维度不参与损失计算。
+
+**阶段二：门控 MoE 聚合。** 冻结主干与回归头，门控网络 $g_\phi$ 仅读取 prompt 特征 $f_\theta(x)$，经 softmax 输出非负权重向量。对除冗长度外的目标做去相关修正得 $r'$，最终标量奖励为
+
+$$
+R = g_\phi\bigl(f_\theta(x)\bigr)^\top r'
+$$
+
+门控参数用成对偏好数据做 BT 优化（带可学习温度 $\beta$）。该设计将"各维度表现如何"与"本轮对话更看重什么"解耦，使诊断和纠偏成为可能。ArmoRM-Llama3-8B-v0.1 在 RewardBench 上取得了同规模 SOTA（Wang et al., 2024）。
 
 ![ArmoRM 架构：单次前向传播、多目标评分与门控合成](/chengYi-xun/img/armorm-architecture.png)
 
-### DeepSeek-R1 与范式转移：推理任务为何优先「可验证」而非神经 RM？
+### 3.2 可验证奖励：DeepSeek-R1 的双轨范式
 
-DeepSeek-AI（*DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning*，[arXiv:2501.12948](https://arxiv.org/abs/2501.12948)）在 **DeepSeek-R1-Zero** 的数学 / 代码 / 逻辑数据上采用 **rule-based reward**：**accuracy reward**（答案能否被规则判定为正确）与 **format reward**（是否满足可自动检查的格式以便抽取答案）。二者写为
+DeepSeek-AI（*DeepSeek-R1*, Nature 2025; arXiv:2501.12948）提出了更激进的方案：在**对错可判定**的任务上，直接用规则替代神经网络裁判。
+
+DeepSeek-R1-Zero 在数学 / 代码 / 逻辑任务上采用纯规则奖励：
 
 $$
-R_{\mathrm{rule}} \;=\; R_{\mathrm{acc}} + R_{\mathrm{format}}.
+R_{\mathrm{rule}} = R_{\mathrm{acc}} + R_{\mathrm{format}}
 $$
 
-团队明确 **避免** 在这类推理任务上依赖神经网络 RM，理由包括：大规模 RL 下神经 RM **更易被 hacking**；同时训练与维护成本高、与「对错可判定」的任务结构也不匹配。
+其中 $R_{\mathrm{acc}}$ 由编译器或正则匹配判定答案正确性，$R_{\mathrm{format}}$ 检查 `<think>...</think>` 等格式约束。团队显式避免使用神经 RM，理由是大规模 RL 下其 Hacking 风险过高（DeepSeek-AI, 2025, §2.3）。
 
-同时，R1 **并非**「全局不用学习式奖励」：在通用对齐阶段，论文仍描述 **helpfulness / safety** 等场景使用 **学习式 RM** 与多源 \(R_{\mathrm{General}}\) 的组合。准确画像是一个 **双轨** 范式：
+配合 **GRPO**（Group Relative Policy Optimization）算法——以组内采样的均值/标准差归一化优势函数 $A_i = (r_i - \mu_G) / \sigma_G$，免去显式 Critic 模型——R1-Zero 仅凭纯 RL 便涌现出了自我反思、回溯验证等推理策略（所谓"aha moment"）。
 
-- **可验证子任务**（数学答案、代码单测、格式检查）：优先 **硬奖励**——便宜、语义清晰、难靠套路刷爆。
-- **开放对话与价值判断**：仍依赖 **BT-RM、GenRM 或人类偏好管线**。
+但 R1 **并非全局抛弃学习式 RM**。在通用对齐阶段（helpfulness、safety），论文仍使用学习式 RM 配合多源奖励 $R_{\mathrm{General}}$。准确画像是**双轨范式**：
 
-这与 **GRPO**（组内相对优势、免显式 Critic）等算法配套，构成了 2024–2026 期间极具代表性的一条路线：**推理用可验证，通用用 RM**。
+| 任务类型 | 奖励来源 | 优势 |
+|:---|:---|:---|
+| 可验证（数学、代码、格式） | 规则硬奖励 | 零 Hacking 空间，零训练成本 |
+| 开放对话与价值判断 | BT-RM / GenRM | 覆盖主观偏好 |
 
-## 视觉生成里的奖励：没有廉价真值时，对齐与美学如何拼在一起？
+这构成了 2024–2026 年最具代表性的路线之一：**推理用可验证，通用用 RM**（亦见 Promptfoo, 2025; Mitra, 2026 对 RLVR 范式的讨论）。
 
-与文本不同，图像 / 视频的输出 $y$ 是高维连续信号（像素矩阵）。“是否美”、“是否忠实于 prompt”往往**高度主观**，又缺少数学证明题那种 **0/1 可验证真值**。因此，视觉生成侧更常见的是 **CLIP 式对齐分、专门训练的美学头、人类偏好 RM** 的组合，以及 **多奖励加权**。
+## 4 视觉生成中的奖励模型
 
-视觉生成的 Reward Hacking 形态也与文本截然不同，例如：
-- **CLIP 分极高但画面崩坏**：模型为了迎合文本提示，把所有元素强行塞进画面，导致构图混乱。
-- **美学分极高但语义跑题**：模型画了一幅极美的风景画，但完全忽略了用户要求的“赛博朋克”风格。
+图像 / 视频的输出 $y$ 是高维连续信号，既缺少可验证真值，又面临维度分裂（对齐 vs 美感 vs 时序一致性）。
 
-### ImageReward：用大规模人类偏好训一个「懂人话又懂图」的裁判
+### 4.1 ImageReward
 
-为了解决单纯依赖 CLIP 或美学分带来的问题，清华大学等提出了 **ImageReward**（Xu et al.，NeurIPS 2023）。
-它在约 **13.7 万**对专家偏好数据上训练，使用 BLIP 式跨模态编码器加上 MLP 打分头，联合刻画了**对齐、美感与细粒度质量**。实验表明，它相对同期的 CLIP Score 或纯美学模型，往往更贴近人类的真实排序。
+Xu et al.（*ImageReward*, NeurIPS 2023）在约 13.7 万对专家偏好数据上，训练了基于 BLIP 编码器 + MLP 头的跨模态偏好模型：
 
-### Flow-GRPO：把在线 RL 接进流匹配文生图
+$$
+s(x, y_{\mathrm{img}}) = \mathrm{MLP}\bigl(f_{\mathrm{BLIP}}(x, y_{\mathrm{img}})\bigr), \quad \mathcal{L} = -\log \sigma\bigl(s(x, y_w) - s(x, y_l)\bigr)
+$$
 
-在视频生成领域，奖励模型需要同时惩罚**帧间闪烁**、**运动不合理**（如水往高处流）以及**文本—视频不对齐**等问题。
+该模型联合刻画对齐、美感与细粒度质量，在与人类排序的一致性上显著优于同期的 CLIP Score 和纯美学模型。
 
-**Flow-GRPO**（2025）是一项面向流匹配（Flow Matching）文生图的最新工作。它解决了视觉生成 RL 的两大痛点：
-1. **ODE 采样探索不足**：将 ODE 过程改写为保留边际分布的 SDE，以此注入噪声，换取策略梯度所需的随机性。
-2. **逐步去噪算力极重**：使用 Denoising Reduction 技术，在训练中用更少步数近似推理轨迹，把在线 RL 的开销压到可接受范围。
+### 4.2 Flow-GRPO：视觉 RL 的两大适配
 
-与 LLM 的 RLHF 相比，视觉 RL 的核心差异在于：
-- **动作空间**：是噪声更新或向量场，而非离散的 token 分布。
-- **奖励信号**：几乎全是**多目标加权**，极少有单一的、可验证的绝对对错。
-- **缓解 Hacking**：通常需要多奖励帕累托优化（Pareto），或条件化生成来协同约束。
+Flow-GRPO（2025）将 GRPO 接入流匹配（Flow Matching）文生图模型，解决两个核心痛点：
 
-## RewardBench 与选型：怎样知道你的 RM「真的好用」？
+**探索不足**：流匹配的默认 ODE 采样是确定性的，缺乏 RL 所需的试错空间。Flow-GRPO 将 ODE 改写为等价 SDE，在保持边际分布不变的前提下注入探索噪声：
 
-### RewardBench：给 RM 做标准化「体检」
+$$
+d\mathbf{x}_t = \Bigl[\mathbf{v}_\theta(\mathbf{x}_t, t) + 2t\sigma_t^2 \bigl(\mathbf{x}_t + (1-t)\mathbf{v}_\theta(\mathbf{x}_t, t)\bigr)\Bigr]\,dt + \sigma_t\,d\mathbf{W}_t
+$$
 
-在 2024 年之前，各家论文都在用自己私有的数据集评测 RM，导致“王婆卖瓜，自卖自夸”。
-Lambert 等人（*RewardBench*, 2024）构建了第一个标准化的评测集。它包含 (prompt, chosen, rejected) 三元组，覆盖了 **Chat（日常对话）、Chat-Hard（困难对话）、Safety（安全拒绝）和 Reasoning（推理）** 四个子集。
-核心指标是 **Win Rate**（预测 chosen 得分高于 rejected 的比例），把 RM 评估推进到了**可复现的公共协议**时代。
+每步转移变为各向同性高斯，从而可计算 GRPO 所需的概率比。
 
-### 选型指南：任务、分布、成本与可解释性
+**算力开销**：采用 Denoising Reduction 技术，以更少步数近似推理轨迹。
 
-当你需要为一个 RLHF 任务选择奖励模型时，请参考以下决策树：
+与 LLM RLHF 的关键差异在于：(1) 动作空间为连续向量场而非离散 token；(2) 奖励几乎全是多目标加权；(3) 缓解 Hacking 需多奖励帕累托优化或条件化生成。
 
-1. **任务是否客观可验证？**
-   - 数学、代码单测、格式检查 $\rightarrow$ **绝对优先选择纯规则的可验证奖励（如 DeepSeek-R1）**。
-   - 开放对话、创意写作 $\rightarrow$ **BT-RM / GenRM / LLM 评委**。
-2. **是否需要可解释的权衡？**
-   - 比如需要在“安全”与“有用”、“简洁”与“正确”之间做权衡 $\rightarrow$ **多目标 RM（如 ArmoRM 的 MoE 架构）**。
-3. **是否面临严重的 OOD（分布外）挑战？**
-   - 训练数据窄，但部署场景多变 $\rightarrow$ 关注带有 CoT 推理能力的 **GenRM**，或建立持续的在线标注刷新机制。
-4. **推理成本敏感度**：
-   - GPT-4 评委 $\rightarrow$ 效果好但极贵且慢。
-   - 标量 BT-RM $\rightarrow$ 便宜，一次前向传播即可。
-   - GenRM $\rightarrow$ 效果好，但需要生成长长的 CoT，成本居中。
+## 5 评测与选型
 
-## 结语：一张 2024–2026 的奖励模型演进地图
+### 5.1 RewardBench
 
-**Reward Hacking** 绝不是危言耸听：Gao et al. 的缩放定律揭示了 Gold 分数随优化强度呈现的**倒 U 型曲线**；而 Kwa et al. 则证明了在重尾误差下，**KL 惩罚也无法阻止灾难性 Goodhart 效应**。
+Lambert et al.（2024）构建了首个 RM 标准化评测基准 **RewardBench**，包含 (prompt, chosen, rejected) 三元组，覆盖 Chat / Chat-Hard / Safety / Reasoning 四个子集。核心指标为胜率：
 
-为了应对这些挑战，2024-2026 年的奖励模型架构发生了剧烈的演进：
-- **GenRM** 用 CoT 自举把评委的逻辑推理能力训进模型，缩小了分布外泛化的差距。
-- **ArmoRM** 抛弃了单一标量黑盒，用**多目标绝对评分 + 门控 MoE** 走向了可解释、可纠偏的奖励合成。
-- **DeepSeek-R1** 则在推理任务上彻底掀翻了桌子，示范了**“推理优先可验证奖励、通用阶段仍用学习式 RM”**的双轨范式。
+$$
+\mathrm{WinRate} = \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}\bigl[\hat{r}_\theta(x_i, y_i^{+}) > \hat{r}_\theta(x_i, y_i^{-})\bigr]
+$$
 
-在视觉生成侧，**ImageReward** 这样的跨模态偏好模型与 **Flow-GRPO** 等算法的结合，正在努力驾驭高维像素空间中的多维主观偏好。
+**RewardBench 2**（Malik et al., 2025）进一步提升难度（平均得分下降约 20 分），并与下游 RLHF / Best-of-$N$ 性能的相关性更高。
 
-奖励模型是 RLHF 的隐藏引擎。理解了它，你才算真正看懂了大模型对齐的底层逻辑。
+### 5.2 选型决策树
 
-> 参考资料（节选）：
+| 判据 | 推荐方案 |
+|:---|:---|
+| 任务客观可验证（数学/代码/格式） | **规则奖励**（DeepSeek-R1 路线） |
+| 开放对话、创意写作 | **BT-RM / GenRM / LLM 评委** |
+| 需要可解释的维度权衡 | **多目标 RM**（ArmoRM） |
+| 严重 OOD 挑战 | **CoT-GenRM** 或持续在线标注刷新 |
+| 推理成本敏感 | 标量 BT-RM（一次前传） > GenRM（需生成 CoT） > GPT-4 评委（API 调用） |
+
+## 6 结语
+
+本文沿"问题 → 量化 → 解法"的主线展开：
+
+1. **诊断**：Gao et al. 的缩放定律量化了过度优化的倒 U 型曲线；Kwa et al. 证明了 KL 惩罚在重尾误差下的理论失效。
+2. **治标**：GenRM 用 CoT 显式化评审推理，OOD 泛化提升显著；ArmoRM 将黑盒标量拆解为多目标门控聚合，增强可诊断性。
+3. **治本**：DeepSeek-R1 在可验证任务上直接用规则奖励替代神经 RM，从根源消除 Hacking 空间。
+4. **视觉侧**：ImageReward 与 Flow-GRPO 分别在裁判构建与 RL 适配上推进了高维连续空间的偏好对齐。
+
+奖励模型是 RLHF 的隐藏引擎。理解它的脆弱性与演进方向，才算真正看懂大模型对齐的底层逻辑。
+
+> 参考文献：
 >
 > 1. Gao, L., Schulman, J. & Hilton, J. (2023). *Scaling Laws for Reward Model Overoptimization*. ICML. [arXiv:2210.10760](https://arxiv.org/abs/2210.10760).
 > 2. Kwa, T., Thomas, D. & Garriga-Alonso, A. (2024). *Catastrophic Goodhart: Regularizing RLHF with KL Divergence Does Not Mitigate Heavy-Tailed Reward Misspecification*. NeurIPS. [arXiv:2407.14503](https://arxiv.org/abs/2407.14503).
 > 3. Mahan, D., et al. (2024). *Generative Reward Models*. [arXiv:2410.12832](https://arxiv.org/abs/2410.12832).
-> 4. Wang, H., et al. (2024). *Interpretable Preferences via Multi-Objective Reward Modeling and Mixture-of-Experts*. [arXiv:2406.12845](https://arxiv.org/abs/2406.12845).
-> 5. DeepSeek-AI (2025). *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning*. [arXiv:2501.12948](https://arxiv.org/abs/2501.12948).
+> 4. Wang, H., et al. (2024). *Interpretable Preferences via Multi-Objective Reward Modeling and Mixture-of-Experts*. EMNLP Findings. [arXiv:2406.12845](https://arxiv.org/abs/2406.12845).
+> 5. DeepSeek-AI (2025). *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning*. Nature. [arXiv:2501.12948](https://arxiv.org/abs/2501.12948).
 > 6. Xu, J., et al. (2023). *ImageReward: Learning and Evaluating Human Preferences for Text-to-Image Generation*. NeurIPS. [arXiv:2304.05977](https://arxiv.org/abs/2304.05977).
-> 7. *Flow-GRPO: Training Flow Matching Models via Online RL*. [arXiv:2505.05470](https://arxiv.org/abs/2505.05470).
+> 7. *Flow-GRPO: Training Flow Matching Models via Online RL* (2025). [arXiv:2505.05470](https://arxiv.org/abs/2505.05470).
 > 8. Lambert, N., et al. (2024). *RewardBench: Evaluating Reward Models for Language Modeling*. [arXiv:2403.13787](https://arxiv.org/abs/2403.13787).
-> 9. Malik, S., Pyatkin, V., Land, S., Morrison, J., Smith, N. A., Hajishirzi, H. & Lambert, N. (2025). *RewardBench 2: Advancing Reward Model Evaluation*. [arXiv:2506.01937](https://arxiv.org/abs/2506.01937).
+> 9. Malik, S., et al. (2025). *RewardBench 2: Advancing Reward Model Evaluation*. [arXiv:2506.01937](https://arxiv.org/abs/2506.01937).
+> 10. Weng, L. (2024). *Reward Hacking in Reinforcement Learning*. [Blog](https://lilianweng.github.io/posts/2024-11-28-reward-hacking/).
+> 11. Bai, Y., et al. (2022). *Constitutional AI: Harmlessness from AI Feedback*. [arXiv:2212.08073](https://arxiv.org/abs/2212.08073).
+> 12. Zheng, L., et al. (2023). *Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena*. NeurIPS. [arXiv:2306.05685](https://arxiv.org/abs/2306.05685).
+
+> ⬅️ 上一篇：[笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
