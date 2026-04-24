@@ -991,4 +991,4 @@ for step in range(total_steps):
 > 8. [f-PO: Generalizing Preference Optimization with f-divergence Minimization](https://arxiv.org/abs/2410.21662)
 > 9. [f-GAN: Training Generative Neural Samplers using Variational Divergence Minimization](https://arxiv.org/abs/1606.00709)
 
-> 下一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 的统一框架](/chengYi-xun/posts/58-superflow/)
+> 下一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)

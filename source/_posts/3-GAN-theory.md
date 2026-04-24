@@ -448,4 +448,4 @@ def train_gan(generator, discriminator, dataloader, num_epochs,
 > 1. Goodfellow, I., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., ... & Bengio, Y. (2014). *Generative adversarial nets*. Advances in neural information processing systems, 27.
 > 2. Arjovsky, M., Chintala, S., & Bottou, L. (2017). *Wasserstein generative adversarial networks*. International conference on machine learning.
 
-> 下一篇：[笔记｜生成模型（四）：VAE 理论与代码实现](/chengYi-xun/posts/4-VAE-theory/)
+> 下一篇：[笔记｜生成模型（四）：变分自编码器理论](/chengYi-xun/posts/4-VAE-theory/)

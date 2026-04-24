@@ -258,5 +258,3 @@ Xu et al.（*ImageReward*, NeurIPS 2023）的思路是：**不再拆成两个独
 > 10. Weng, L. (2024). *Reward Hacking in Reinforcement Learning*. [Blog](https://lilianweng.github.io/posts/2024-11-28-reward-hacking/).
 > 11. Bai, Y., et al. (2022). *Constitutional AI: Harmlessness from AI Feedback*. [arXiv:2212.08073](https://arxiv.org/abs/2212.08073).
 > 12. Zheng, L., et al. (2023). *Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena*. NeurIPS. [arXiv:2306.05685](https://arxiv.org/abs/2306.05685).
-
-> ⬅️ 上一篇：[笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)

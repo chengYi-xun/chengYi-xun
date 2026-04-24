@@ -290,5 +290,5 @@ $$
 > 2. [Score-based Generative Models](https://littlenyima.github.io/posts/16-score-based-generative-models/)
 > 3. [Yang Song's Blog: Generative Modeling by Estimating Gradients of the Data Distribution](https://yang-song.net/blog/2021/score/)
 
-> 下一篇：[笔记｜生成模型（九）：SDE 随机微分方程](/chengYi-xun/posts/8-SDE/)
+> 下一篇：[笔记｜生成模型（八）：SDE统一DDPM和SMLD](/chengYi-xun/posts/8-SDE/)
 

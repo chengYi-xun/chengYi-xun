@@ -407,4 +407,4 @@ class DDPM:
 > 1. [Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239)
 > 2. [What are Diffusion Models?](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)
 
-> 下一篇：[笔记｜生成模型（七）：加速采样的魔法 (DDIM)](/chengYi-xun/posts/6-ddim/)
+> 下一篇：[笔记｜生成模型（六）：DDIM理论](/chengYi-xun/posts/6-ddim/)

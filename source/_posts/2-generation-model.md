@@ -85,4 +85,4 @@ $$f(x) = \mathop {\arg \max }\limits_y \;P(y\mid x)$$
 
 好像还有一个薛定谔的桥理论，但是非主流方法，我对此了解也不深，所以没有写上去。后续会陆续讲解他们的原理，感兴趣的同学请follow me。
 
-> 下一篇：[笔记｜生成模型（三）：GAN 理论与代码实现](/chengYi-xun/posts/3-GAN-theory/)
+> 下一篇：[笔记｜生成模型（三）：生成对抗理论](/chengYi-xun/posts/3-GAN-theory/)

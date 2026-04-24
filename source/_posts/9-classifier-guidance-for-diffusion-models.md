@@ -180,4 +180,4 @@ new_mean = mean.float() + guidance_scale * variance * guidance.float()
 > 3. [Classifier Guidance 和 Classifier Free Guidance，一堆公式不如两行代码](https://zhuanlan.zhihu.com/p/660518657)
 > 4. [openai/guided-diffusion](https://github.com/openai/guided-diffusion/tree/main)
 
-> 下一篇：[笔记｜生成模型（十一）：Classifier-Free Guidance](/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/)
+> 下一篇：[笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/)

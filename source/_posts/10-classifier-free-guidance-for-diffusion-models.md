@@ -507,4 +507,4 @@ class StableDiffusionPipeline:
 > 5. [diffusion model（四）——文生图diffusion model（classifier-free guided）](https://zhuanlan.zhihu.com/p/642519063)
 > 6. [Classifier-Free Guidance](https://littlenyima.github.io/posts/19-classifier-free-guidance-for-diffusion-models/)
 
-> 下一篇：[笔记｜生成模型（十二）：U-ViT vs DiT](/chengYi-xun/posts/11-UIT-VS-DIT/)
+> 下一篇：[笔记｜生成模型（十一）：UIT和DiT架构详解](/chengYi-xun/posts/11-UIT-VS-DIT/)

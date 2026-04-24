@@ -298,4 +298,4 @@ $$\sigma_t = \eta\sqrt{\frac{1-\bar{\alpha}_\tau}{1-\bar{\alpha}_t}}\sqrt{1-\alp
 > 3. [diffusion model(二)：DDIM技术小结 (denoising diffusion implicit model)](http://www.myhz0606.com/article/ddim)
 > 4. [扩散模型（一）| DDPM & DDIM](https://lichtung612.github.io/posts/1-diffusion-models/)
 
-> 下一篇：[笔记｜生成模型（八）：分数匹配 (Score Matching)](/chengYi-xun/posts/7-score-match/)
+> 下一篇：[笔记｜生成模型（七）：Score-Based理论](/chengYi-xun/posts/7-score-match/)

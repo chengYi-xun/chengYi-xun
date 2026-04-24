@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 本文是强化学习系列的总结篇。经过前面九篇文章的旅程——从策略梯度基础、PPO、DPO、GRPO，到 DAPO、Flow-GRPO、SuperFlow 和 DanceGRPO——我们已经接触了十余种方法。本文将它们放在同一张桌上做横向对比，帮助读者在实际选型中快速定位最适合自己场景的算法。
 >
-> ⬅️ 上一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> ⬅️ 上一篇：[笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/59-video-grpo/)
 >
 > ➡️ 下一篇：[笔记｜强化学习（十一）：奖励模型——RLHF 的隐藏引擎](/chengYi-xun/posts/61-reward-model/)
 

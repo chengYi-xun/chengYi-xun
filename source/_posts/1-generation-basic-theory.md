@@ -234,4 +234,4 @@ $$
 >
 >
 
-> 下一篇：[笔记｜生成模型（二）：生成模型大家族](/chengYi-xun/posts/2-generation-model/)
+> 下一篇：[笔记｜生成模型（二）：生成模型的技术路线总览](/chengYi-xun/posts/2-generation-model/)

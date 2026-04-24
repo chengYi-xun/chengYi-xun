@@ -20,7 +20,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
 >
-> ➡️ 下一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> ➡️ 下一篇：[笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/59-video-grpo/)
 
 >
 > 论文：[SuperFlow: Training Flow Matching Models with RL on the Fly](https://arxiv.org/abs/2512.17951)（2025.12, revised 2026.01）
@@ -323,4 +323,4 @@ TRL v1.0 的三阶段流水线（SFT → Reward Modeling → Alignment）支持 
 > 3. [GenRL: Scalable RL for Generative Models](https://github.com/ModelTC/GenRL)
 > 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
 
-> 下一篇：[笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> 下一篇：[笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/59-video-grpo/)

@@ -332,4 +332,4 @@ shift = scale = 0                     # 对于最终层
 > 3. [UIT](https://littlenyima.github.io/posts/29-uvit-a-vit-backbone-for-diffusion-models/)
 > 4. [DIT](https://littlenyima.github.io/posts/32-dit-scalable-diffusion-with-transformers/)
 
-> 下一篇：[笔记｜生成模型（十三）：流模型 (Normalizing Flow)](/chengYi-xun/posts/12-Normalizing-flow/)
+> 下一篇：[笔记｜生成模型（十二）：Normalizing Flow理论与实现](/chengYi-xun/posts/12-Normalizing-flow/)
