@@ -53,7 +53,7 @@ tags:
 56. [笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](../56-dapo)
 57. [笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](../57-grpo-variants)
 58. [笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](../58-superflow)
-59. [笔记｜强化学习（九）：DanceGRPO——视频生成的统一强化学习框架](../59-video-grpo)
+59. [笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](../59-dance-mix-grpo)
 60. [笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](../60-rl-alignment-comparison)
 61. [笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](../61-reward-model)
 62. [笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](../62-reward-model-advanced)

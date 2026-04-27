@@ -20,7 +20,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT](/chengYi-xun/posts/57-grpo-variants/)
 >
-> ➡️ 下一篇：[笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> ➡️ 下一篇：[笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](/chengYi-xun/posts/59-dance-mix-grpo/)
 
 >
 > 论文：[SuperFlow: Training Flow Matching Models with RL on the Fly](https://arxiv.org/abs/2512.17951)（2025.12, revised 2026.01）
