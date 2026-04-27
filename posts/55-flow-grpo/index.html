@@ -1,0 +1,1464 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析） | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为 RL 系列第五篇。在完整梳理了从 REINFORCE 到 PPO、DPO，再到最新 GRPO 的演进路线后，我们将目光转向图像生成领域。本文将结合 flow_grpo 开源代码库，深入解析如何将 GRPO 算法应用于基于 Flow Matching 的图像生成模型（如 Flux）的微调中。方法学与系统实验见论文 Flow-GRPO: Training Flow Matching Mode">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/55-flow-grpo/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为 RL 系列第五篇。在完整梳理了从 REINFORCE 到 PPO、DPO，再到最新 GRPO 的演进路线后，我们将目光转向图像生成领域。本文将结合 flow_grpo 开源代码库，深入解析如何将 GRPO 算法应用于基于 Flow Matching 的图像生成模型（如 Flux）的微调中。方法学与系统实验见论文 Flow-GRPO: Training Flow Matching Mode">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-20T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.490Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta property="article:tag" content="Flow Matching">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/55-flow-grpo/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.490Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为 RL 系列第五篇。在完整梳理了从 REINFORCE 到 PPO、DPO，再到最新
+GRPO 的演进路线后，我们将目光转向图像生成领域。本文将结合
+<code>flow_grpo</code> 开源代码库，深入解析如何将 GRPO 算法应用于基于
+Flow Matching 的图像生成模型（如 Flux）的微调中。方法学与系统实验见论文
+<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2505.05470"><em>Flow-GRPO: Training Flow
+Matching Models via Online RL</em></a>（文中以 SD3.5
+等为主报告；仓库实现覆盖 Flux）。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/54-grpo/">笔记｜强化学习（四）：大模型在线 RL
+破局者：GRPO 算法详解</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/56-dapo/">笔记｜强化学习（六）：DAPO：从 GRPO
+到大规模推理 RL 的工程实践</a></p>
+</blockquote>
+<h1 id="图像生成中的强化学习">图像生成中的强化学习</h1>
+<p><strong>先用一个例子理解为什么需要 RL。</strong></p>
+<p>假设你用一个 Flux 模型生成图像，给定
+Prompt："一只橘猫坐在蓝色沙发上"。模型可能生成以下几种结果：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">生成结果</th>
+<th style="text-align: left;">问题</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">一只白色猫坐在蓝色沙发上</td>
+<td style="text-align: left;">颜色不对（应该是橘猫）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">一只橘猫站在蓝色沙发旁边</td>
+<td style="text-align: left;">动作不对（应该是"坐在"）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">一只橘猫坐在蓝色沙发上，画面清晰</td>
+<td style="text-align: left;">完美</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">一只橘猫坐在蓝色沙发上，但画面模糊</td>
+<td style="text-align: left;">质量差</td>
+</tr>
+</tbody>
+</table>
+<p>传统的训练方式（Flow Matching
+损失）只是让模型学会"生成看起来像训练集的图像"。但训练集里可能有模糊的、构图差的、与
+Prompt 不一致的图像——模型无法区分好坏。</p>
+<p><strong>RL 的价值</strong>：我们训练一个"美术老师"（奖励模型，如
+PickScore 或 ImageReward）来给图像打分。模型自己生成图像 → 美术老师打分
+→ 模型根据分数调整自己。这就是 RLHF 在图像生成中的应用。</p>
+<p><img src="/chengYi-xun/img/flow_grpo_arch.png"
+alt="Flow-GRPO 概览：ODE→SDE 注入随机性、训练期 Denoising Reduction 与组内 GRPO 更新（摘自 Liu et al., arXiv:2505.05470 图 2）" /></p>
+<hr />
+<h1 id="flow-grpo-框架解析图像版矮子里拔高个">Flow-GRPO
+框架解析：图像版"矮子里拔高个"</h1>
+<p><strong>先看例子</strong>：对于 Prompt
+"一只橘猫坐在蓝色沙发上"，我们让 Flux 模型生成 <span
+class="math inline">\(G = 4\)</span> 张图像，美术老师分别打分：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">图像</th>
+<th style="text-align: left;">描述</th>
+<th style="text-align: center;">奖励 <span
+class="math inline">\(r_i\)</span></th>
+<th style="text-align: center;">相对优势 <span
+class="math inline">\(\hat{A}_i\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">图 1</td>
+<td style="text-align: left;">橘猫坐沙发，画面清晰</td>
+<td style="text-align: center;"><span class="math inline">\(r_1 =
+0.9\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(+1.27\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">图 2</td>
+<td style="text-align: left;">橘猫坐沙发，稍微模糊</td>
+<td style="text-align: center;"><span class="math inline">\(r_2 =
+0.6\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(-0.12\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">图 3</td>
+<td style="text-align: left;">白猫坐沙发（颜色错）</td>
+<td style="text-align: center;"><span class="math inline">\(r_3 =
+0.3\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(-1.50\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">图 4</td>
+<td style="text-align: left;">橘猫坐沙发，普通水平</td>
+<td style="text-align: center;"><span class="math inline">\(r_4 =
+0.7\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(+0.35\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>（均值 <span class="math inline">\(\mu_R = 0.625\)</span>，标准差
+<span class="math inline">\(\sigma_R \approx 0.22\)</span>）</p>
+<p>跟上一篇 GRPO 的做法完全一样：图 1 和图 4
+高于平均（正优势），模型学习生成更像它们的图；图 3
+远低于平均（负优势），模型学习远离这种生成方式。<strong>不需要 Critic
+网络，只需要多生成几张图做对比。</strong></p>
+<p><strong>核心思考出发点</strong>：由于像 Flux
+这样的图像生成模型参数量达到百亿级别，传统的 PPO 算法由于需要额外的
+Critic 网络，显存根本无法承受。因此，Flow-GRPO 采用了 GRPO
+算法——彻底抛弃 Critic，用"组内相对评分"来实现高效的在线强化学习。</p>
+<h2
+id="核心挑战如何在连续生成过程中定义-log-pi_theta">核心挑战：如何在连续生成过程中定义
+<span class="math inline">\(\log \pi_\theta\)</span>？</h2>
+<p>在 LLM 中，动作（Action）是离散的词表 Token，<span
+class="math inline">\(\log \pi_\theta(a|s)\)</span> 就是 softmax
+输出的对数概率——定义清晰、计算简单。然而在 Flow Matching
+中，生成过程是一个<strong>连续的常微分方程（ODE）求解过程</strong>，没有天然的"离散动作"概念。</p>
+<p><strong>用例子理解</strong>：LLM
+生成文本就像逐字写作——每个字是一个离散的"动作"，概率就是词表上的
+softmax。而 Flux
+生成图像像是画画——每个时间步的"动作"是在画布上做一次<strong>连续的涂抹</strong>（从噪声图向清晰图的一步变换），这是一个高维连续向量，不存在离散概率。</p>
+<h3 id="将去噪过程建模为-mdp">将去噪过程建模为 MDP</h3>
+<p>Flow-GRPO 的第一个关键设计是：将 Flow Matching 的去噪过程定义为一个
+<strong>马尔可夫决策过程</strong>：</p>
+<table>
+<colgroup>
+<col style="width: 38%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">MDP 要素</th>
+<th style="text-align: left;">LLM (GRPO)</th>
+<th style="text-align: left;">图像生成 (Flow-GRPO)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>状态</strong> <span
+class="math inline">\(s_t\)</span></td>
+<td style="text-align: left;"><span class="math inline">\((x,
+y_{&lt;t})\)</span> (Prompt + 已生成 token)</td>
+<td style="text-align: left;"><span class="math inline">\((x_t, t,
+c)\)</span> (当前噪声图 + 时间步 + 文本条件)</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>动作</strong> <span
+class="math inline">\(a_t\)</span></td>
+<td style="text-align: left;">下一个 token <span
+class="math inline">\(y_t \in \mathcal{V}\)</span>（离散）</td>
+<td style="text-align: left;">预测的速度场 <span
+class="math inline">\(v_\theta(x_t, t, c)\)</span>（连续向量）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>转移</strong></td>
+<td style="text-align: left;">确定性：拼接 <span
+class="math inline">\(y_t\)</span> 到序列</td>
+<td style="text-align: left;">确定性 ODE 步：<span
+class="math inline">\(x_{t-\Delta t} = x_t - \Delta t \cdot
+v_\theta\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>奖励</strong></td>
+<td style="text-align: left;">只在最后一步（整句完成后打分）</td>
+<td style="text-align: left;">只在最后一步（整张图生成后打分）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="推导-flow-matching-中的对数概率">推导 Flow Matching
+中的对数概率</h3>
+<p>在 Flow Matching 框架中，前向过程（加噪）定义为线性插值：</p>
+<p><span class="math display">\[
+x_t = (1 - t) \cdot x_0 + t \cdot \epsilon, \quad \epsilon \sim
+\mathcal{N}(0, I)
+\]</span></p>
+<p>其中 <span class="math inline">\(x_0\)</span> 是干净图像，<span
+class="math inline">\(\epsilon\)</span> 是纯噪声，<span
+class="math inline">\(t \in [0, 1]\)</span>。模型 <span
+class="math inline">\(v_\theta(x_t, t, c)\)</span> 学习预测速度场（即
+<span class="math inline">\(x_0\)</span> 到 <span
+class="math inline">\(\epsilon\)</span> 方向的向量场）。</p>
+<p>在去噪（生成）过程中，每一步的转移可以写成：</p>
+<p><span class="math display">\[
+x_{t - \Delta t} = x_t - \Delta t \cdot v_\theta(x_t, t, c)
+\]</span></p>
+<p><strong>如何从这个过程中提取对数概率？</strong> 关键观察：确定性 ODE
+没有概率可言，但如果我们在每一步都加入微小的高斯扰动（将 ODE 变成
+SDE），转移就变成了一个随机过程。</p>
+<p>为了保证加入噪声后轨迹依然收敛到真实数据分布，必须引入 <strong>Score
+Function</strong> 进行 Langevin 纠偏。</p>
+<h3 id="为什么要引入-sde-与-score-function">1. 为什么要引入 SDE 与 Score
+Function？</h3>
+<p>在纯 ODE
+采样中，模型就像是沿着一条设定好的轨道平滑地滑向终点（只需速度 <span
+class="math inline">\(v_\theta\)</span> 即可更新 <span
+class="math inline">\(x_t\)</span>）。但 Flow-GRPO
+为了让强化学习能够“试错”和“探索”，引入了
+<strong>SDE（随机微分方程）</strong>，也就是在滑行的过程中加入随机的扰动（噪声）。</p>
+<p><strong>问题来了</strong>：如果盲目地加入随机噪声，生成的轨迹就会偏离真实图像的流形（Manifold），最终生成崩坏的画面。</p>
+<p><strong>解决方案</strong>：我们需要一个“指南针”来纠正这种偏离，这个指南针就是
+<strong>Score Function（分数函数 <span
+class="math inline">\(\nabla_{x_t} \log
+p_t(x_t)\)</span>）</strong>。它在数学上永远指向数据分布最密集（最像真实图像）的方向。一旦随机探索让你偏航，Score
+就会把你拉回来。</p>
+<p><strong>Score 在 SDE 中的数学角色</strong>：将 ODE 转换为 SDE
+后（完整推导见下文 Section 2），每一步去噪更新变为：</p>
+<p><span class="math display">\[x_{t-\Delta t} = \underbrace{(x_t -
+\Delta t \cdot v_\theta)}_{\text{ODE 漂移}} +
+\underbrace{\tfrac{1}{2}g^2 \cdot \nabla_{x_t}\log p_t(x_t) \cdot \Delta
+t}_{\text{Score 纠偏}} + \underbrace{g\sqrt{\Delta
+t}\cdot\epsilon}_{\text{随机探索}}\]</span></p>
+<p>第一项是原始 ODE 的确定性去噪；第三项是为 RL
+注入的随机噪声；第二项就是 Score
+纠偏——它的方向指向数据高密度区域，恰好抵消噪声带来的分布偏移。</p>
+<div class="note warning no-icon flat"><p><strong>关键问题：Score 纠偏和随机噪声之间是什么关系？</strong></p>
+<p>直觉上会产生一个疑问：噪声 <span
+class="math inline">\(\epsilon\)</span>
+是随机的（每个样本不同），那纠偏是否也应该依赖于具体加了什么噪声？答案是：<strong>Score
+不纠正某个具体的 <span
+class="math inline">\(\epsilon\)</span>，而是提供一个位置相关的"恢复力场"。</strong></p>
+<p>类比：想象一群粒子在山谷中随机游走。噪声 =
+每个粒子随机晃动的方向（每人不同）；Score =
+山谷壁给的重力（只取决于你站在哪里，不关心你怎么晃过来的）。山谷壁不需要知道你具体往哪个方向晃了——它只需要把所有偏离谷底的人往回拉。</p>
+<p>数学上，通过 <strong>Fokker-Planck
+方程</strong>可以严格证明这一点。</p>
+<p><strong>预备知识：Fokker-Planck 方程是什么？</strong></p>
+<p>想象你同时释放 100 万个粒子，每个都独立遵循相同的 SDE <span
+class="math inline">\(dx = \mu\,d\tau + \sigma\,dW\)</span>。在任意时刻
+<span
+class="math inline">\(\tau\)</span>，这些粒子散布在空间中形成一团"概率云"。<span
+class="math inline">\(p(x, \tau)\)</span> 就是这个云的密度——描述在位置
+<span class="math inline">\(x\)</span> 附近找到粒子的概率。</p>
+<p>Fokker-Planck
+方程告诉我们这个密度如何随时间演化，它由两个物理效应叠加而成：</p>
+<p><span class="math display">\[\frac{\partial p}{\partial \tau} =
+\underbrace{-\nabla\cdot(\mu\, p)}_{\text{漂移搬运概率（连续性方程）}} +
+\underbrace{\frac{1}{2}\sigma^2\nabla^2
+p}_{\text{噪声摊平概率（热方程）}}\]</span></p>
+<ul>
+<li><strong>第一项</strong>来自确定性漂移 <span
+class="math inline">\(\mu\)</span>：如同流体力学中的质量守恒，<span
+class="math inline">\(\mu \cdot p\)</span> 是"概率流"，<span
+class="math inline">\(\nabla\cdot(\mu p)\)</span>
+是某处的净流出量。流出多于流入 → 密度下降 → 需要负号。</li>
+<li><strong>第二项</strong>来自随机噪声 <span
+class="math inline">\(\sigma\,dW\)</span>：噪声让粒子扩散（从密集处散开），其效果等价于热传导——热量从高温（高密度）流向低温（低密度）。<span
+class="math inline">\(\nabla^2 p\)</span> 度量局部密度的"凹凸程度"，系数
+<span class="math inline">\(\frac{1}{2}\sigma^2\)</span>
+来自维纳过程的方差性质 <span
+class="math inline">\(\text{Var}(\sigma\,dW) =
+\sigma^2\,d\tau\)</span>。</li>
+</ul>
+<p><strong>若没有噪声</strong>（<span class="math inline">\(\sigma =
+0\)</span>），FP 方程退化为纯漂移的 Liouville 方程 <span
+class="math inline">\(\partial_\tau p =
+-\nabla\cdot(\mu\,p)\)</span>。</p>
+<p>以下是利用 FP 方程的完整证明：</p>
+<p><strong>目标</strong>：证明 SDE 采样与 ODE 采样产生相同的边缘分布
+<span class="math inline">\(p_t(x)\)</span>。</p>
+<p><strong>Step 1. 写出两者的分布演化方程。</strong> 设反向时间变量
+<span class="math inline">\(\tau\)</span>（<span
+class="math inline">\(\tau\)</span> 递增时实际时间 <span
+class="math inline">\(t\)</span> 递减）。</p>
+<p>纯 ODE（<span class="math inline">\(x_{\text{new}} = x - v_\theta
+\Delta t\)</span>）的 Liouville 方程（FP 方程中 <span
+class="math inline">\(\sigma=0\)</span> 的特例）：</p>
+<p><span class="math display">\[\frac{\partial p}{\partial \tau} =
+\nabla \cdot (v_\theta \cdot p)\]</span></p>
+<p>SDE（漂移 <span class="math inline">\(\mu = -v_\theta +
+\frac{1}{2}g^2\nabla\log p_t\)</span>，扩散 <span
+class="math inline">\(\sigma = g\)</span>）的 Fokker-Planck 方程：</p>
+<p><span class="math display">\[\frac{\partial p}{\partial \tau} =
+-\nabla\cdot(\mu\, p) + \frac{1}{2}\sigma^2\nabla^2 p\]</span></p>
+<p><strong>Step 2. 展开 SDE 的 Fokker-Planck 方程：</strong></p>
+<p><span class="math display">\[= -\nabla\cdot\left[\left(-v_\theta +
+\tfrac{1}{2}g^2\nabla\log p_t\right)p\right] + \tfrac{1}{2}g^2\nabla^2
+p\]</span></p>
+<p><span class="math display">\[= \underbrace{\nabla\cdot(v_\theta\,
+p)}_{\text{ODE 贡献}} \;-\;
+\underbrace{\tfrac{1}{2}g^2\nabla\cdot\left[(\nabla\log
+p_t)\,p\right]}_{\text{Score 项贡献}} \;+\;
+\underbrace{\tfrac{1}{2}g^2\nabla^2
+p}_{\text{噪声扩散贡献}}\]</span></p>
+<p><strong>Step 3. 利用恒等式 <span class="math inline">\((\nabla\log
+p_t)\cdot p_t = \nabla p_t\)</span></strong>（因为 <span
+class="math inline">\(\nabla\log p = \nabla p / p\)</span>）：</p>
+<p><span class="math display">\[\tfrac{1}{2}g^2\nabla\cdot[(\nabla\log
+p_t)\,p_t] = \tfrac{1}{2}g^2\nabla\cdot(\nabla p_t) =
+\tfrac{1}{2}g^2\nabla^2 p_t\]</span></p>
+<p><strong>Step 4. Score 项与噪声项完美抵消：</strong></p>
+<p><span class="math display">\[\frac{\partial p}{\partial \tau} =
+\nabla\cdot(v_\theta p) - \cancel{\tfrac{1}{2}g^2\nabla^2 p_t} +
+\cancel{\tfrac{1}{2}g^2\nabla^2 p_t} = \nabla\cdot(v_\theta\,
+p)\]</span></p>
+<p>这与纯 ODE 的 Liouville 方程完全相同。<span
+class="math inline">\(\blacksquare\)</span></p>
+<p><strong>结论</strong>：Score 纠偏项（<span
+class="math inline">\(\frac{1}{2}g^2 \nabla\log
+p_t\)</span>）与噪声扩散效应（方差 <span class="math inline">\(g^2\Delta
+t\)</span>）在 Fokker-Planck 方程中逐项对消，使 SDE 的分布演化等价于纯
+ODE。这就是为什么 Score 系数恰好是 <span
+class="math inline">\(\frac{1}{2}g^2\)</span>：它精确匹配噪声的统计效应。</p>
+<ul>
+<li>个体样本：轨迹因 <span class="math inline">\(\epsilon\)</span>
+不同而各异（这正是 RL "探索"的意义）</li>
+<li>统计分布：所有样本构成的整体分布始终与 ODE
+保持一致（"边缘分布不变"）</li>
+</ul>
+</div>
+<p><strong>那么，核心问题变成了：如何高效计算这个 <span
+class="math inline">\(\nabla_{x_t}\log
+p_t(x_t)\)</span>？这就用到了特威迪公式（Tweedie's
+Formula）：</strong></p>
+<p>特威迪公式（Tweedie's
+Formula）证明了一个深刻的结论：<strong>只要你能预测出当前的干净图像
+<span class="math inline">\(\hat{x}_0\)</span>，就能直接算出当前的
+Score。</strong></p>
+<p>具体推导如下：</p>
+<p><strong>第一步：确定 <span class="math inline">\(x_t\)</span>
+的条件分布</strong> 在 Rectified Flow 中，前向加噪过程是干净图像 <span
+class="math inline">\(x_0\)</span> 和纯噪声 <span
+class="math inline">\(x_1 \sim \mathcal{N}(0, I)\)</span> 的直线插值：
+<span class="math display">\[x_t = (1-\sigma)x_0 + \sigma x_1\]</span>
+由于 <span class="math inline">\(x_1\)</span> 是标准高斯噪声，所以给定
+<span class="math inline">\(x_0\)</span> 时，<span
+class="math inline">\(x_t\)</span> 的条件分布 <span
+class="math inline">\(p(x_t | x_0)\)</span> 自然也是一个高斯分布：</p>
+<ul>
+<li>均值 <span class="math inline">\(\mu_t = (1-\sigma)x_0\)</span></li>
+<li>方差 <span class="math inline">\(\sigma_t^2 = \sigma^2
+I\)</span></li>
+</ul>
+<p><strong>第二步：写出高斯分布的概率密度函数（PDF）并取对数</strong>
+多维高斯分布的概率密度函数为： <span class="math display">\[p(x_t | x_0)
+= \frac{1}{(2\pi \sigma^2)^{d/2}} \exp\left( -\frac{\|x_t -
+\mu_t\|^2}{2\sigma^2} \right)\]</span> 我们在两边同时取自然对数 <span
+class="math inline">\(\log\)</span>： <span class="math display">\[\log
+p(x_t | x_0) = -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} -
+\frac{d}{2}\log(2\pi\sigma^2)\]</span></p>
+<p><strong>第三步：对 <span class="math inline">\(x_t\)</span>
+求梯度（即计算 Score）</strong> Score Function 的定义就是对数概率密度对
+<span class="math inline">\(x_t\)</span> 的偏导数（梯度）。 因为后面的
+<span class="math inline">\(-\frac{d}{2}\log(2\pi\sigma^2)\)</span>
+是常数，求导后为 0。我们只需要对前面的二次项求导： <span
+class="math display">\[\nabla_{x_t} \log p(x_t | x_0) = \nabla_{x_t}
+\left( -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} \right)\]</span>
+根据向量求导法则 <span class="math inline">\(\nabla_x \|x - \mu\|^2 =
+2(x - \mu)\)</span>，代入上式得到： <span
+class="math display">\[\nabla_{x_t} \log p(x_t | x_0) = -\frac{2(x_t -
+\mu_t)}{2\sigma^2} = -\frac{x_t - \mu_t}{\sigma^2}\]</span></p>
+<p><strong>第四步：代入均值 <span class="math inline">\(\mu_t\)</span>
+与模型预测</strong> 将 <span class="math inline">\(\mu_t =
+(1-\sigma)x_0\)</span> 代入，得到： <span
+class="math display">\[\nabla_{x_t} \log p(x_t | x_0) = -\frac{x_t -
+(1-\sigma)x_0}{\sigma^2}\]</span> 在实际生成时，我们并不知道真实的 <span
+class="math inline">\(x_0\)</span>
+是什么，但根据特威迪公式，我们可以用模型当前预测的 <span
+class="math inline">\(\hat{x}_0\)</span> 来近似替代真实的 <span
+class="math inline">\(x_0\)</span>。 而根据直线运动公式（起点 = 当前位置
+- 速度 × 时间），我们可以用模型预测的速度场 <span
+class="math inline">\(v_\theta\)</span> 反推 <span
+class="math inline">\(\hat{x}_0\)</span>： <span
+class="math display">\[\hat{x}_0 = x_t - \sigma \cdot
+v_\theta\]</span></p>
+<p>把模型预测的 <span class="math inline">\(\hat{x}_0\)</span> 代入
+Score 公式，就能在代码中直接计算出纠偏所需的“指南针”了。</p>
+<h3 id="从前向-sde-推导逆向-sdeanderson-定理">2. 从前向 SDE 推导逆向
+SDE（Anderson 定理）</h3>
+<p>在 SDE
+理论中，一个连续时间的随机微分方程（如扩散模型的前向加噪过程）通常写为：
+<span class="math display">\[\mathrm{d}x_t = f(x_t, t) \mathrm{d}t +
+g(t) \mathrm{d}w_t\]</span></p>
+<p>其中 <span class="math inline">\(f(x_t, t)\)</span>
+是漂移项（决定运动的宏观方向），<span class="math inline">\(g(t)
+\mathrm{d}w_t\)</span> 是扩散项（注入高斯噪声，导致分布发散）。</p>
+<p><strong>如何推导它的逆向过程？</strong>
+我们可以通过离散化的时间步结合贝叶斯公式来进行直观推导。</p>
+<p>假设时间步长为 <span class="math inline">\(\Delta t &gt;
+0\)</span>，前向过程从 <span class="math inline">\(t\)</span> 走到 <span
+class="math inline">\(t + \Delta t\)</span>： <span
+class="math display">\[x_{t+\Delta t} = x_t + f(x_t, t)\Delta t +
+g(t)\sqrt{\Delta t} \epsilon, \quad \epsilon \sim \mathcal{N}(0,
+I)\]</span></p>
+<p>这说明，给定 <span class="math inline">\(x_t\)</span> 时，<span
+class="math inline">\(x_{t+\Delta t}\)</span> 服从高斯分布： <span
+class="math display">\[p(x_{t+\Delta t} | x_t) \approx \mathcal{N}(x_t +
+f(x_t, t)\Delta t, \; g(t)^2 \Delta t I)\]</span></p>
+<p>现在我们要推导逆向过程，即给定 <span
+class="math inline">\(x_{t+\Delta t}\)</span> 时，求 <span
+class="math inline">\(x_t\)</span> 的分布 <span
+class="math inline">\(p(x_t | x_{t+\Delta t})\)</span>。根据贝叶斯公式：
+<span class="math display">\[p(x_t | x_{t+\Delta t}) =
+\frac{p(x_{t+\Delta t} | x_t) p(x_t)}{p(x_{t+\Delta t})}\]</span></p>
+<p>我们在两边取对数： <span class="math display">\[\log p(x_t |
+x_{t+\Delta t}) = \log p(x_{t+\Delta t} | x_t) + \log p(x_t) - \log
+p(x_{t+\Delta t})\]</span></p>
+<p>利用一阶泰勒展开，我们可以将 <span class="math inline">\(\log
+p(x_t)\)</span> 在 <span class="math inline">\(x_{t+\Delta t}\)</span>
+处近似展开： <span class="math display">\[\log p(x_t) \approx \log
+p(x_{t+\Delta t}) + \nabla_{x_{t+\Delta t}} \log p(x_{t+\Delta t}) \cdot
+(x_t - x_{t+\Delta t})\]</span></p>
+<p>将这个展开式和前面前向转移概率 <span
+class="math inline">\(p(x_{t+\Delta t} | x_t)\)</span>
+的高斯对数密度代入贝叶斯公式。经过代数化简和配方（合并关于 <span
+class="math inline">\(x_t\)</span> 的二次项），我们可以发现逆向分布
+<span class="math inline">\(p(x_t | x_{t+\Delta t})\)</span>
+依然是一个高斯分布，其均值为： <span
+class="math display">\[\mathbb{E}[x_t | x_{t+\Delta t}] \approx
+x_{t+\Delta t} - \left[ f(x_{t+\Delta t}, t+\Delta t) - g(t+\Delta t)^2
+\nabla_{x} \log p(x_{t+\Delta t}) \right] \Delta t\]</span></p>
+<p>当 <span class="math inline">\(\Delta t \to 0\)</span>
+时，我们将时间倒流记为逆向微元 <span
+class="math inline">\(\mathrm{d}\bar{t}\)</span>，上面的离散更新公式就化为了连续的<strong>逆向
+SDE（Reverse SDE，即 Anderson 定理）</strong>： <span
+class="math display">\[\mathrm{d}x_t = \left[ f(x_t, t) - g(t)^2
+\nabla_{x_t} \log p_t(x_t) \right] \mathrm{d}t + g(t)
+\mathrm{d}\bar{w}_t\]</span></p>
+<p><strong>公式中各变量的物理意义与代码映射：</strong></p>
+<p>在图像生成（如 Diffusion/Flow Matching）的上下文中，这个逆向 SDE
+公式描述了如何从纯噪声逐步去噪生成清晰图像的过程：</p>
+<ul>
+<li><strong><span class="math inline">\(t\)</span> 与 <span
+class="math inline">\(\mathrm{d}t\)</span></strong>：时间步与时间微元。在图像生成中，<span
+class="math inline">\(t \in [0, 1]\)</span>，<span
+class="math inline">\(t=1\)</span> 对应纯噪声，<span
+class="math inline">\(t=0\)</span>
+对应清晰图像。代码中通常对应离散的时间步长
+<code>dt = t_prev - t_curr</code>。</li>
+<li><strong><span class="math inline">\(x_t\)</span> 与 <span
+class="math inline">\(\mathrm{d}x_t\)</span></strong>：时刻 <span
+class="math inline">\(t\)</span>
+的状态及其微小变化量。在图像生成中，<span
+class="math inline">\(x_t\)</span>
+代表<strong>正在被去噪的中间潜变量（Latent）或图像</strong>。<span
+class="math inline">\(\mathrm{d}x_t\)</span>
+则是这一步去噪后像素值的变化量。代码中对应
+<code>sample</code>（当前潜变量）和
+<code>prev_sample - sample</code>。</li>
+<li><strong><span class="math inline">\(f(x_t,
+t)\)</span></strong>：<strong>漂移项（Drift
+term）</strong>。物理上代表系统固有的确定性演化速度场。在图像生成中，它代表<strong>神经网络预测的去噪主方向</strong>（即
+Probability Flow ODE 的速度）。代码中对应模型输出
+<code>model_output</code>（如预测的 velocity 或 noise）。</li>
+<li><strong><span
+class="math inline">\(g(t)\)</span></strong>：<strong>扩散系数（Diffusion
+coefficient）</strong>。物理上代表注入系统的热噪声强度。在图像生成中，它代表<strong>为了探索（Exploration）而刻意注入的随机噪声的标准差</strong>。代码中对应随时间变化的噪声调度参数，如
+<code>std_dev_t</code>。</li>
+<li><strong><span class="math inline">\(\nabla_{x_t} \log
+p_t(x_t)\)</span></strong>：<strong>得分函数（Score
+function）</strong>。物理上代表概率密度场在状态空间的梯度。在图像生成中，它是一个向量场，<strong>指向真实图像数据流形的最短路径</strong>（即告诉每个像素如何修改才能更像真实图像）。在基于
+Score 的模型中，这通常由神经网络隐式或显式拟合。</li>
+<li><strong><span class="math inline">\(- g(t)^2 \nabla_{x_t} \log
+p_t(x_t)\)</span></strong>：<strong>得分修正项</strong>。物理上是为了抵消布朗运动带来的发散效应而施加的恢复力。在图像生成中，它代表<strong>纠偏项</strong>。因为注入了随机噪声
+<span class="math inline">\(g(t)
+\mathrm{d}\bar{w}_t\)</span>，图像可能会偏离真实的数据流形；这个修正项利用
+Score function 强行将偏离的像素拉回真实图像的概率分布内。</li>
+<li><strong><span class="math inline">\(g(t)
+\mathrm{d}\bar{w}_t\)</span></strong>：<strong>逆向标准布朗运动微元</strong>。物理上代表纯粹的随机热运动。在图像生成（尤其是
+RL
+微调）中，它代表<strong>纯随机的像素扰动（高斯白噪声）</strong>，用于在生成轨迹中引入随机性以探索不同的生成结果。代码中对应
+<code>noise = torch.randn_like(sample)</code>。</li>
+</ul>
+<p><strong>核心结论：</strong></p>
+<p>在图像生成与强化学习微调（如
+Flow-GRPO）的结合中，该公式展示了“探索与保真”的数学平衡。为了在生成过程中探索不同的高奖励输出（如更好的美学评分或更准确的
+prompt 遵循），必须通过 <span class="math inline">\(g(t)
+\mathrm{d}\bar{w}_t\)</span>
+<strong>注入随机噪声</strong>；但纯粹的噪声会破坏图像的真实性（导致伪影或崩坏），因此必须同步引入
+<span class="math inline">\(- g(t)^2 \nabla_{x_t} \log p_t(x_t)\)</span>
+作为<strong>数学上的强制纠偏力</strong>，确保探索轨迹始终贴合真实图像的数据流形。</p>
+<p><strong>Flow Matching 中的特殊性（ODE 转 SDE）：</strong> 在 Flow
+Matching 中，我们原本拥有的是一个确定性的常微分方程（ODE），即 <span
+class="math inline">\(\mathrm{d}x_t = f(x_t, t)
+\mathrm{d}t\)</span>。这个 ODE
+已经能够完美地在噪声和图像分布之间映射（它被称为 Probability Flow
+ODE）。 现在，为了在强化学习中进行“探索”，我们想在这个 ODE
+中<strong>强行注入噪声</strong> <span class="math inline">\(g(t)
+\mathrm{d}\bar{w}_t\)</span>，但又<strong>不想改变每个时刻的边缘分布
+<span class="math inline">\(p_t(x_t)\)</span></strong>。
+根据随机过程理论，如果我们向一个保持分布的 ODE 中注入方差为 <span
+class="math inline">\(g(t)^2\)</span>
+的噪声，为了抵消噪声带来的发散效应，必须在漂移项中加入 <span
+class="math inline">\(-\frac{1}{2} g(t)^2 \nabla_{x_t} \log
+p_t(x_t)\)</span> 的修正。</p>
+<p>因此，Flow-GRPO 中实际使用的 SDE 漂移项修正系数是 <span
+class="math inline">\(\frac{1}{2}\)</span>：</p>
+<ol type="1">
+<li><span class="math inline">\(f(x_t, t)\)</span> 是原本的 ODE
+漂移项（基础更新）。</li>
+<li><span class="math inline">\(-\frac{1}{2} g(t)^2 \nabla_{x_t} \log
+p_t(x_t)\)</span>
+就是<strong>为了抵消注入噪声带来的分布发散，而必须强制加入的 Score
+修正项</strong>。</li>
+</ol>
+<h3 id="实现公式链从-sde-理论到代码">3. 实现公式链：从 SDE
+理论到代码</h3>
+<p>下面将上述 SDE 理论逐步具体化为离散实现公式。设 <span
+class="math inline">\(t\)</span> 为当前时间步，<span
+class="math inline">\(v_\theta = v_\theta(x_t, t, c)\)</span>
+为模型预测速度场，<span class="math inline">\(g\)</span> 为 SDE
+扩散系数（控制探索噪声强度），<span class="math inline">\(\Delta t = t -
+t_{\text{next}} &gt; 0\)</span>。</p>
+<div class="note info no-icon flat"><p><strong>符号对照：官方代码 vs 伪代码</strong></p>
+<p>官方代码 <code>sd3_sde_with_logprob.py</code> 中：</p>
+<ul>
+<li><code>sigma</code> → 时间 <span
+class="math inline">\(t\)</span>（伪代码：<code>t_now</code>）</li>
+<li><code>std_dev_t</code> → 扩散系数 <span
+class="math inline">\(g(t)\)</span>（伪代码：<code>g</code>，简化为常数）</li>
+<li><code>model_output</code> → 速度场 <span
+class="math inline">\(v_\theta\)</span>（伪代码：<code>velocity</code>）</li>
+<li><code>dt</code> → <span class="math inline">\(-\Delta
+t\)</span>，符号相反（伪代码：<code>dt</code> <span
+class="math inline">\(= \Delta t &gt; 0\)</span>）</li>
+</ul>
+<p>官方代码中 <span class="math inline">\(g(t)\)</span>
+随时间自适应：<span class="math inline">\(g(t) = \sqrt{t/(1-t)} \cdot
+\eta\)</span>，其中 <span class="math inline">\(\eta\)</span>
+对应代码中的 <code>noise_level</code>（默认
+0.7，控制探索强度）。伪代码为简化起见将 <span
+class="math inline">\(g\)</span> 视为常数。</p>
+</div>
+<p><strong>公式 ①：Tweedie 反推干净样本</strong></p>
+<p><span class="math display">\[\hat{x}_0 = x_t - t \cdot v_\theta
+\tag{①}\]</span></p>
+<blockquote>
+<p>代码：<code>pred_x0 = noisy_img - t_now * velocity</code></p>
+</blockquote>
+<p><strong>公式 ②：Score Function（Tweedie 估计）</strong></p>
+<p>将 ① 代入前文推导的 Score 公式 <span
+class="math inline">\(\nabla_{x_t}\log p_t = -\frac{x_t -
+(1-t)x_0}{t^2}\)</span>：</p>
+<p><span class="math display">\[\nabla_{x_t}\log p_t(x_t) \approx
+-\frac{x_t - (1-t)\hat{x}_0}{t^2} \tag{②}\]</span></p>
+<p>展开化简：<span class="math inline">\(= -\frac{x_t +
+(1-t)v_\theta}{t}\)</span>。</p>
+<blockquote>
+<p>代码：<code>score = -(noisy_img - (1 - t_now) * pred_x0) / (t_now ** 2)</code></p>
+</blockquote>
+<p><strong>公式 ③：SDE 转移均值（ODE 漂移 + Langevin 修正）</strong></p>
+<p><span class="math display">\[\mu = \underbrace{(x_t - \Delta t \cdot
+v_\theta)}_{\text{ODE 漂移}} + \underbrace{\tfrac{1}{2}g^2 \cdot
+\nabla_{x_t}\log p_t \cdot \Delta t}_{\text{Langevin 修正}}
+\tag{③}\]</span></p>
+<blockquote>
+<p>代码：<code>mu = (noisy_img - dt * velocity) + 0.5 * g**2 * score * dt</code></p>
+<p>官方合并写法：<code>prev_sample_mean = sample*(1+std_dev_t**2/(2*sigma)*dt) + model_output*(1+std_dev_t**2*(1-sigma)/(2*sigma))*dt</code></p>
+</blockquote>
+<p><strong>为什么不直接用 ODE 均值？</strong> 如果我们只在 ODE 落点
+<span class="math inline">\((x_t - \Delta t \cdot v_\theta)\)</span>
+上直接加噪声（跳过 Langevin 修正），噪声会把 <span
+class="math inline">\(x_{t-\Delta t}\)</span> 的分布"撑大"——相比真实分布
+<span class="math inline">\(p_{t-\Delta t}\)</span>
+多出了一个额外的高斯扩散。随着步数累积，这种分布偏移会让图像逐渐崩坏。Langevin
+修正项沿 Score
+方向（即数据高密度区域）对均值做微调，恰好<strong>预先补偿</strong>即将注入的噪声带来的分布膨胀——确保加噪后的采样仍然落在正确的分布内。如果不注入噪声（<span
+class="math inline">\(g=0\)</span>），该修正项为零，公式退化为纯
+ODE。</p>
+<p><strong>公式 ④：SDE 采样（添加随机探索噪声）</strong></p>
+<p><span class="math display">\[x_{t-\Delta t} = \mu + g\sqrt{\Delta t}
+\cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
+\tag{④}\]</span></p>
+<blockquote>
+<p>代码：<code>noisy_img = mu + g * noise * (dt ** 0.5)</code></p>
+</blockquote>
+<p>公式 ③④ 合起来构成 SDE 一步的核心操作：<strong>先估计修正均值 <span
+class="math inline">\(\mu\)</span>，再以 <span
+class="math inline">\(\mu\)</span> 为中心重采样</strong>。此时 <span
+class="math inline">\(x_{t-\Delta t}\)</span> 的条件分布为 <span
+class="math inline">\(\mathcal{N}(\mu, \; g^2 \Delta t \cdot
+I)\)</span>。</p>
+<p><strong>边缘分布不变的含义</strong>：③④
+的设计保证了——在<strong>统计意义</strong>上，SDE 采样与纯 ODE
+采样生成的图像集合遵循同一分布（质量、多样性、风格等总体特征一致）。但单条轨迹变为随机的：同一个初始噪声，纯
+ODE 每次产出相同的图，而 SDE
+每次产出不同的图。这种"统计等效但轨迹随机"的性质，正是 GRPO
+所需要的——同一 Prompt
+下能生成多张不同的图做组内对比（"矮子里拔高个"），且不会因为探索而降低图像质量。</p>
+<p><strong>公式 ⑤：单步对数概率</strong></p>
+<p>由于 <span class="math inline">\(x_{t-\Delta t} \sim \mathcal{N}(\mu,
+g^2\Delta t \cdot I)\)</span>，实际采样到的 <span
+class="math inline">\(x_{t-\Delta t}\)</span> 离修正均值 <span
+class="math inline">\(\mu\)</span>
+越近，对数概率越高——模型对这条轨迹越"有信心"：</p>
+<p><span class="math display">\[\log p_\theta(x_{t-\Delta t} | x_t, c) =
+-\frac{\|x_{t-\Delta t} - \mu\|^2}{2\,g^2\,\Delta t} \underbrace{-
+\log(g\sqrt{\Delta t}) - \tfrac{1}{2}\log(2\pi)}_{\text{高斯归一化常数}}
+\tag{⑤}\]</span></p>
+<blockquote>
+<p>代码：<code>log_prob_step = -0.5 * ((actual_next - mu) ** 2).sum() / (g ** 2 * dt)</code></p>
+</blockquote>
+<p>归一化常数只依赖 <span class="math inline">\(g\)</span> 和 <span
+class="math inline">\(\Delta t\)</span>，不依赖策略参数 <span
+class="math inline">\(\theta\)</span>，因此在 GRPO 的 importance ratio
+<span class="math inline">\(\exp(\log\pi_\theta^{\text{new}} -
+\log\pi_\theta^{\text{old}})\)</span>
+中分子分母相消。伪代码省略了这些常数项；官方实现保留了完整的
+<code>- log(std_dev_t * sqrt(-dt)) - log(sqrt(2π))</code> 以便调试。</p>
+<p><strong>公式 ⑥：整条轨迹对数概率</strong></p>
+<p><span class="math display">\[\log \pi_\theta(\text{trajectory} | c) =
+\sum_{k=1}^{T} \log p_\theta(x_{t_k - \Delta t} | x_{t_k}, c)
+\tag{⑥}\]</span></p>
+<blockquote>
+<p>代码：<code>total_log_prob = total_log_prob + log_prob_step</code>（逐步累加）</p>
+</blockquote>
+<p>这与 LLM 中 token 级对数概率求和的形式完全对应——至此，GRPO
+的整套框架可以无缝迁移到图像生成。</p>
+<hr />
+<h1 id="flow-grpo-完整实现">Flow-GRPO 完整实现</h1>
+<h2 id="模型定义与奖励函数">1. 模型定义与奖励函数</h2>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ── 模型定义：与 LLM GRPO 相同，只需 Actor + Reference ──</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Actor π_θ：当前可训练策略（只训练 LoRA 参数）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_model </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> FluxPipeline.</span><span style="color:#383A42;--shiki-dark:#61AFEF">from_pretrained</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#50A14F;--shiki-dark:#98C379">"black-forest-labs/FLUX.1-dev"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">enable_lora</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">rank</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">32</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Reference π_ref：冻结的参考策略，用于 KL 惩罚（锚定初始分布）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ref_model </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> FluxPipeline.</span><span style="color:#383A42;--shiki-dark:#61AFEF">from_pretrained</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#50A14F;--shiki-dark:#98C379">"black-forest-labs/FLUX.1-dev"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ref_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">requires_grad_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ── 奖励模型：多个"美术老师"加权打分 ──</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">reward_models </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> &#123;</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    "aesthetic"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#383A42;--shiki-dark:#61AFEF">AestheticScore</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(),     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 美学评分（构图、色彩）</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    "pick_score"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#383A42;--shiki-dark:#61AFEF">PickScore</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(),         </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 人类偏好综合评分</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    "clip_score"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#383A42;--shiki-dark:#61AFEF">CLIPScore</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(),         </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 图文匹配度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">&#125;</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">reward_weights </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> &#123;</span><span style="color:#50A14F;--shiki-dark:#98C379">"aesthetic"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#986801;--shiki-dark:#D19A66">0.3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#50A14F;--shiki-dark:#98C379">"pick_score"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#986801;--shiki-dark:#D19A66">0.5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#50A14F;--shiki-dark:#98C379">"clip_score"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">: </span><span style="color:#986801;--shiki-dark:#D19A66">0.2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">&#125;</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_reward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">images</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """多奖励加权求和 → 单个标量回报 r。"""</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> sum</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        w </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> reward_models[k](images, prompts)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> k, w </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> reward_weights.</span><span style="color:#383A42;--shiki-dark:#61AFEF">items</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ── 训练超参 ──</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">AdamW</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">lora_parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">G </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 4</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">             # 每个 Prompt 生成的图像数（GRPO 组大小）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">clip_eps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.2</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # PPO 裁剪阈值</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">beta </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.01</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">       # KL 惩罚系数</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">num_steps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 50</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 去噪步数</span></span></code></pre></div>
+<h2 id="计算-flow-matching-轨迹的对数概率">2. 计算 Flow Matching
+轨迹的对数概率</h2>
+<p>这是 Flow-GRPO 区别于 LLM GRPO 的<strong>核心函数</strong>：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_trajectory_log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">model</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> trajectory</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> prompt_embeds</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> g</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.01</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    计算一条去噪轨迹的总对数概率 log π_θ(trajectory | c)。</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    依次实现公式 ①→②→③→⑤，按公式 ⑥ 逐步累加。</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    total_log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> k </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(trajectory) </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noisy_img, t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> trajectory[k]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        actual_next, t_next </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> trajectory[k </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_next                       </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Δt > 0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        velocity </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">predict_velocity</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img, t_now, prompt_embeds)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ①  x̂₀ = x_t − t·v_θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        pred_x0 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> velocity</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ②  Score = −(x_t − (1−t)·x̂₀) / t²</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        score </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> pred_x0) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ③  μ = (x_t − Δt·v_θ) + ½·g²·Score·Δt</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        mu </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> velocity) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.5</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> g</span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> score </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ⑤  log p = −‖x_&#123;t−Δt&#125; − μ‖² / (2·g²·Δt)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        variance </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> g </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        log_prob_step </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#986801;--shiki-dark:#D19A66">0.5</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ((actual_next </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> mu) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">).</span><span style="color:#383A42;--shiki-dark:#61AFEF">sum</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> variance</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ⑥  逐步累加</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        total_log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> total_log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> log_prob_step</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> total_log_prob</span></span></code></pre></div>
+<h2 id="在线采样生成图像并记录轨迹">3. 在线采样：生成图像并记录轨迹</h2>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> generate_with_trajectory</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">model</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> prompt_embeds</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> num_steps</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> g</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.01</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    生成一张图像，并记录完整去噪轨迹供后续计算 log π_θ。</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    依次实现公式 ①→②→③→④。</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randn</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">16</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">64</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">64</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">linspace</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, num_steps </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    trajectory </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [(noisy_img.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clone</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), timesteps[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">])]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> i </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(num_steps):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        t_now  </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps[i]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        t_next </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps[i </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_next                                     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Δt > 0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            velocity </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">predict_velocity</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img, t_now, prompt_embeds)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ①  x̂₀ = x_t − t·v_θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        pred_x0 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> velocity</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ②  Score = −(x_t − (1−t)·x̂₀) / t²</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        score </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t_now) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> pred_x0) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (t_now </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ③  μ = (x_t − Δt·v_θ) + ½·g²·Score·Δt</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        mu </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> velocity) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.5</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> g</span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> score </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 公式 ④  x_&#123;t−Δt&#125; = μ + g·√Δt·ε</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randn_like</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noisy_img </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> mu </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> g </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        trajectory.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((noisy_img.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clone</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), t_next))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    image </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> vae_decode</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noisy_img)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> image, trajectory</span></span></code></pre></div>
+<h2 id="完整训练循环">4. 完整训练循环</h2>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> step </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(total_steps):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    prompts_batch </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> sample_prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(dataset, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">batch_size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">4</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    prompt_embeds </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> encode_text</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts_batch)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ══════════ 阶段 1：组内采样（每个 Prompt 生成 G 张图像）══════════</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    all_images, all_trajectories </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [], []</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    all_old_logps, all_ref_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [], []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 采样阶段不需要梯度</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> emb </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> prompt_embeds:</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">            for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> _ </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(G):  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同一 Prompt 下生成 G 条轨迹（GRPO 的"组"）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                image, traj </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> generate_with_trajectory</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor_model, emb, num_steps)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">                # 记录采样时 Actor 和 Reference 在同一轨迹上的 log π</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                old_logp </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_trajectory_log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor_model, traj, emb)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                ref_logp </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_trajectory_log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ref_model, traj, emb)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                all_images.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(image)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                all_trajectories.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(traj)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                all_old_logps.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(old_logp)      </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π_old（ratio 的分母）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                all_ref_logps.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ref_logp)       </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π_ref（KL 惩罚项）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ══════════ 阶段 2：奖励打分 → 组内相对优势 ══════════</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    rewards </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_reward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(all_images, </span><span style="color:#383A42;--shiki-dark:#61AFEF">repeat_prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts_batch, G))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (batch*G,)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    rewards_grouped </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> rewards.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, G)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (batch, G)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # GRPO 核心：用组内均值/标准差代替 Critic</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    mean_r </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> rewards_grouped.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">keepdim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    std_r  </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> rewards_grouped.</span><span style="color:#383A42;--shiki-dark:#61AFEF">std</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">keepdim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ((rewards_grouped </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> mean_r) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (std_r </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1e-8</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)).</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># z-score</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    old_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">stack</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(all_old_logps)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (batch*G,)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    ref_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">stack</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(all_ref_logps)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (batch*G,)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ══════════ 阶段 3：多 epoch PPO 式策略更新 ══════════</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> epoch </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(K_epochs):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 用当前 θ 重算 log π_θ（这次需要梯度，用于反传）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        new_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">stack</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#61AFEF">            compute_trajectory_log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor_model, traj, emb)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">            for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> traj, emb </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> zip</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(all_trajectories, </span><span style="color:#383A42;--shiki-dark:#61AFEF">repeat_embeds</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompt_embeds, G))</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (batch*G,)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 重要性采样比 r(θ) = π_θ / π_old</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(new_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_logps)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # PPO 裁剪目标：min(r·A, clip(r)·A)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr1 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr2 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clamp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ratio, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_eps, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_eps) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">min</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(surr1, surr2).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # KL 惩罚：防止策略偏离参考模型过远</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        kl_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (new_logps </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ref_logps).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> beta </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> kl_loss</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        torch.nn.utils.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clip_grad_norm_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">lora_parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">max_norm</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span></code></pre></div>
+<blockquote>
+<p><strong>与 LLM GRPO 的代码结构对比</strong>：整体框架（组采样 →
+优势计算 → 裁剪更新 → KL
+惩罚）完全一致。唯一的区别在于<strong>对数概率的计算方式</strong>：LLM
+用 token 级 softmax 对数概率求和，Flow-GRPO
+用高斯转移核的对数密度求和。</p>
+</blockquote>
+<hr />
+<h2
+id="flow-grpo-fast加速采样的工程优化">Flow-GRPO-Fast：加速采样的工程优化</h2>
+<p>全量去噪采样是 Flow-GRPO 的计算瓶颈——生成一张 1024×1024 图像，Flux
+默认需要 50 步 ODE 求解。每个 Prompt 生成 <span
+class="math inline">\(G=4\)</span> 张就是 200 步，每个训练 step 有 4 个
+Prompt 就是 800 步。Flow-GRPO 提出了两种加速策略：</p>
+<h3 id="策略-1部分去噪partial-denoising">策略 1：部分去噪（Partial
+Denoising）</h3>
+<p>不从纯噪声 <span class="math inline">\(t=1\)</span>
+开始，而是从中间时间步 <span
+class="math inline">\(t_{\text{start}}\)</span> 开始（如 <span
+class="math inline">\(t=0.5\)</span>）：</p>
+<p><span class="math display">\[
+x_{t_{\text{start}}} = (1 - t_{\text{start}}) \cdot x_0^{\text{ref}} +
+t_{\text{start}} \cdot \epsilon
+\]</span></p>
+<p>其中 <span class="math inline">\(x_0^{\text{ref}}\)</span>
+是参考模型生成的一张"参考图"。这样只需去噪 <span
+class="math inline">\(t_{\text{start}} \times T\)</span> 步（比如 25
+步而非 50 步），速度翻倍。</p>
+<p><strong>代价</strong>：生成多样性降低（所有 <span
+class="math inline">\(G\)</span>
+张图都从同一个"参考半成品"出发），但对于微调场景通常足够。</p>
+<h3 id="策略-2减少采样步数">策略 2：减少采样步数</h3>
+<p>直接减少 ODE 求解步数（如从 50 步减到 20 步），配合高阶 ODE
+求解器（如 DPM-Solver++）。精度略有下降，但速度大幅提升。</p>
+<hr />
+<h1 id="grpo-guard缓解隐式过优化">GRPO-Guard：缓解隐式过优化</h1>
+<blockquote>
+<p>论文：<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2510.22319">GRPO-Guard:
+Mitigating Implicit Over-Optimization in Flow Matching via Regulated
+Clipping</a>（同为 Flow-GRPO 团队，2025） 代码：已集成在 <a
+target="_blank" rel="noopener" href="https://github.com/yifan123/flow_grpo">flow_grpo</a> 和 <a
+target="_blank" rel="noopener" href="https://github.com/X-GenGroup/Flow-Factory">Flow-Factory</a>
+中</p>
+</blockquote>
+<h2 id="问题importance-ratio-的固有偏差">问题：Importance Ratio
+的固有偏差</h2>
+<p>Flow-GRPO 和 DanceGRPO 在训练中使用 PPO-style clipping
+来约束策略更新。PPO 的 clipping 机制假设 importance ratio <span
+class="math inline">\(r_t = \pi_\theta(a_t|s_t) /
+\pi_{\theta_\text{old}}(a_t|s_t)\)</span> 的分布<strong>以 1
+为中心</strong>。但在 Flow Matching 模型中，importance ratio
+的分布存在<strong>系统性的负向偏差</strong>：</p>
+<ol type="1">
+<li><strong>均值始终低于 1</strong>，在低噪声步（如 SD3.5-M 的 step
+8）偏差尤为显著。</li>
+<li><strong>方差在不同去噪步之间差异极大</strong>，低噪声步方差远小于高噪声步。</li>
+</ol>
+<div class="note info no-icon flat"><p><strong>深度解析：为什么偏差是"负向"的？为什么方差随时间步变化？</strong></p>
+<p>在 Flow Matching SDE 中，每一步的"策略"是一个高斯分布：<span
+class="math inline">\(\pi_\theta(x_{t+1}|x_t) = \mathcal{N}(\mu_\theta,
+\sigma_t^2 I)\)</span>。设 <span class="math inline">\(\delta =
+\mu_\theta - \mu_{\theta_\text{old}}\)</span>
+为策略更新导致的均值偏移，<span class="math inline">\(e = x_{t+1} -
+\mu_{\theta_\text{old}} \sim \mathcal{N}(0, \sigma_t^2 I)\)</span>
+为采样噪声，则 log-ratio 可以精确展开为：</p>
+<p><span class="math display">\[\log r_t = \frac{e^T \delta}{\sigma_t^2}
+- \frac{\|\delta\|^2}{2\sigma_t^2}\]</span></p>
+<p>第一项 <span class="math inline">\(\frac{e^T
+\delta}{\sigma_t^2}\)</span> 是零均值的随机项（因为 <span
+class="math inline">\(\mathbb{E}[e] = 0\)</span>），第二项 <span
+class="math inline">\(-\frac{\|\delta\|^2}{2\sigma_t^2}\)</span>
+是一个<strong>恒为负的常数偏置</strong>。因此：</p>
+<p><span class="math display">\[\mathbb{E}[\log r_t] =
+-\frac{\|\delta\|^2}{2\sigma_t^2} &lt; 0\]</span></p>
+<p><strong>1. 为什么偏差一定是负向的？</strong> 由于 <span
+class="math inline">\(\|\delta\|^2 \geq
+0\)</span>，这个偏置<strong>永远是负的</strong>——这是高斯分布的固有数学性质，与策略更新的方向无关。只要
+<span class="math inline">\(\theta \neq
+\theta_\text{old}\)</span>（即策略发生了任何更新），<span
+class="math inline">\(\log r_t\)</span> 的均值就必然小于 0。虽然理论上
+<span class="math inline">\(\mathbb{E}[r_t] =
+1\)</span>（对数正态分布的性质），但在图像 latent 的高维空间中（维度
+<span class="math inline">\(d \sim 16 \times 64 \times 64 =
+65536\)</span>），<span class="math inline">\(\|\delta\|^2\)</span> 与
+<span class="math inline">\(d\)</span> 成正比，导致 <span
+class="math inline">\(\log r_t\)</span> 的分布极度右偏：绝大多数样本的
+<span class="math inline">\(r_t \ll 1\)</span>，仅有极少数样本 <span
+class="math inline">\(r_t \gg 1\)</span>
+来拉平均值。在有限样本下，这些极端值几乎观测不到，因此经验均值始终远低于
+1。</p>
+<p><strong>2. 为什么低噪声步方差小、高噪声步方差大？</strong> <span
+class="math inline">\(\log r_t\)</span> 的方差为 <span
+class="math inline">\(\text{Var}[\log r_t] =
+\frac{\|\delta\|^2}{\sigma_t^2}\)</span>。在低噪声步（<span
+class="math inline">\(\sigma_t\)</span> 小），高斯分布 <span
+class="math inline">\(\mathcal{N}(\mu_{\theta_\text{old}}, \sigma_t^2
+I)\)</span> 非常"尖锐"，样本 <span
+class="math inline">\(x_{t+1}\)</span> 紧紧聚拢在均值附近。虽然
+log-ratio 的波动范围大，但由于偏置项 <span
+class="math inline">\(-\|\delta\|^2/(2\sigma_t^2)\)</span>
+也极大，几乎所有样本都被压到了 <span class="math inline">\(r_t \approx
+0\)</span>
+的位置——方差自然极小（大家都挤在零附近）。相反，在高噪声步（<span
+class="math inline">\(\sigma_t\)</span>
+大），高斯分布宽而平坦，偏置项较小，样本的 <span
+class="math inline">\(r_t\)</span> 在 1 附近分散得更开，方差更大。</p>
+</div>
+<p>这种偏差使得 PPO 的 clipping 区间 <span
+class="math inline">\([1-\varepsilon, 1+\varepsilon]\)</span>
+变得<strong>不对称</strong>。由于绝大多数样本的 <span
+class="math inline">\(r_t\)</span> 远小于 1，正样本（高奖励的好图）的
+ratio 反而更容易落在 clipping
+区间内部（不被截断），导致正样本的梯度更新不受约束，策略模型不断向这些样本偏移。</p>
+<div class="note warning no-icon flat"><p><strong>为什么向"好图"方向偏移，图像质量反而会下降？</strong></p>
+<p>这是经典的<strong>古德哈特定律（Goodhart's
+Law）</strong>："当一个度量成为了目标，它就不再是一个好的度量。"</p>
+<p>GRPO 训练中的"正样本"（好图）是由<strong>代理奖励模型</strong>（如
+PickScore）定义的，而非真实的人类偏好。PickScore
+本质上是一个有限能力的神经网络，它对"好图"的判断存在系统性的盲点和偏见（例如对某些纹理模式的虚假偏好）。当策略模型被过度优化后，它学会了<strong>精准利用奖励模型的这些弱点</strong>——生成那些"PickScore
+认为很好，但人类觉得不对"的图像。</p>
+<p>因此，<strong>代理分数（proxy
+score）持续上升</strong>（模型越来越擅长"取悦"
+PickScore），但<strong>真实质量（gold
+score）不断下降</strong>（人类评估者认为图像质量在退化）。这就是隐式过优化（Implicit
+Over-Optimization）的本质。</p>
+</div>
+<h2 id="解决方案rationorm-gradient-reweight">解决方案：RatioNorm +
+Gradient Reweight</h2>
+<p>GRPO-Guard 提出了两个互补的机制：</p>
+<h3 id="rationorm比率归一化">1. RatioNorm（比率归一化）</h3>
+<p>RatioNorm 的目标是纠正 importance ratio 的分布偏差，使其均值回归到
+1、方差在不同步之间保持一致。</p>
+<p>具体做法是引入一个时间步相关的缩放因子 <span
+class="math inline">\(c_t = \sqrt{\Delta t} \cdot
+\sigma_t\)</span>（其中 <span class="math inline">\(\Delta t\)</span>
+是步长，<span class="math inline">\(\sigma_t\)</span>
+是噪声标准差），并用它来重新缩放 log-ratio：</p>
+<p><span class="math display">\[\hat{r}_t = \exp\left[({\log \pi_\theta
+- \log \pi_{\theta_\text{old}}}) \cdot c_t + \frac{\|\mu_\theta -
+\mu_{\theta_\text{old}}\|^2}{2 c_t}\right]\]</span></p>
+<p>其中 <span class="math inline">\(\mu_\theta\)</span> 和 <span
+class="math inline">\(\mu_{\theta_\text{old}}\)</span>
+分别是当前策略和旧策略预测的去噪均值。第二项 <span
+class="math inline">\(\frac{\|\mu_\theta -
+\mu_{\theta_\text{old}}\|^2}{2c_t}\)</span> 用于补偿均值偏移导致的 ratio
+下降。</p>
+<p>经过 RatioNorm 校正后，importance ratio 的分布在所有时间步上都以 1
+为中心，PPO 的 clipping 机制重新恢复了对称性。</p>
+<h3 id="gradient-reweight梯度重加权">2. Gradient
+Reweight（梯度重加权）</h3>
+<p>即使 RatioNorm 校正了 ratio 的分布，不同时间步对总 loss
+的梯度贡献仍然不均衡。Gradient Reweight 对最终的 policy loss
+进行时间步相关的重加权：</p>
+<p><span class="math display">\[\mathcal{L}_\text{Guard} =
+\frac{\mathcal{L}_\text{PPO}(\hat{r}_t)}{(\sqrt{\Delta
+t})^2}\]</span></p>
+<p>这使得每个时间步对总梯度的贡献大致相等，防止某些特定噪声水平下的过度优化。</p>
+<h2 id="与-mixgrpo-的对比哪个更好">与 MixGRPO 的对比：哪个更好？</h2>
+<p>GRPO-Guard 与 MixGRPO 都试图解决 Flow-GRPO 的过优化/Reward Hacking
+问题，但它们解决的是<strong>不同层面</strong>的问题，严格来说不构成"谁更好"的竞争关系，而是互补关系。</p>
+<p><strong>切入点完全不同：</strong></p>
+<ul>
+<li><strong>GRPO-Guard</strong>
+从<strong>梯度端</strong>入手：认为问题的根源是 SDE 使 importance ratio
+的统计特性产生了偏差，导致 PPO clipping 失效。解决方法是 RatioNorm +
+Gradient Reweight。</li>
+<li><strong>MixGRPO</strong>
+从<strong>采样端</strong>入手：认为问题的根源是标准 SDE
+的高频伪影欺骗了奖励模型。解决方法是 CPS 采样（消除伪影）+ Hybrid
+Inference（推理时混合原始模型限制传播）+ 滑动窗口提升训练效率。</li>
+</ul>
+<p><strong>各自的优势领域：</strong></p>
+<ul>
+<li><strong>抗过优化能力</strong>：GRPO-Guard
+是专门为此设计的。GRPO-Guard 论文的实验表明，在 SD3.5-M 上以 GenEval 为
+proxy reward 训练 1860 步后，Flow-GRPO 的 Gold Score（三项真实指标
+HPS-v2、ImageReward、UnifiedReward 的归一化均值）跌至 0.84（基线 =
+1.00），而 GRPO-Guard 维持在 0.89（提升 +0.05）。在 Flux.1-dev
+上，DanceGRPO 的 Gold Score 跌至 0.88，GRPO-Guard 则恢复到
+1.02（甚至超过原始模型）。视觉上，Flow-GRPO 和 DanceGRPO
+在训练后期会出现严重的水平/垂直条纹伪影、面部同质化和人体比例失调，而
+GRPO-Guard 保持了正常的图像质量和多样性。</li>
+<li><strong>训练效率</strong>：MixGRPO 在这方面优势明显，通过 Mixed
+ODE-SDE + 滑动窗口机制将训练开销削减了约 50%，同时在 ImageReward 和
+HPS-v2.1 等指标上超越了 Flow-GRPO 和 DanceGRPO。</li>
+</ul>
+<p><strong>GRPO-Guard 的局限</strong>（论文自己承认的）：RatioNorm
+只能修复 clipping
+机制的失效问题，<strong>无法消除奖励模型本身的固有缺陷</strong>（proxy
+score 与 gold score 之间的
+gap）。如果奖励模型本身就有系统性偏见，单纯修复 clipping 也无法完全阻止
+reward hacking。彻底的解决方案是提升奖励模型本身的能力（如
+RewardDance），但这会引入大量计算开销。</p>
+<p><strong>实际使用建议</strong>：这两种方法并不互斥，可以组合使用。<a
+target="_blank" rel="noopener" href="https://github.com/X-GenGroup/Flow-Factory">Flow-Factory</a>
+已经同时支持了两者，用户可以选择 <code>trainer_type: 'grpo-guard'</code>
++ <code>dynamics_type: 'CPS'</code>，将梯度端的 ratio
+修正与采样端的伪影消除同时启用，理论上能获得最佳的抗过优化效果。</p>
+<hr />
+<h1 id="算法对比与开源生态">算法对比与开源生态</h1>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">维度</th>
+<th style="text-align: center;">Diffusion-DPO</th>
+<th style="text-align: center;">DDPO (PPO)</th>
+<th style="text-align: center;">Flow-GRPO</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>训练方式</strong></td>
+<td style="text-align: center;">离线（偏好对）</td>
+<td style="text-align: center;">在线 RL</td>
+<td style="text-align: center;">在线 RL</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>需要 Critic</strong></td>
+<td style="text-align: center;">否</td>
+<td style="text-align: center;">是</td>
+<td style="text-align: center;"><strong>否</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>基线估计</strong></td>
+<td style="text-align: center;">无</td>
+<td style="text-align: center;">Critic <span
+class="math inline">\(V_\phi\)</span></td>
+<td style="text-align: center;">组内均值</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>适用模型</strong></td>
+<td style="text-align: center;">DDPM / LDM</td>
+<td style="text-align: center;">DDPM / LDM</td>
+<td style="text-align: center;"><strong>Flow Matching
+(Flux)</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>显存</strong></td>
+<td style="text-align: center;">低</td>
+<td style="text-align: center;">极高</td>
+<td style="text-align: center;"><strong>低</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>探索能力</strong></td>
+<td style="text-align: center;">弱</td>
+<td style="text-align: center;">强</td>
+<td style="text-align: center;">强</td>
+</tr>
+</tbody>
+</table>
+<p><strong>开源代码参考：</strong> <a
+target="_blank" rel="noopener" href="https://github.com/yifan123/flow_grpo">flow_grpo</a> 提供了基于
+Flux 的完整实现，支持 LoRA 微调、多 GPU 训练和 Flow-GRPO-Fast 加速。</p>
+<hr />
+<h1 id="系列总结">系列总结</h1>
+<p>通过这五篇文章，我们从最基础的强化学习与策略梯度出发，推导了解决步长控制的
+PPO 算法，探讨了绕开 RL 的 DPO 路线，最终迎来了解决大模型显存危机的 GRPO
+算法，并成功将其落地到了最前沿的 Flow-GRPO 图像生成微调框架中。</p>
+<p>强化学习与生成模型的结合，正在开启 AI
+领域的新纪元。无论是语言模型中的深度思考（DeepSeek-R1），还是图像生成中的美学对齐（Flow-GRPO），在线强化学习都展现出了无与伦比的潜力。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Liu, Y., Wang, P., Shao, Z., ... &amp; Hao, K. (2025).
+<em>Flow-GRPO: Training Flow Matching Models via Online RL</em>.
+arXiv:2505.05470.</li>
+<li>Black Forest Labs. (2024). <em>Flux.1 [dev]</em>.
+https://blackforestlabs.ai/</li>
+<li><a target="_blank" rel="noopener" href="https://github.com/yifan123/flow_grpo">flow_grpo</a></li>
+<li>Wang, J., et al. (2025). <em>GRPO-Guard: Mitigating Implicit
+Over-Optimization in Flow Matching via Regulated Clipping</em>.
+arXiv:2510.22319.</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/56-dapo/">笔记｜强化学习（六）：DAPO：从 GRPO
+到大规模推理 RL 的工程实践</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/55-flow-grpo/">https://chengyi-xun.github.io/chengYi-xun/posts/55-flow-grpo/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Flow-Matching/">Flow Matching</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E4%B8%AD%E7%9A%84%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0"><span class="toc-number">1.</span> <span class="toc-text">图像生成中的强化学习</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-grpo-%E6%A1%86%E6%9E%B6%E8%A7%A3%E6%9E%90%E5%9B%BE%E5%83%8F%E7%89%88%E7%9F%AE%E5%AD%90%E9%87%8C%E6%8B%94%E9%AB%98%E4%B8%AA"><span class="toc-number">2.</span> <span class="toc-text">Flow-GRPO
+框架解析：图像版&quot;矮子里拔高个&quot;</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%8C%91%E6%88%98%E5%A6%82%E4%BD%95%E5%9C%A8%E8%BF%9E%E7%BB%AD%E7%94%9F%E6%88%90%E8%BF%87%E7%A8%8B%E4%B8%AD%E5%AE%9A%E4%B9%89-log-pi_theta"><span class="toc-number">2.1.</span> <span class="toc-text">核心挑战：如何在连续生成过程中定义
+\(\log \pi_\theta\)？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B0%86%E5%8E%BB%E5%99%AA%E8%BF%87%E7%A8%8B%E5%BB%BA%E6%A8%A1%E4%B8%BA-mdp"><span class="toc-number">2.1.1.</span> <span class="toc-text">将去噪过程建模为 MDP</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8E%A8%E5%AF%BC-flow-matching-%E4%B8%AD%E7%9A%84%E5%AF%B9%E6%95%B0%E6%A6%82%E7%8E%87"><span class="toc-number">2.1.2.</span> <span class="toc-text">推导 Flow Matching
+中的对数概率</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%BC%95%E5%85%A5-sde-%E4%B8%8E-score-function"><span class="toc-number">2.1.3.</span> <span class="toc-text">1. 为什么要引入 SDE 与 Score
+Function？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%8E%E5%89%8D%E5%90%91-sde-%E6%8E%A8%E5%AF%BC%E9%80%86%E5%90%91-sdeanderson-%E5%AE%9A%E7%90%86"><span class="toc-number">2.1.4.</span> <span class="toc-text">2. 从前向 SDE 推导逆向
+SDE（Anderson 定理）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E7%8E%B0%E5%85%AC%E5%BC%8F%E9%93%BE%E4%BB%8E-sde-%E7%90%86%E8%AE%BA%E5%88%B0%E4%BB%A3%E7%A0%81"><span class="toc-number">2.1.5.</span> <span class="toc-text">3. 实现公式链：从 SDE
+理论到代码</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-grpo-%E5%AE%8C%E6%95%B4%E5%AE%9E%E7%8E%B0"><span class="toc-number">3.</span> <span class="toc-text">Flow-GRPO 完整实现</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A8%A1%E5%9E%8B%E5%AE%9A%E4%B9%89%E4%B8%8E%E5%A5%96%E5%8A%B1%E5%87%BD%E6%95%B0"><span class="toc-number">3.1.</span> <span class="toc-text">1. 模型定义与奖励函数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AE%A1%E7%AE%97-flow-matching-%E8%BD%A8%E8%BF%B9%E7%9A%84%E5%AF%B9%E6%95%B0%E6%A6%82%E7%8E%87"><span class="toc-number">3.2.</span> <span class="toc-text">2. 计算 Flow Matching
+轨迹的对数概率</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9C%A8%E7%BA%BF%E9%87%87%E6%A0%B7%E7%94%9F%E6%88%90%E5%9B%BE%E5%83%8F%E5%B9%B6%E8%AE%B0%E5%BD%95%E8%BD%A8%E8%BF%B9"><span class="toc-number">3.3.</span> <span class="toc-text">3. 在线采样：生成图像并记录轨迹</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E8%AE%AD%E7%BB%83%E5%BE%AA%E7%8E%AF"><span class="toc-number">3.4.</span> <span class="toc-text">4. 完整训练循环</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#flow-grpo-fast%E5%8A%A0%E9%80%9F%E9%87%87%E6%A0%B7%E7%9A%84%E5%B7%A5%E7%A8%8B%E4%BC%98%E5%8C%96"><span class="toc-number">3.5.</span> <span class="toc-text">Flow-GRPO-Fast：加速采样的工程优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%AD%96%E7%95%A5-1%E9%83%A8%E5%88%86%E5%8E%BB%E5%99%AApartial-denoising"><span class="toc-number">3.5.1.</span> <span class="toc-text">策略 1：部分去噪（Partial
+Denoising）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%AD%96%E7%95%A5-2%E5%87%8F%E5%B0%91%E9%87%87%E6%A0%B7%E6%AD%A5%E6%95%B0"><span class="toc-number">3.5.2.</span> <span class="toc-text">策略 2：减少采样步数</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#grpo-guard%E7%BC%93%E8%A7%A3%E9%9A%90%E5%BC%8F%E8%BF%87%E4%BC%98%E5%8C%96"><span class="toc-number">4.</span> <span class="toc-text">GRPO-Guard：缓解隐式过优化</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98importance-ratio-%E7%9A%84%E5%9B%BA%E6%9C%89%E5%81%8F%E5%B7%AE"><span class="toc-number">4.1.</span> <span class="toc-text">问题：Importance Ratio
+的固有偏差</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88rationorm-gradient-reweight"><span class="toc-number">4.2.</span> <span class="toc-text">解决方案：RatioNorm +
+Gradient Reweight</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#rationorm%E6%AF%94%E7%8E%87%E5%BD%92%E4%B8%80%E5%8C%96"><span class="toc-number">4.2.1.</span> <span class="toc-text">1. RatioNorm（比率归一化）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#gradient-reweight%E6%A2%AF%E5%BA%A6%E9%87%8D%E5%8A%A0%E6%9D%83"><span class="toc-number">4.2.2.</span> <span class="toc-text">2. Gradient
+Reweight（梯度重加权）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%8E-mixgrpo-%E7%9A%84%E5%AF%B9%E6%AF%94%E5%93%AA%E4%B8%AA%E6%9B%B4%E5%A5%BD"><span class="toc-number">4.3.</span> <span class="toc-text">与 MixGRPO 的对比：哪个更好？</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94%E4%B8%8E%E5%BC%80%E6%BA%90%E7%94%9F%E6%80%81"><span class="toc-number">5.</span> <span class="toc-text">算法对比与开源生态</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%B3%BB%E5%88%97%E6%80%BB%E7%BB%93"><span class="toc-number">6.</span> <span class="toc-text">系列总结</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/55-flow-grpo/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/55-flow-grpo/',
+      title: '笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

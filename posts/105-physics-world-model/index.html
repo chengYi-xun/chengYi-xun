@@ -1,0 +1,835 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="核心论文：PhysDreamer (arXiv:2404.13026, ECCV 2024)、PhysGen (arXiv:2409.18964, ECCV 2024)、NewtonGen (arXiv:2509.21309, 2025)、NewtonRewards (arXiv:2512.00425, 2025) 代码：stevenlsw&#x2F;physgen · pandayuanyu&#x2F;Newto">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/105-physics-world-model/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="核心论文：PhysDreamer (arXiv:2404.13026, ECCV 2024)、PhysGen (arXiv:2409.18964, ECCV 2024)、NewtonGen (arXiv:2509.21309, 2025)、NewtonRewards (arXiv:2512.00425, 2025) 代码：stevenlsw&#x2F;physgen · pandayuanyu&#x2F;Newto">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T16:50:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.487Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="World Model">
+<meta property="article:tag" content="PhysDreamer">
+<meta property="article:tag" content="PhysGen">
+<meta property="article:tag" content="NewtonGen">
+<meta property="article:tag" content="Physics-Grounded">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/105-physics-world-model/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.487Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p><strong>核心论文</strong>：PhysDreamer (arXiv:2404.13026, ECCV
+2024)、PhysGen (arXiv:2409.18964, ECCV 2024)、NewtonGen
+(arXiv:2509.21309, 2025)、NewtonRewards (arXiv:2512.00425, 2025)</p>
+<p><strong>代码</strong>：<a
+target="_blank" rel="noopener" href="https://github.com/stevenlsw/physgen">stevenlsw/physgen</a> · <a
+target="_blank" rel="noopener" href="https://github.com/pandayuanyu/NewtonGen">pandayuanyu/NewtonGen</a>
+| <strong>前置知识</strong>：<a
+href="/chengYi-xun/posts/104-video-world-model/">上一篇：视频生成世界模型</a></p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/104-video-world-model/">笔记｜世界模型（四）：视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/106-driving-world-model/">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a></p>
+</blockquote>
+<h2 id="sora-生成的球为什么不遵守牛顿定律">0. Sora
+生成的球为什么不遵守牛顿定律？</h2>
+<p>上一篇我们看到，纯数据驱动的视频模型存在根本性的物理缺陷——"How Far"
+论文（ICML
+2025）证明它们做的是"基于案例的模仿"而非"物理规则的抽象"。</p>
+<p>一个具体的例子：用 Sora
+生成"球从桌子上滚下来"。你可能会看到球的轨迹大致合理，但仔细观察——球在桌边没有加速（无视重力），落地后弹跳角度不对，甚至可能穿过桌面。模型学到了"球通常往下掉"这种<strong>统计规律</strong>，但没有学到
+<span class="math inline">\(F = ma\)</span>。</p>
+<p>那么，有没有办法让视频生成模型<strong>既保持视觉逼真度，又遵守物理定律</strong>？本篇介绍四种技术路线，按"物理嵌入的深度"排列——从显式仿真驱动，到潜空间物理约束，再到后训练物理奖励。</p>
+<h2 id="physdreamer从视频先验蒸馏物理属性">1.
+PhysDreamer：从视频先验蒸馏物理属性</h2>
+<h3 id="核心思想">1.1 核心思想</h3>
+<p>PhysDreamer（MIT 等，2024）将问题分为两步：</p>
+<ol type="1">
+<li><p><strong>从视频模型中"蒸馏"出物理属性</strong>（如材质的弹性模量）</p></li>
+<li><p><strong>用显式物理仿真器驱动运动</strong>（Material Point
+Method）</p></li>
+</ol>
+<p>这是"数据驱动的物理参数估计 + 基于物理的仿真"的混合方案。</p>
+<h3 id="方法">1.2 方法</h3>
+<p>给定一个静态 3D 物体（用 3D Gaussian Splatting 表示），PhysDreamer
+的流程：</p>
+<p><strong>Step 1：物理属性估计</strong></p>
+<p>对 3D 场景中的每个 Gaussian 预测一个材质参数向量 <span
+class="math inline">\(\mathbf{m}_i = (\mu_i,
+\lambda_i)\)</span>（杨氏模量和泊松比）：</p>
+<p><span class="math display">\[
+\mathbf{m}_i = \text{MLP}_\theta(\mathbf{x}_i, \mathbf{f}_i)
+\]</span></p>
+<p>其中 <span class="math inline">\(\mathbf{x}_i\)</span>
+是空间位置，<span class="math inline">\(\mathbf{f}_i\)</span>
+是外观特征。</p>
+<p>如何训练这个
+MLP？用<strong>视频扩散模型的得分函数</strong>作为监督信号（Score
+Distillation）：</p>
+<p><span class="math display">\[
+\nabla_\theta \mathcal{L}_{\text{SDS}} = \mathbb{E}_{t,
+\epsilon}\left[w(t) \cdot (\hat{\epsilon}_\phi(z_t, t, c) - \epsilon)
+\cdot \frac{\partial z}{\partial \theta}\right]
+\]</span></p>
+<p>直觉：视频扩散模型"知道"物体在外力作用下应该如何运动（从训练视频中学到），PhysDreamer
+利用这个知识来估计材质参数。</p>
+<p><strong>Step 2：物理仿真</strong></p>
+<p>用 <strong>Material Point Method (MPM)</strong>
+进行可微物理仿真：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathbf{v}^{n+1}_p &amp;= \mathbf{v}^n_p + \Delta t \cdot
+\left(\mathbf{g} + \frac{1}{m_p} \mathbf{f}^n_p\right) \\
+\mathbf{x}^{n+1}_p &amp;= \mathbf{x}^n_p + \Delta t \cdot
+\mathbf{v}^{n+1}_p
+\end{aligned}
+\]</span></p>
+<p>其中 <span class="math inline">\(\mathbf{g}\)</span>
+是重力加速度，<span class="math inline">\(\mathbf{f}^n_p\)</span>
+是弹性力（由材质参数决定），<span class="math inline">\(m_p\)</span>
+是质点质量。</p>
+<p>弹性力通过变形梯度 <span class="math inline">\(\mathbf{F}\)</span>
+和应力张量 <span class="math inline">\(\boldsymbol{\sigma}\)</span>
+计算：</p>
+<p><span class="math display">\[
+\boldsymbol{\sigma} = \frac{1}{J}\frac{\partial \Psi}{\partial
+\mathbf{F}} \mathbf{F}^\top
+\]</span></p>
+<p>其中 <span class="math inline">\(\Psi\)</span>
+是弹性势能密度（由杨氏模量 <span class="math inline">\(E\)</span>
+和泊松比 <span class="math inline">\(\nu\)</span> 决定），<span
+class="math inline">\(J = \det(\mathbf{F})\)</span>。</p>
+<p><strong>Step 3：渲染</strong></p>
+<p>将仿真后的粒子位置更新到 3D Gaussian，用可微渲染生成视频。</p>
+<h3 id="效果">1.3 效果</h3>
+<p>PhysDreamer 能让静态 3D
+物体在外力作用下产生<strong>物理合理</strong>的形变和运动。例如推一只布料做的兔子，它会像真正的布料一样变形和回弹。</p>
+<p>局限：偏向<strong>慢速、平滑</strong>的运动（弹性形变），无法处理碰撞、断裂等复杂物理。</p>
+<h2 id="physgen刚体物理-扩散视频">2. PhysGen：刚体物理 + 扩散视频</h2>
+<h3 id="混合管线">2.1 混合管线</h3>
+<p>PhysGen（UIUC,
+2024）走了一条不同的路——<strong>先仿真后生成</strong>：</p>
+<div class="shiki-container"><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span>图像理解 → 物理参数提取 → 刚体仿真 →</span></span>
+<span class="line"><span>视频扩散细化</span></span></code></pre></div>
+<p><img src="/chengYi-xun/img/physgen_method.png"
+alt="PhysGen 三阶段流程：感知 → 物理仿真 → 渲染与精修（PhysGen Project Page, ECCV 2024）" /></p>
+<h3 id="三阶段流程">2.2 三阶段流程</h3>
+<p><strong>阶段 1：场景理解</strong></p>
+<p>从单张图像中提取物理信息：</p>
+<p><span class="math display">\[
+\{\text{几何}, \text{材质}, \text{物理参数}\} =
+\text{SceneParser}(\mathbf{I})
+\]</span></p>
+<p>包括物体的 3D 形状、质量、摩擦系数等。</p>
+<p><strong>阶段 2：图像空间物理仿真</strong></p>
+<p>在 2D 图像空间中运行简化的刚体动力学：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathbf{F} &amp;= m\mathbf{a} \quad &amp;\text{（牛顿第二定律）} \\
+\boldsymbol{\tau} &amp;= I\boldsymbol{\alpha} \quad
+&amp;\text{（旋转动力学）} \\
+\mathbf{v}&#39; &amp;= -e \cdot \mathbf{v}_n + \mu \cdot \mathbf{v}_t
+\quad &amp;\text{（碰撞响应）}
+\end{aligned}
+\]</span></p>
+<p>其中 <span class="math inline">\(e\)</span> 是恢复系数，<span
+class="math inline">\(\mu\)</span>
+是摩擦系数。仿真输出是<strong>粗糙但物理正确的</strong>运动轨迹。</p>
+<p><strong>阶段 3：视频扩散细化</strong></p>
+<p>用视频扩散模型将粗糙的仿真结果（线条/简笔画级别）"美化"为逼真视频：</p>
+<p><span class="math display">\[
+V_{\text{realistic}} = \text{VideoDiffusion}(V_{\text{sim}},
+\mathbf{I}_0, \text{prompt})
+\]</span></p>
+<h3 id="数学力条件控制">2.3 数学：力条件控制</h3>
+<p>PhysGen 允许用户指定<strong>作用力</strong>来控制生成：</p>
+<p><span class="math display">\[
+\mathbf{F}_{\text{ext}} = (F_x, F_y), \quad \text{作用点} = (x_0, y_0)
+\]</span></p>
+<p>物理仿真器根据这些力计算运动轨迹，再交给视频模型渲染。</p>
+<h2 id="newtongenneural-newtonian-dynamics">3. NewtonGen：Neural
+Newtonian Dynamics</h2>
+<h3 id="核心创新">3.1 核心创新</h3>
+<p>NewtonGen（Pan et al., 2025, arXiv:2509.21309）提出了 <strong>Neural
+Newtonian Dynamics（NND）</strong>：用物理信息 Neural ODE
+预测物体的牛顿运动轨迹，再将预测轨迹转化为光流（optical
+flow）来引导视频生成器。</p>
+<p>NND 在一个 9 维的<strong>物理状态向量</strong>上操作：</p>
+<p><span class="math display">\[
+Z = [x, y, v_x, v_y, \theta, \omega, s, l, a]
+\]</span></p>
+<p>包括位置、速度、旋转角/角速度、物体尺寸等。状态更新遵循牛顿运动方程：</p>
+<p><span class="math display">\[
+Z_{t+1} = Z_t + \Delta t \cdot \dot{Z}_t + \frac{1}{2} (\Delta t)^2
+\cdot \ddot{Z}_t
+\]</span></p>
+<h3 id="架构">3.2 架构</h3>
+<p>NewtonGen 在标准视频扩散模型中加入一个 <strong>NND
+模块</strong>：</p>
+<p><span class="math display">\[
+\begin{aligned}
+v_t &amp;= \text{VelocityNet}_\psi(z_t, t) \\
+a_t &amp;= \text{AccelNet}_\psi(z_t, v_t, t, F_{\text{ext}}) \\
+z_{t+1}^{\text{physics}} &amp;= z_t + \Delta t \cdot v_t + \frac{(\Delta
+t)^2}{2} a_t \\
+z_{t+1} &amp;= (1 - \lambda) \cdot z_{t+1}^{\text{diffusion}} + \lambda
+\cdot z_{t+1}^{\text{physics}}
+\end{aligned}
+\]</span></p>
+<p><span class="math inline">\(\lambda\)</span>
+控制物理约束的强度——<span class="math inline">\(\lambda = 0\)</span>
+回退为标准扩散，<span class="math inline">\(\lambda = 1\)</span>
+完全由物理主导。</p>
+<h3 id="可控物理参数">3.3 可控物理参数</h3>
+<p>NewtonGen 支持用户指定物理参数来控制生成：</p>
+<table>
+<thead>
+<tr class="header">
+<th>参数</th>
+<th>含义</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>重力 <span class="math inline">\(g\)</span></td>
+<td>重力加速度</td>
+<td>改变物体下落速度</td>
+</tr>
+<tr class="even">
+<td>恢复系数 <span class="math inline">\(e\)</span></td>
+<td>弹性碰撞程度</td>
+<td>控制弹跳高度</td>
+</tr>
+<tr class="odd">
+<td>摩擦系数 <span class="math inline">\(\mu\)</span></td>
+<td>表面摩擦</td>
+<td>影响滑动速度</td>
+</tr>
+<tr class="even">
+<td>外力 <span
+class="math inline">\(\mathbf{F}_{\text{ext}}\)</span></td>
+<td>施加的力</td>
+<td>推动物体运动</td>
+</tr>
+</tbody>
+</table>
+<h2 id="newtonrewards用后训练奖励教模型物理">4.
+NewtonRewards：用后训练奖励教模型物理</h2>
+<h3 id="另一种思路">4.1 另一种思路</h3>
+<p>前面三种方法都在<strong>训练/推理过程</strong>中嵌入物理。NewtonRewards（2025）走了一条更简单的路：<strong>后训练</strong>——用可验证的物理奖励对已有视频模型做
+RLHF。</p>
+<h3 id="可验证物理奖励">4.2 可验证物理奖励</h3>
+<p><strong>速度奖励</strong>：通过光流估计速度，检查是否满足匀加速运动：</p>
+<p><span class="math display">\[
+r_{\text{vel}} = -\sum_t \|v_t - (v_0 + a \cdot t)\|^2
+\]</span></p>
+<p>如果物体做自由落体，<span class="math inline">\(a =
+g\)</span>，奖励鼓励模型生成符合 <span class="math inline">\(v = v_0 +
+gt\)</span> 的运动。</p>
+<p><strong>质量一致性奖励</strong>：检测到的物体应有一致的质量表现：</p>
+<p><span class="math display">\[
+r_{\text{mass}} = -\text{Var}\left(\frac{F_i}{a_i}\right)_{i=1}^{N}
+\]</span></p>
+<p>如果同一个物体在不同碰撞中表现出不同的质量（<span
+class="math inline">\(m = F/a\)</span> 不一致），给低奖励。</p>
+<p><strong>综合奖励</strong>：</p>
+<p><span class="math display">\[
+r = w_1 r_{\text{vel}} + w_2 r_{\text{mass}} + w_3 r_{\text{quality}}
+\]</span></p>
+<h3 id="后训练流程">4.3 后训练流程</h3>
+<ol type="1">
+<li><p>用已有视频模型生成 <span class="math inline">\(N\)</span>
+个候选视频</p></li>
+<li><p>计算每个视频的物理奖励</p></li>
+<li><p>用 GRPO/DPO 等方法优化模型偏好</p></li>
+</ol>
+<h3 id="newtonbench-60k">4.4 NewtonBench-60K</h3>
+<p>NewtonRewards 附带了 <strong>NewtonBench-60K</strong> 评测基准——60K
+个视频，涵盖 5 种牛顿运动元（Newtonian Motion Primitives）：</p>
+<table>
+<thead>
+<tr class="header">
+<th>运动元</th>
+<th>物理现象</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>自由落体</td>
+<td><span class="math inline">\(y = \frac{1}{2}gt^2\)</span></td>
+<td>球从高处落下</td>
+</tr>
+<tr class="even">
+<td>水平抛出</td>
+<td>匀速水平 + 匀加速下落</td>
+<td>球从桌边滚落</td>
+</tr>
+<tr class="odd">
+<td>抛物线抛出</td>
+<td>抛物线轨迹</td>
+<td>投篮</td>
+</tr>
+<tr class="even">
+<td>斜面下滑</td>
+<td><span class="math inline">\(a = g\sin\theta\)</span></td>
+<td>物体沿斜面滑下</td>
+</tr>
+<tr class="odd">
+<td>斜面上滑</td>
+<td>先减速后加速</td>
+<td>物体被推上斜面</td>
+</tr>
+</tbody>
+</table>
+<p><img src="/chengYi-xun/img/physics_wm_comparison.png"
+alt="物理约束世界模型四种技术方案对比" /></p>
+<h2 id="四种方案对比">5. 四种方案对比</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 40%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方案</th>
+<th>物理嵌入方式</th>
+<th>优点</th>
+<th>局限</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PhysDreamer</strong></td>
+<td>蒸馏材质参数 + MPM 仿真</td>
+<td>物理准确的3D形变</td>
+<td>仅弹性体，速度慢</td>
+</tr>
+<tr class="even">
+<td><strong>PhysGen</strong></td>
+<td>先仿真后生成</td>
+<td>力控制，刚体物理</td>
+<td>仿真粗糙，仅2D</td>
+</tr>
+<tr class="odd">
+<td><strong>NewtonGen</strong></td>
+<td>潜空间牛顿方程</td>
+<td>端到端，参数可控</td>
+<td>物理近似</td>
+</tr>
+<tr class="even">
+<td><strong>NewtonRewards</strong></td>
+<td>后训练物理奖励</td>
+<td>即插即用，不改架构</td>
+<td>依赖奖励质量</td>
+</tr>
+</tbody>
+</table>
+<h2 id="物理约束的数学框架">6. 物理约束的数学框架</h2>
+<h3 id="守恒律作为损失项">6.1 守恒律作为损失项</h3>
+<p>物理中最基本的约束是守恒律。可以将其作为正则化项加入训练损失：</p>
+<p><strong>能量守恒</strong>：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{energy}} = \left|\sum_i \frac{1}{2}m_i v_i^2(t) + m_i
+g h_i(t) - E_0\right|^2
+\]</span></p>
+<p><strong>动量守恒</strong>（无外力时）：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{momentum}} = \left\|\sum_i m_i \mathbf{v}_i(t) -
+\mathbf{p}_0\right\|^2
+\]</span></p>
+<h3 id="pinn-式混合动力学与-2025-年的理论反思">6.2 PINN 式混合动力学与
+2025 年的理论反思</h3>
+<p>Physics-Informed Neural
+Networks（PINN）的核心思想：让神经网络的输出满足物理 PDE。</p>
+<p>对于视频世界模型，理论上可以要求：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{total}} =
+\underbrace{\mathcal{L}_{\text{data}}}_{\text{拟合数据}} + \alpha
+\underbrace{\mathcal{L}_{\text{PDE}}}_{\text{满足物理方程}}
+\]</span></p>
+<p>例如，对流体场景，<span
+class="math inline">\(\mathcal{L}_{\text{PDE}}\)</span> 可以是
+Navier-Stokes 方程的残差：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{NS}} = \left\|\frac{\partial \mathbf{u}}{\partial t}
++ (\mathbf{u} \cdot \nabla)\mathbf{u} + \frac{1}{\rho}\nabla p - \nu
+\nabla^2 \mathbf{u}\right\|^2
+\]</span></p>
+<p><strong>理论局限性与 2025 年的实证挑战</strong>：</p>
+<p>尽管将物理方程作为损失项（PINN
+范式）在科学计算中很成功，但在高维视频生成中遇到了巨大阻力。2025
+年发表于 ICML 的研究（<em>How Far Is Video Generation from World
+Model</em>）以及相关的物理评测基准（如
+MORPHEUS，2025）揭示了深层原因：</p>
+<ol type="1">
+<li><strong>表观特征的"捷径"（Shortcut
+Learning）</strong>：视频模型在优化 <span
+class="math inline">\(\mathcal{L}_{\text{total}}\)</span>
+时，倾向于优先拟合颜色、大小等表观特征，而不是速度、加速度等物理特征。因为在像素空间中，改变颜色的梯度远大于改变运动轨迹的梯度。</li>
+<li><strong>基于案例的泛化（Case-based
+Generalization）</strong>：即使加上了物理正则化，模型依然没有抽象出普遍的物理规律（如动量守恒），而是在遇到新场景时，试图"回忆"并拼接训练集中最相似的视觉片段。这导致在分布外（OOD）场景下，物理约束往往失效。</li>
+<li><strong>评估的错觉</strong>：传统的评估方法（如 FID
+或人类主观评价）往往会被"视觉上合理但物理上错误"的视频欺骗。只有引入基于守恒律的严格物理指标，才能发现当前最先进的视频模型在物理推理上依然极其脆弱。</li>
+</ol>
+<p>因此，纯粹的软约束（Loss
+penalty）很难让视频模型真正"理解"物理，这也是为什么像 PhysGen
+这样采用<strong>硬约束（先显式仿真，后视频渲染）</strong>的混合管线在当前阶段更为可靠。</p>
+<h2 id="总结物理知识如何进入视频模型">7.
+总结：物理知识如何进入视频模型？</h2>
+<p>物理化的视频生成代表了世界模型领域最重要的交叉方向——<strong>数据驱动的学习</strong>与<strong>物理知识的注入</strong>并非对立，而是互补。四种方案形成了一个从"硬物理"到"软物理"的谱系：</p>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 31%" />
+<col style="width: 31%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方案</th>
+<th>物理嵌入方式</th>
+<th>物理保证强度</th>
+<th>灵活性</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PhysDreamer</td>
+<td>显式 MPM 仿真</td>
+<td>最强（精确方程）</td>
+<td>最低（需要 3D 表示）</td>
+</tr>
+<tr class="even">
+<td>PhysGen</td>
+<td>先仿真后渲染</td>
+<td>强（刚体方程）</td>
+<td>中等（2D 仿真）</td>
+</tr>
+<tr class="odd">
+<td>NewtonGen</td>
+<td>潜空间 Neural ODE</td>
+<td>中等（学到的近似）</td>
+<td>较高（端到端）</td>
+</tr>
+<tr class="even">
+<td>NewtonRewards</td>
+<td>后训练奖励</td>
+<td>最弱（统计偏好）</td>
+<td>最高（不改架构）</td>
+</tr>
+</tbody>
+</table>
+<p>当前的趋势是<strong>混合方案</strong>——用物理仿真提供"骨架"，用视频生成填充视觉细节；或用可验证的物理奖励在后训练阶段"校准"模型的物理直觉。下一篇将进入世界模型最重要的工业应用之一——<strong>自动驾驶</strong>。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Zhang, T., ... &amp; Freeman, W. T. (2024). <em>PhysDreamer:
+Physics-Based Interaction with 3D Objects via Video Generation</em>.
+ECCV 2024.</li>
+<li>Liu, S., ... &amp; Wang, S. (2024). <em>PhysGen: Rigid-Body
+Physics-Grounded Image-to-Video Generation</em>. ECCV 2024.</li>
+<li>Pan, Y., ... &amp; Lu, C. (2025). <em>NewtonGen: Physics-Consistent
+and Controllable Text-to-Video Generation via Neural Newtonian
+Dynamics</em>. arXiv:2509.21309.</li>
+<li>Duan, H., ... &amp; Li, Y. (2025). <em>What about gravity in video
+generation? Post-Training Newton's Laws with Verifiable Rewards</em>.
+arXiv:2512.00425.</li>
+<li>Kang, G., et al. (2025). <em>How Far Is Video Generation from World
+Model: A Physical Law Perspective</em>. ICML 2025.</li>
+<li>(2025). <em>MORPHEUS: A Physics-Informed Benchmark for Video
+Generation</em>. arXiv:2504.02918.</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/106-driving-world-model/">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/105-physics-world-model/">https://chengyi-xun.github.io/chengYi-xun/posts/105-physics-world-model/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/World-Model/">World Model</a><a class="post-meta__tags" href="/chengYi-xun/tags/PhysDreamer/">PhysDreamer</a><a class="post-meta__tags" href="/chengYi-xun/tags/PhysGen/">PhysGen</a><a class="post-meta__tags" href="/chengYi-xun/tags/NewtonGen/">NewtonGen</a><a class="post-meta__tags" href="/chengYi-xun/tags/Physics-Grounded/">Physics-Grounded</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</div></div></a></div><div><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div><div><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div><div><a href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</div></div></a></div><div><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div><div><a href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#sora-%E7%94%9F%E6%88%90%E7%9A%84%E7%90%83%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E9%81%B5%E5%AE%88%E7%89%9B%E9%A1%BF%E5%AE%9A%E5%BE%8B"><span class="toc-number">1.</span> <span class="toc-text">0. Sora
+生成的球为什么不遵守牛顿定律？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#physdreamer%E4%BB%8E%E8%A7%86%E9%A2%91%E5%85%88%E9%AA%8C%E8%92%B8%E9%A6%8F%E7%89%A9%E7%90%86%E5%B1%9E%E6%80%A7"><span class="toc-number">2.</span> <span class="toc-text">1.
+PhysDreamer：从视频先验蒸馏物理属性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">2.1.</span> <span class="toc-text">1.1 核心思想</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%96%B9%E6%B3%95"><span class="toc-number">2.2.</span> <span class="toc-text">1.2 方法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%95%88%E6%9E%9C"><span class="toc-number">2.3.</span> <span class="toc-text">1.3 效果</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#physgen%E5%88%9A%E4%BD%93%E7%89%A9%E7%90%86-%E6%89%A9%E6%95%A3%E8%A7%86%E9%A2%91"><span class="toc-number">3.</span> <span class="toc-text">2. PhysGen：刚体物理 + 扩散视频</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B7%B7%E5%90%88%E7%AE%A1%E7%BA%BF"><span class="toc-number">3.1.</span> <span class="toc-text">2.1 混合管线</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%89%E9%98%B6%E6%AE%B5%E6%B5%81%E7%A8%8B"><span class="toc-number">3.2.</span> <span class="toc-text">2.2 三阶段流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%95%B0%E5%AD%A6%E5%8A%9B%E6%9D%A1%E4%BB%B6%E6%8E%A7%E5%88%B6"><span class="toc-number">3.3.</span> <span class="toc-text">2.3 数学：力条件控制</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#newtongenneural-newtonian-dynamics"><span class="toc-number">4.</span> <span class="toc-text">3. NewtonGen：Neural
+Newtonian Dynamics</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E5%88%9B%E6%96%B0"><span class="toc-number">4.1.</span> <span class="toc-text">3.1 核心创新</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84"><span class="toc-number">4.2.</span> <span class="toc-text">3.2 架构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AF%E6%8E%A7%E7%89%A9%E7%90%86%E5%8F%82%E6%95%B0"><span class="toc-number">4.3.</span> <span class="toc-text">3.3 可控物理参数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#newtonrewards%E7%94%A8%E5%90%8E%E8%AE%AD%E7%BB%83%E5%A5%96%E5%8A%B1%E6%95%99%E6%A8%A1%E5%9E%8B%E7%89%A9%E7%90%86"><span class="toc-number">5.</span> <span class="toc-text">4.
+NewtonRewards：用后训练奖励教模型物理</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%A6%E4%B8%80%E7%A7%8D%E6%80%9D%E8%B7%AF"><span class="toc-number">5.1.</span> <span class="toc-text">4.1 另一种思路</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AF%E9%AA%8C%E8%AF%81%E7%89%A9%E7%90%86%E5%A5%96%E5%8A%B1"><span class="toc-number">5.2.</span> <span class="toc-text">4.2 可验证物理奖励</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%90%8E%E8%AE%AD%E7%BB%83%E6%B5%81%E7%A8%8B"><span class="toc-number">5.3.</span> <span class="toc-text">4.3 后训练流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#newtonbench-60k"><span class="toc-number">5.4.</span> <span class="toc-text">4.4 NewtonBench-60K</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E7%A7%8D%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94"><span class="toc-number">6.</span> <span class="toc-text">5. 四种方案对比</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%89%A9%E7%90%86%E7%BA%A6%E6%9D%9F%E7%9A%84%E6%95%B0%E5%AD%A6%E6%A1%86%E6%9E%B6"><span class="toc-number">7.</span> <span class="toc-text">6. 物理约束的数学框架</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%88%E6%81%92%E5%BE%8B%E4%BD%9C%E4%B8%BA%E6%8D%9F%E5%A4%B1%E9%A1%B9"><span class="toc-number">7.1.</span> <span class="toc-text">6.1 守恒律作为损失项</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#pinn-%E5%BC%8F%E6%B7%B7%E5%90%88%E5%8A%A8%E5%8A%9B%E5%AD%A6%E4%B8%8E-2025-%E5%B9%B4%E7%9A%84%E7%90%86%E8%AE%BA%E5%8F%8D%E6%80%9D"><span class="toc-number">7.2.</span> <span class="toc-text">6.2 PINN 式混合动力学与
+2025 年的理论反思</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93%E7%89%A9%E7%90%86%E7%9F%A5%E8%AF%86%E5%A6%82%E4%BD%95%E8%BF%9B%E5%85%A5%E8%A7%86%E9%A2%91%E6%A8%A1%E5%9E%8B"><span class="toc-number">8.</span> <span class="toc-text">7.
+总结：物理知识如何进入视频模型？</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</a><time datetime="2026-04-05T16:35:00.000Z" title="发表于 2026-04-06 00:35:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</a><time datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/105-physics-world-model/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/105-physics-world-model/',
+      title: '笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

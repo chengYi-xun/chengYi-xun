@@ -1,0 +1,480 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>牛大帅的个人博客 - 分享编程与生活</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="个人技术博客，记录学习与生活">
+<meta property="og:type" content="website">
+<meta property="og:title" content="牛大帅的个人博客">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/page/2/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="个人技术博客，记录学习与生活">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="编程,技术,博客,生活">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/page/2/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '牛大帅的个人博客',
+  isPost: false,
+  isHome: true,
+  isHighlightShrink: false,
+  isToc: false,
+  postUpdate: '2026-04-28 01:06:05'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="page" id="body-wrap"><header class="full_page" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="site-info"><h1 id="site-title">牛大帅的个人博客</h1><div id="site_social_icons"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div id="scroll-down"><i class="fas fa-angle-down scroll-down-effects"></i></div></header><main class="layout" id="content-inner"><div class="recent-posts" id="recent-posts"><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文是强化学习系列的总结篇。经过前面九篇文章的旅程——从策略梯度基础、PPO、DPO、GRPO，到
+DAPO、Flow-GRPO、SuperFlow 和
+DanceGRPO——我们已经接触了十余种方法。本文将它们放在同一张桌上做横向对比，帮助读者在实际选型中快速定位最适合自己场景的算法。
+⬅️ 上一篇：笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架
+➡️ 下一篇：笔记｜强化学习（十一）：奖励模型——RLHF
+的隐藏引擎
+
+回顾：从 REINFORCE 到
+SuperFlow 的技术脉络
+
+
+
+
+
+
+
+
+
+篇章
+主题
+核心贡献
+解决的问题
+
+
+
+
+一
+REINFORCE → Actor-Critic
+策略梯度基础
+如何用梯度优化策略
+
+
+二
+TRPO → PPO
+裁剪 surrogate 目标
+策略更新步长控制
+
+
+三
+DPO
+隐式奖励 + 偏好对
+绕过奖励模型和 RL
+
+
+四
+GRPO
+组内相对优势
+去除 Critic，适配大模型
+
+
+五
+Flow-GRPO
+连续动作空间的 GRPO
+将 RL 引入图像生成
+
+
+六
+DAPO
+4 项工程改进
+大规模 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+Flow-GRPO 证明了 GRPO
+在图像生成上的有效性，但留下了两个方向的空白：任务维度（能否推广到视频？）和效率维度（全轨迹
+SDE 的开销能否降低？）。
+本文讲清楚两篇一脉相承的工作：DanceGRPO 解决了"广度"问题，将 GRPO
+统一到 Diffusion + Flow Matching 双范式和图像+视频双模态；MixGRPO
+解决了"效率"问题，用混合 ODE-SDE 和滑动窗口将训练时间砍掉 50%~71%。
+⬅️ 上一篇：笔记｜强化学习（八）：SuperFlow
+与图像生成 RL 前沿（2026）
+➡️ 下一篇：笔记｜强化学习（十）：LLM
+对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow
+论文： - DanceGRPO:
+Unleashing GRPO on Visual Generation（ByteDance, 2025） - MixGRPO: Unlocking Flow-based
+GRPO Efficiency with Mixed ODE-SDE（Tencent Hunyuan, 2026）
+
+
+Part I: DanceGRP ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为 RL 系列的图像生成篇。在第五篇中我们介绍了 Flow-GRPO，将 GRPO
+应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进
+SuperFlow，以及 2026 年图像/视频生成 RL
+的统一框架生态，最后回顾整个系列的完整技术脉络。
+⬅️ 上一篇：笔记｜强化学习（七）：GRPO
+的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT
+➡️ 下一篇：笔记｜强化学习（九）：DanceGRPO
+与 MixGRPO——视觉生成 GRPO 的扩展与加速
+
+
+论文：SuperFlow: Training
+Flow Matching Models with RL on the Fly（2025.12, revised
+2026.01）
+
+Flow-GRPO 的三个遗留问题
+延续之前"橘猫坐在蓝色沙发上"的例子。 回忆 Flow-GRPO
+的做法：对每个 Prompt（提示词）生成 \(G\) 张图像，用奖励模型（裁判）打分，算出这
+\(G\)
+张图谁比谁好（组内相对优势），然后用策略梯度更新模型。
+这个流程在理论上很完美，但在大规模训练时，暴露出三个致 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为 RL 系列第七篇。上一篇介绍了 DAPO
+的四大工程改进。本文从理论角度出发，剖析 GRPO 的数学本质：为什么 GRPO
+其实是在做 DPO？为什么 2 个 rollout 就够了？如何从 KL 散度推广到任意
+f-散度？最后介绍融合了 GRPO 和 DPO 优势的 GIFT 算法。
+⬅️ 上一篇：笔记｜强化学习（六）：DAPO：从 GRPO
+到大规模推理 RL 的工程实践
+➡️ 下一篇：笔记｜强化学习（八）：SuperFlow
+与图像生成 RL 前沿（2026）
+
+
+论文：
+
+It Takes Two: Your GRPO
+Is Secretly DPO（2025.10）
+f-GRPO and Beyond:
+Divergence-Based RL for General LLM Alignment（2026.02）
+GIFT: Group-relative
+Implicit Fine Tuning（2025.10）
+
+
+从一个令人意外的实验结果说起
+在前几篇中，我们花了大量篇幅推导 GRPO
+的组内相对优势计算，强调"组越大（\(G =
+16\) 或 \(64\)），优 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为 RL 系列的第六篇。在上几篇中我们推导了
+GRPO（组相对策略优化，Group Relative Policy
+Optimization）的核心思想并将其应用于图像生成。本文将介绍 GRPO
+的工程增强版——DAPO（解耦裁剪与动态采样策略优化，Decoupled
+clip and dynAmic samPling policy
+Optimization），它是字节跳动 Seed 团队与清华 AIR
+联合提出的大规模 LLM 强化学习算法，用 Qwen2.5-32B 基座模型在 AIME 2024
+上达到 50 分（超过 DeepSeek-R1-Zero 的 47 分），且训练步数减少 50%。
+⬅️ 上一篇：笔记｜强化学习（五）：Flow-GRPO
+与图像生成应用（基于 Flux 的代码解析）
+➡️ 下一篇：笔记｜强化学习（七）：GRPO
+的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT
+
+
+论文：DAPO: An Open-Source
+LLM Reinforcement Learning System at Scale（2025.03）
+
+先看问题：GRP ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为 RL 系列第五篇。在完整梳理了从 REINFORCE 到 PPO、DPO，再到最新
+GRPO 的演进路线后，我们将目光转向图像生成领域。本文将结合
+flow_grpo 开源代码库，深入解析如何将 GRPO 算法应用于基于
+Flow Matching 的图像生成模型（如 Flux）的微调中。方法学与系统实验见论文
+Flow-GRPO: Training Flow
+Matching Models via Online RL（文中以 SD3.5
+等为主报告；仓库实现覆盖 Flux）。
+⬅️ 上一篇：笔记｜强化学习（四）：大模型在线 RL
+破局者：GRPO 算法详解
+➡️ 下一篇：笔记｜强化学习（六）：DAPO：从 GRPO
+到大规模推理 RL 的工程实践
+
+图像生成中的强化学习
+先用一个例子理解为什么需要 RL。
+假设你用一个 Flux 模型生成图像，给定
+Prompt："一只橘猫坐在蓝色沙发上"。模型可能生成以下几种结果：
+
+
+
+生成结果
+问题
+
+
+
+
+一只白色猫坐在蓝色沙发上
+颜色不对（应该是橘猫）
+
+
+一只橘猫站在蓝色沙发旁边
+动作不对（应该是"坐在"）
+
+
+一只橘猫坐在蓝色 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为系列第四篇。在了解了 PPO 的显存痛点和 DPO
+的离线局限性后，我们终于迎来了目前大模型在线 RL
+的最前沿破局者——GRPO（Group Relative Policy
+Optimization）。本文将详细推导 GRPO 的核心思想，看它是如何优雅地丢弃
+Critic 网络，实现高效的在线强化学习的。
+⬅️ 上一篇：笔记｜强化学习（三）：大模型对齐的另一条路：DPO
+(Direct Preference Optimization)
+➡️ 下一篇：笔记｜强化学习（五）：Flow-GRPO
+与图像生成应用（基于 Flux 的代码解析）
+
+在线 RL 的不可替代性与
+Critic 的累赘
+正如上一篇所言，DPO
+虽然简单省显存，但它只能"死记硬背"人类给出的标准答案（离线学习）。为了让模型产生"顿悟"和自我进化，我们必须回归在线强化学习（Online
+RL）。
+然而，PPO 算法中的 Critic
+网络（价值网络）成为了最大的绊脚石。对于百亿参数的大模型，多维护一个
+Critic 意味着显存开销直接翻倍。
+核心思考出发点：既然 Critic
+只是为了给出一个"及格线"（基准值 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为系列第三篇。在上一篇中，我们提到 PPO
+算法虽然稳定，但在百亿参数大模型微调时面临着极大的显存压力（需要同时维护
+Actor 和 Critic 模型）。为了解决这一痛点，斯坦福大学在 2023
+年提出了一条完全不同于在线 RL 的路线——DPO。本文将简要介绍 DPO
+算法，作为后续回归 RL 路线（GRPO）的对比铺垫。
+⬅️ 上一篇：笔记｜强化学习（二）：信任区域与近端策略优化
+(从 TRPO 到 PPO)
+➡️ 下一篇：笔记｜强化学习（四）：大模型在线 RL
+破局者：GRPO 算法详解
+
+PPO
+的繁琐与显存危机：大模型吃不消了
+先看例子：假设我们要用 RLHF
+微调一个大模型，让它学会写出更好的代码。传统流程分三步：
+
+SFT：用大量代码问答数据做监督微调——教模型"怎么写代码"。
+RM：给同一道编程题生成两份代码（A 和
+B），让人类标注哪份更好，训练一个"代码评审员"（奖励模型）。
+RL：让模型自己去写代码，"评审员"给分，模型根据分数用
+PPO 算法调整自己。
+
+这个流程极其繁琐，且在 PPO
+阶段，显存中需要同时驻留四个庞大的模型：
+
+Actor
+模型（正在训 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic
+架构。然而，包括 REINFORCE
+在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从
+TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning from
+Human Feedback，基于人类反馈的强化学习）的基石——PPO 算法。
+⬅️ 上一篇：笔记｜强化学习（一）：强化学习基础与策略梯度
+➡️ 下一篇：笔记｜强化学习（三）：大模型对齐的另一条路：DPO
+(Direct Preference Optimization)
+
+关键概念回顾：Q
+函数与优势函数
+在深入本文之前，我们先回顾上一篇中两个最重要的概念。
+动作价值函数 \(Q^\pi(s,
+a)\)
+衡量的不是"当前这一步动作有多好"，而是"选择这个动作后，一直走完全程能拿多少分"。具体来说：在状态
+\(s\) 下选择动作 \(a\)，然后从下一步开始按策略 \(\pi\)
+继续行动直 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，从最基础的
+REINFORCE 算法讲起，逐步引入 Actor-Critic 架构，为后续深入理解 PPO 和
+GRPO 打下坚实的理论基础。
+⬅️ 上一篇：笔记｜生成模型（十五）：Flux
+架构解析
+➡️ 下一篇：笔记｜强化学习（二）：信任区域与近端策略优化
+(从 TRPO 到 PPO)
+
+强化学习基础概念：从"训狗"说起
+对于纯小白读者来说，理解强化学习（Reinforcement Learning,
+RL）最直观的例子就是"训狗"。
+
+智能体（Agent）：就是那只狗（在 AI
+中就是我们的模型）。
+环境（Environment）：狗所处的现实世界。
+状态（State）：狗当前看到的画面、听到的口令（比如你喊"坐下"）。
+动作（Action）：狗做出的反应（比如坐下、趴下、或者跑开）。
+奖励（Reward）：如果狗做对了，你给它一块肉（正奖励）；做错了，你呵斥它（负奖励或零奖励）。
+
+强化学习的核心目标，就是让这只狗（模型）在不断的"尝试-犯错-获得奖励"的过程中，自己摸索出一条 ...</div></div></div><nav id="pagination"><div class="pagination"><a class="extend prev" rel="prev" href="/chengYi-xun/"><i class="fas fa-chevron-left fa-fw"></i></a><a class="page-number" href="/chengYi-xun/">1</a><span class="page-number current">2</span><a class="page-number" href="/chengYi-xun/page/3/#content-inner">3</a><a class="page-number" href="/chengYi-xun/page/4/#content-inner">4</a><a class="extend next" rel="next" href="/chengYi-xun/page/3/#content-inner"><i class="fas fa-chevron-right fa-fw"></i></a></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div><div class="card-widget card-categories"><div class="item-headline">
+            <i class="fas fa-folder-open"></i>
+            <span>分类</span>
+            
+            </div>
+            <ul class="card-category-list" id="aside-cat-list">
+            <li class="card-category-list-item "><a class="card-category-list-link" href="/chengYi-xun/categories/Notes/"><span class="card-category-list-name">Notes</span><span class="card-category-list-count">28</span></a></li><li class="card-category-list-item "><a class="card-category-list-link" href="/chengYi-xun/categories/Tutorials/"><span class="card-category-list-name">Tutorials</span><span class="card-category-list-count">8</span></a></li>
+            </ul></div><div class="card-widget card-tags"><div class="item-headline"><i class="fas fa-tags"></i><span>标签</span></div><div class="card-tag-cloud"><a href="/chengYi-xun/tags/Video-Generation/" style="font-size: 1.17em; color: #999c9f">Video Generation</a> <a href="/chengYi-xun/tags/Generative-models-theory/" style="font-size: 1.43em; color: #99a6b9">Generative models theory</a> <a href="/chengYi-xun/tags/Flux/" style="font-size: 1.1em; color: #999">Flux</a> <a href="/chengYi-xun/tags/Model-based-RL/" style="font-size: 1.17em; color: #999c9f">Model-based RL</a> <a href="/chengYi-xun/tags/PhysDreamer/" style="font-size: 1.1em; color: #999">PhysDreamer</a> <a href="/chengYi-xun/tags/Flow-Matching/" style="font-size: 1.23em; color: #999ea6">Flow Matching</a> <a href="/chengYi-xun/tags/Generative-models/" style="font-size: 1.23em; color: #999ea6">Generative models</a> <a href="/chengYi-xun/tags/Autonomous-Driving/" style="font-size: 1.17em; color: #999c9f">Autonomous Driving</a> <a href="/chengYi-xun/tags/Frontier/" style="font-size: 1.1em; color: #999">Frontier</a> <a href="/chengYi-xun/tags/%E8%87%AA%E6%88%91%E4%BB%8B%E7%BB%8D/" style="font-size: 1.1em; color: #999">自我介绍</a> <a href="/chengYi-xun/tags/OccWorld/" style="font-size: 1.1em; color: #999">OccWorld</a> <a href="/chengYi-xun/tags/Reinforcement-Learning/" style="font-size: 1.37em; color: #99a4b2">Reinforcement Learning</a> <a href="/chengYi-xun/tags/4D-Generation/" style="font-size: 1.1em; color: #999">4D Generation</a> <a href="/chengYi-xun/tags/Stable-Diffusion/" style="font-size: 1.1em; color: #999">Stable Diffusion</a> <a href="/chengYi-xun/tags/Latent-Space/" style="font-size: 1.1em; color: #999">Latent Space</a> <a href="/chengYi-xun/tags/Diffusion-Models/" style="font-size: 1.17em; color: #999c9f">Diffusion Models</a> <a href="/chengYi-xun/tags/thinking/" style="font-size: 1.1em; color: #999">thinking</a> <a href="/chengYi-xun/tags/JEPA/" style="font-size: 1.17em; color: #999c9f">JEPA</a> <a href="/chengYi-xun/tags/NewtonGen/" style="font-size: 1.1em; color: #999">NewtonGen</a> <a href="/chengYi-xun/tags/Self-Supervised-Learning/" style="font-size: 1.1em; color: #999">Self-Supervised Learning</a> <a href="/chengYi-xun/tags/Sora/" style="font-size: 1.1em; color: #999">Sora</a> <a href="/chengYi-xun/tags/GAIA-1/" style="font-size: 1.1em; color: #999">GAIA-1</a> <a href="/chengYi-xun/tags/Deep-learning/" style="font-size: 1.5em; color: #99a9bf">Deep learning</a> <a href="/chengYi-xun/tags/DriveDreamer/" style="font-size: 1.1em; color: #999">DriveDreamer</a> <a href="/chengYi-xun/tags/Vista/" style="font-size: 1.1em; color: #999">Vista</a> <a href="/chengYi-xun/tags/Diffusion-models/" style="font-size: 1.23em; color: #999ea6">Diffusion models</a> <a href="/chengYi-xun/tags/Embodied-AI/" style="font-size: 1.1em; color: #999">Embodied AI</a> <a href="/chengYi-xun/tags/DPO/" style="font-size: 1.1em; color: #999">DPO</a> <a href="/chengYi-xun/tags/World-Model/" style="font-size: 1.3em; color: #99a1ac">World Model</a> <a href="/chengYi-xun/tags/Survey/" style="font-size: 1.1em; color: #999">Survey</a> <a href="/chengYi-xun/tags/Cosmos/" style="font-size: 1.1em; color: #999">Cosmos</a> <a href="/chengYi-xun/tags/Physics-Grounded/" style="font-size: 1.1em; color: #999">Physics-Grounded</a> <a href="/chengYi-xun/tags/Generative-Model/" style="font-size: 1.1em; color: #999">Generative Model</a> <a href="/chengYi-xun/tags/PhysGen/" style="font-size: 1.1em; color: #999">PhysGen</a> <a href="/chengYi-xun/tags/Dreamer/" style="font-size: 1.1em; color: #999">Dreamer</a> <a href="/chengYi-xun/tags/Genie/" style="font-size: 1.1em; color: #999">Genie</a> <a href="/chengYi-xun/tags/RSSM/" style="font-size: 1.1em; color: #999">RSSM</a> <a href="/chengYi-xun/tags/WorldScore/" style="font-size: 1.1em; color: #999">WorldScore</a> <a href="/chengYi-xun/tags/V-JEPA/" style="font-size: 1.1em; color: #999">V-JEPA</a></div></div><div class="card-widget card-archives"><div class="item-headline"><i class="fas fa-archive"></i><span>归档</span></div><ul class="card-archive-list"><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2026/04/"><span class="card-archive-list-date">四月 2026</span><span class="card-archive-list-count">14</span></a></li><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2025/08/"><span class="card-archive-list-date">八月 2025</span><span class="card-archive-list-count">20</span></a></li><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2025/07/"><span class="card-archive-list-date">七月 2025</span><span class="card-archive-list-count">2</span></a></li></ul></div><div class="card-widget card-webinfo"><div class="item-headline"><i class="fas fa-chart-line"></i><span>网站资讯</span></div><div class="webinfo"><div class="webinfo-item"><div class="item-name">文章数目 :</div><div class="item-count">36</div></div><div class="webinfo-item"><div class="item-name">已运行时间 :</div><div class="item-count" id="runtimeshow" data-publishDate="2025-07-28T16:00:00.000Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">本站访客数 :</div><div class="item-count" id="busuanzi_value_site_uv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">本站总访问量 :</div><div class="item-count" id="busuanzi_value_site_pv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">最后更新时间 :</div><div class="item-count" id="last-push-date" data-lastPushDate="2026-04-27T17:06:04.825Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

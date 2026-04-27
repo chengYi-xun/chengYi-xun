@@ -1,0 +1,409 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>牛大帅的个人博客 - 分享编程与生活</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="个人技术博客，记录学习与生活">
+<meta property="og:type" content="website">
+<meta property="og:title" content="牛大帅的个人博客">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="个人技术博客，记录学习与生活">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="编程,技术,博客,生活">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '牛大帅的个人博客',
+  isPost: false,
+  isHome: true,
+  isHighlightShrink: false,
+  isToc: false,
+  postUpdate: '2026-04-28 01:06:05'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="page" id="body-wrap"><header class="full_page" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="site-info"><h1 id="site-title">牛大帅的个人博客</h1><div id="site_social_icons"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div id="scroll-down"><i class="fas fa-angle-down scroll-down-effects"></i></div></header><main class="layout" id="content-inner"><div class="recent-posts" id="recent-posts"><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/top-1-article-index/" title="置顶｜本站文章索引"><i class="fas fa-thumbtack sticky"></i>置顶｜本站文章索引</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-07-14T08:08:11.000Z" title="发表于 2025-07-14 16:08:11">2025-07-14</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">关于我
+来着何人，报上姓名。俺是牛大帅，是一名三维视觉算法工程师，以前从事SLAM，现在主要从事3dgs重建，神经辐射场，图像和视频的AIGC，目前在自动驾驶领域当牛马，也可以找我交流CSGO和OW（上勾拳！）。
+以后会在这边分享一些技术，或者一些杂谈。
+联系方式
+如果你想要与我交流，可以通过以下方式联系我：
+
+GitHub: https://github.com/chengYi-xun
+邮箱: ldq4399@163.com
+
+感谢你的阅读，希望我们可以一起学习和成长！
+生成式人工智能
+通用理论
+
+笔记｜生成模型（一）：一些概率论的基础概念和理论
+笔记｜生成模型（二）：生成模型的技术路线总览
+笔记｜生成模型（三）：生成对抗理论
+笔记｜生成模型（四）：变分自编码器理论
+笔记｜生成模型（五）：DDPM理论
+笔记｜生成模型（六）：DDIM理论
+笔记｜生成模型（七）：Score-Based理论
+笔记｜生成模型（八）：SDE统一DDPM和SMLD
+笔记｜生成模型（九）：Classifier
+Guidance 理论与实现
+笔记｜生成模型（十）：Classifier-Free
+Guidance 理 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+前置知识：本文是世界模型系列的终篇。建议先阅读前六篇。
+- （一）世界模型基础
+- （二）Dreamer 系列 - （三）JEPA - （四）视频生成世界模型
+- （五）物理化世界模型
+- （六）自动驾驶世界模型
+⬅️ 上一篇：笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测
+
+0. 2026
+年的世界模型：百花齐放还是趋于收敛？
+回顾前六篇，我们沿着五条路线走了一遍世界模型的版图：
+
+Model-based RL（Dreamer
+系列）：在潜空间做想象训练
+JEPA（I/V-JEPA）：在嵌入空间做预测，丢弃不可预测细节
+视频生成（Sora、Genie、Cosmos）：用大规模视频模型涌现物理理解
+物理化生成（PhysDreamer、NewtonGen）：显式嵌入牛顿定律
+自动驾驶（GAIA-1、Vista、OccWorld）：像素/占用/结构化三种预测范式
+
+截至 2026
+年，我们看到一个明确的趋势：路线开始交叉融合。
+本篇讨论四个前沿方向，然后从统一视角分析这种收敛。
+1. 4D 生成：时空一体的世界构建
+1.1 什么是 4D 生成？
+4D = 3D 空间 +  ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+核心论文：GAIA-1 (arXiv:2309.17080,
+2023)、DriveDreamer (arXiv:2309.09777, ECCV 2024)、Vista
+(arXiv:2405.17398, NeurIPS 2024)、OccWorld (arXiv:2311.16038, ECCV
+2024)
+前置知识：上一篇：物理化世界模型
+⬅️ 上一篇：笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律
+➡️ 下一篇：笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛
+
+0.
+为什么自动驾驶特别需要世界模型？
+上一篇讨论了如何让视频模型遵守物理定律。但在所有世界模型的应用中，自动驾驶是对物理准确性和安全性要求最高的领域——这里的"物理错误"不是视觉瑕疵，而是可能导致事故的决策失误。
+假设你在开发自动驾驶系统，需要测试"行人突然从路边冲出"的场景：
+
+真实路测：等这种场景自然发生——几万公里都遇不到一次，有安全风险
+传统仿真器（CARLA
+等）：画面和真实世界差距太大（domain
+gap），训练出的模型可能无法迁移
+
+世界模型提供了第三条路：从真实驾驶视频中学习 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+核心论文：PhysDreamer (arXiv:2404.13026, ECCV
+2024)、PhysGen (arXiv:2409.18964, ECCV 2024)、NewtonGen
+(arXiv:2509.21309, 2025)、NewtonRewards (arXiv:2512.00425, 2025)
+代码：stevenlsw/physgen · pandayuanyu/NewtonGen
+| 前置知识：上一篇：视频生成世界模型
+⬅️ 上一篇：笔记｜世界模型（四）：视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos
+➡️ 下一篇：笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测
+
+0. Sora
+生成的球为什么不遵守牛顿定律？
+上一篇我们看到，纯数据驱动的视频模型存在根本性的物理缺陷——"How Far"
+论文（ICML
+2025）证明它们做的是"基于案例的模仿"而非"物理规则的抽象"。
+一个具体的例子：用 Sora
+生成"球从桌子上滚下来"。你可能会看到球的轨迹大致合理，但仔细观察——球在桌边没有加速（无视重力），落地后弹跳角度不对，甚 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+核心论文：Genie (arXiv:2402.15391, ICML
+2024)、Cosmos (arXiv:2501.03575, 2025)、UniSim (arXiv:2310.06114, ICLR
+2024)
+前置知识：上一篇：JEPA
+⬅️ 上一篇：笔记｜世界模型（三）：JEPA——在嵌入空间预测世界
+➡️ 下一篇：笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律
+
+0. 如果视频模型就是世界模型？
+上一篇介绍了 JEPA
+的哲学："不需要画出未来，只需要理解未来。"但另一个阵营持完全相反的立场。
+给一个视频生成模型一张图片和指令"向左走"，它生成了一段视角向左移动的视频——走廊延伸出去，墙上的画从右侧滑入视野，地板的透视关系正确变化。这个模型"理解"了三维空间吗？它是不是已经在内部构建了某种"世界模型"？
+2024 年 2 月，OpenAI 发布 Sora
+时明确提出：视频生成模型是世界模拟器的有前途的路径。
+这是与 JEPA 截然相反的立场——JEPA 说"不需要生成像素"，Sora
+说"生成像素本身就是理解世界"。
+本文将梳理四个代表性的视频世界模型方案 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+核心论文：I-JEPA (arXiv:2301.08243, CVPR
+2023)、V-JEPA (arXiv:2404.08471, 2024)、V-JEPA 2 (arXiv:2506.09985,
+2025)
+代码：facebookresearch/ijepa
+· facebookresearch/jepa
+| 前置知识：上一篇：Dreamer 系列
+⬅️ 上一篇：笔记｜世界模型（二）：Dreamer
+系列——在想象中学习控制
+➡️ 下一篇：笔记｜世界模型（四）：视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos
+
+0. 预测每片树叶的飘动是愚蠢的
+上一篇介绍了 Dreamer
+系列：在潜空间想象未来，用解码器重建像素来训练世界模型。DreamerV3 甚至在
+Minecraft 中从零采到了钻石。但 Yann LeCun
+提出了一个尖锐的质疑：为什么世界模型一定要能"画出"未来？
+观察窗外的一棵树。树叶在风中随机飘动——每片叶子的具体轨迹本质上不可预测。但你能预测"树叶还会继续飘动"、"风变大了树会摇得更厉害"。你的大脑从不尝试重建每一片叶子的像素级位置，却 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:35:00.000Z" title="发表于 2026-04-06 00:35:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+核心论文：Dreamer v1 (arXiv:1912.01603, ICLR
+2020)、DreamerV2 (arXiv:2010.02193, ICLR 2021)、DreamerV3
+(arXiv:2301.04104, Nature 2025)
+代码：danijar/dreamerv3 |
+前置知识：上一篇：世界模型基础
+⬅️ 上一篇：笔记｜世界模型（一）：什么是世界模型？从认知科学到深度学习
+➡️ 下一篇：笔记｜世界模型（三）：JEPA——在嵌入空间预测世界
+
+0. 在 Minecraft
+中不靠人类示范采到钻石
+想象你在打 Minecraft——需要砍树 → 合成工作台 → 挖石头 → 合成石镐 →
+找到并挖掘钻石。整个过程长达 36,000 步（约 30
+分钟），中间没有任何奖励反馈，只有最终挖到钻石时才得一分。这是 RL
+界公认的"登月挑战"。
+如果用传统的 model-free RL（如
+PPO），智能体必须在真实环境中反复试错。由于奖励极其稀疏，绝大多数尝试一无所获，需要几亿步交互才有可能学到有意义的策略。
+DreamerV3
+换了一种思路：先学一个环境的"脑内 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="content">
+系列说明：本文是世界模型系列的第一篇，也是一篇面向初学者的全景综述。本文从最直觉的类比出发，循序渐进地展开概念、数学、技术路线、核心理论和未来展望。后续文章将对每条路线做深入拆解。
+⬅️ 上一篇：笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架
+➡️ 下一篇：笔记｜世界模型（二）：Dreamer
+系列——在想象中学习控制
+
+闭眼踢球——大脑里的物理模拟器
+闭上眼睛，想象你在踢一个足球。球从脚尖飞出，在空中画一条抛物线，弹地后滚动减速。你不需要看到球，就能在脑海中预测它的轨迹。这种能力来自你大脑中的世界模型——一个关于物理世界如何运作的内部模拟器。
+认知科学家 Kenneth Craik 在 1943
+年就提出了这个概念："如果生物体能在头脑中构建一个外部现实的微型模型，它就能在行动前先在模型中尝试各种方案，预测哪种最优。"
+在深度学习中，世界模型（World
+Model）就是这个内部模拟器的计算实现：一个能够预测环境在给定动作下如何变化的神经网络。这个定义虽然简单，却引出了
+2018-2026 年间 AI 领域最激动人心的研究路线之一。从 DeepM ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本篇是 上一篇（奖励模型基础）
+的续篇。上一篇完成了代理裁判 \(\hat{r}_\theta\)
+的构建，本篇追问三个递进的问题：(1)
+拼命优化一个不完美的裁判会怎样？(2)
+如何让裁判更健壮？(3) 能否绕过裁判？
+⬅️ 上一篇：笔记｜强化学习（十一）：奖励模型基础——从传统
+RL 到大模型与视觉生成
+
+1 Reward
+Hacking：当优化器攻击裁判
+1.1 问题定义与优化动力学
+
+阶段澄清：RLHF 分两步——阶段一用 BT 损失训练奖励模型
+\(\hat{r}_\theta\)（训裁判），阶段二冻结
+\(\hat{r}_\theta\) 用 PPO
+等算法训练策略 \(\pi\)（考选手）。Reward Hacking
+发生在阶段二。
+
+上一篇完成了阶段一。现在进入阶段二：我们冻结 \(\hat{r}_\theta\)，让策略 \(\pi\) 最大化期望得分。由于 \(\hat{r}_\theta\) 只是真实偏好 \(r^*\) 的近似，将其输出分解为
+\[
+\hat{r}_\theta(x,y) = r^*(x,y) + \epsilon(x,y)
+\]
+其中 \( ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="content">
+本篇为全文的第一部分：基础与原理。我们从「奖励模型是什么」出发，对比传统强化学习、大语言模型
+RLHF 与视觉生成的奖励信号差异；给出 \(r_\theta(x,y)\) 的一般数学范式与
+Bradley–Terry 配对损失；梳理文本侧「骨干 +
+标量头」架构、五步训练管线，以及序列级 / 结果级 / 过程级 /
+可验证奖励的粒度谱系；最后落到图像与视频生成里常见的对齐分、美学分与人类偏好模型，并点出视频奖励的多维难点。
+⬅️ 上一篇：笔记｜强化学习（十）：LLM
+对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow
+➡️ 下一篇：笔记｜强化学习（十二）：奖励模型进阶——Reward
+Hacking、生成式奖励模型与可验证奖励
+
+奖励模型是什么：从环境的客观标量到人类偏好的可微代理
+奖励模型（Reward Model,
+RM）是在数据上学习得到的标量打分器，用来近似某个「裁判」对生成结果的好坏判断。在数学上，它通常被定义为一个映射函数：
+\[
+r_\theta:\mathcal{X}\times\mathcal{Y}\to\mathbb{R},\quad (x,y)\ ...</div></div></div><nav id="pagination"><div class="pagination"><span class="page-number current">1</span><a class="page-number" href="/chengYi-xun/page/2/#content-inner">2</a><a class="page-number" href="/chengYi-xun/page/3/#content-inner">3</a><a class="page-number" href="/chengYi-xun/page/4/#content-inner">4</a><a class="extend next" rel="next" href="/chengYi-xun/page/2/#content-inner"><i class="fas fa-chevron-right fa-fw"></i></a></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div><div class="card-widget card-categories"><div class="item-headline">
+            <i class="fas fa-folder-open"></i>
+            <span>分类</span>
+            
+            </div>
+            <ul class="card-category-list" id="aside-cat-list">
+            <li class="card-category-list-item "><a class="card-category-list-link" href="/chengYi-xun/categories/Notes/"><span class="card-category-list-name">Notes</span><span class="card-category-list-count">28</span></a></li><li class="card-category-list-item "><a class="card-category-list-link" href="/chengYi-xun/categories/Tutorials/"><span class="card-category-list-name">Tutorials</span><span class="card-category-list-count">8</span></a></li>
+            </ul></div><div class="card-widget card-tags"><div class="item-headline"><i class="fas fa-tags"></i><span>标签</span></div><div class="card-tag-cloud"><a href="/chengYi-xun/tags/Video-Generation/" style="font-size: 1.17em; color: #999c9f">Video Generation</a> <a href="/chengYi-xun/tags/Generative-models-theory/" style="font-size: 1.43em; color: #99a6b9">Generative models theory</a> <a href="/chengYi-xun/tags/Flux/" style="font-size: 1.1em; color: #999">Flux</a> <a href="/chengYi-xun/tags/Model-based-RL/" style="font-size: 1.17em; color: #999c9f">Model-based RL</a> <a href="/chengYi-xun/tags/PhysDreamer/" style="font-size: 1.1em; color: #999">PhysDreamer</a> <a href="/chengYi-xun/tags/Flow-Matching/" style="font-size: 1.23em; color: #999ea6">Flow Matching</a> <a href="/chengYi-xun/tags/Generative-models/" style="font-size: 1.23em; color: #999ea6">Generative models</a> <a href="/chengYi-xun/tags/Autonomous-Driving/" style="font-size: 1.17em; color: #999c9f">Autonomous Driving</a> <a href="/chengYi-xun/tags/Frontier/" style="font-size: 1.1em; color: #999">Frontier</a> <a href="/chengYi-xun/tags/%E8%87%AA%E6%88%91%E4%BB%8B%E7%BB%8D/" style="font-size: 1.1em; color: #999">自我介绍</a> <a href="/chengYi-xun/tags/OccWorld/" style="font-size: 1.1em; color: #999">OccWorld</a> <a href="/chengYi-xun/tags/Reinforcement-Learning/" style="font-size: 1.37em; color: #99a4b2">Reinforcement Learning</a> <a href="/chengYi-xun/tags/4D-Generation/" style="font-size: 1.1em; color: #999">4D Generation</a> <a href="/chengYi-xun/tags/Stable-Diffusion/" style="font-size: 1.1em; color: #999">Stable Diffusion</a> <a href="/chengYi-xun/tags/Latent-Space/" style="font-size: 1.1em; color: #999">Latent Space</a> <a href="/chengYi-xun/tags/Diffusion-Models/" style="font-size: 1.17em; color: #999c9f">Diffusion Models</a> <a href="/chengYi-xun/tags/thinking/" style="font-size: 1.1em; color: #999">thinking</a> <a href="/chengYi-xun/tags/JEPA/" style="font-size: 1.17em; color: #999c9f">JEPA</a> <a href="/chengYi-xun/tags/NewtonGen/" style="font-size: 1.1em; color: #999">NewtonGen</a> <a href="/chengYi-xun/tags/Self-Supervised-Learning/" style="font-size: 1.1em; color: #999">Self-Supervised Learning</a> <a href="/chengYi-xun/tags/Sora/" style="font-size: 1.1em; color: #999">Sora</a> <a href="/chengYi-xun/tags/GAIA-1/" style="font-size: 1.1em; color: #999">GAIA-1</a> <a href="/chengYi-xun/tags/Deep-learning/" style="font-size: 1.5em; color: #99a9bf">Deep learning</a> <a href="/chengYi-xun/tags/DriveDreamer/" style="font-size: 1.1em; color: #999">DriveDreamer</a> <a href="/chengYi-xun/tags/Vista/" style="font-size: 1.1em; color: #999">Vista</a> <a href="/chengYi-xun/tags/Diffusion-models/" style="font-size: 1.23em; color: #999ea6">Diffusion models</a> <a href="/chengYi-xun/tags/Embodied-AI/" style="font-size: 1.1em; color: #999">Embodied AI</a> <a href="/chengYi-xun/tags/DPO/" style="font-size: 1.1em; color: #999">DPO</a> <a href="/chengYi-xun/tags/World-Model/" style="font-size: 1.3em; color: #99a1ac">World Model</a> <a href="/chengYi-xun/tags/Survey/" style="font-size: 1.1em; color: #999">Survey</a> <a href="/chengYi-xun/tags/Cosmos/" style="font-size: 1.1em; color: #999">Cosmos</a> <a href="/chengYi-xun/tags/Physics-Grounded/" style="font-size: 1.1em; color: #999">Physics-Grounded</a> <a href="/chengYi-xun/tags/Generative-Model/" style="font-size: 1.1em; color: #999">Generative Model</a> <a href="/chengYi-xun/tags/PhysGen/" style="font-size: 1.1em; color: #999">PhysGen</a> <a href="/chengYi-xun/tags/Dreamer/" style="font-size: 1.1em; color: #999">Dreamer</a> <a href="/chengYi-xun/tags/Genie/" style="font-size: 1.1em; color: #999">Genie</a> <a href="/chengYi-xun/tags/RSSM/" style="font-size: 1.1em; color: #999">RSSM</a> <a href="/chengYi-xun/tags/WorldScore/" style="font-size: 1.1em; color: #999">WorldScore</a> <a href="/chengYi-xun/tags/V-JEPA/" style="font-size: 1.1em; color: #999">V-JEPA</a></div></div><div class="card-widget card-archives"><div class="item-headline"><i class="fas fa-archive"></i><span>归档</span></div><ul class="card-archive-list"><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2026/04/"><span class="card-archive-list-date">四月 2026</span><span class="card-archive-list-count">14</span></a></li><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2025/08/"><span class="card-archive-list-date">八月 2025</span><span class="card-archive-list-count">20</span></a></li><li class="card-archive-list-item"><a class="card-archive-list-link" href="/chengYi-xun/archives/2025/07/"><span class="card-archive-list-date">七月 2025</span><span class="card-archive-list-count">2</span></a></li></ul></div><div class="card-widget card-webinfo"><div class="item-headline"><i class="fas fa-chart-line"></i><span>网站资讯</span></div><div class="webinfo"><div class="webinfo-item"><div class="item-name">文章数目 :</div><div class="item-count">36</div></div><div class="webinfo-item"><div class="item-name">已运行时间 :</div><div class="item-count" id="runtimeshow" data-publishDate="2025-07-28T16:00:00.000Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">本站访客数 :</div><div class="item-count" id="busuanzi_value_site_uv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">本站总访问量 :</div><div class="item-count" id="busuanzi_value_site_pv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">最后更新时间 :</div><div class="item-count" id="last-push-date" data-lastPushDate="2026-04-27T17:06:04.825Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

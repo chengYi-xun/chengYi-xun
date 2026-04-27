@@ -1,0 +1,872 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（十三）：Flow Matching理论与实现 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="论文链接：Flow Matching for Generative Modeling ⬅️ 上一篇：笔记｜生成模型（十二）：Normalizing Flow理论与实现 ➡️ 下一篇：笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)  在 Stable Diffusion 3 中，模型是通过 Flow Matching 的方法训练的。从这个方法的名字来看，就知">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（十三）：Flow Matching理论与实现">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/13-flow_matching/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="论文链接：Flow Matching for Generative Modeling ⬅️ 上一篇：笔记｜生成模型（十二）：Normalizing Flow理论与实现 ➡️ 下一篇：笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)  在 Stable Diffusion 3 中，模型是通过 Flow Matching 的方法训练的。从这个方法的名字来看，就知">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-13T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.487Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/13-flow_matching/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（十三）：Flow Matching理论与实现',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（十三）：Flow Matching理论与实现</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.487Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（十三）：Flow Matching理论与实现"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>论文链接：<em><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2210.02747">Flow
+Matching for Generative Modeling</a></em></p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/12-Normalizing-flow/">笔记｜生成模型（十二）：Normalizing
+Flow理论与实现</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/14-sd3/">笔记｜生成模型（十四）：Stable
+Diffusion 3 架构解析 (MMDiT)</a></p>
+</blockquote>
+<p>在 Stable Diffusion 3 中，模型是通过 Flow Matching
+的方法训练的。从这个方法的名字来看，就知道它和 Flow-based Model
+有比较强的关联，因此在正式开始介绍这个方法之前先交代一些 Flow-based
+Model 相关的背景知识。</p>
+<h1 id="flow-based-models">Flow-based Models</h1>
+<h2 id="normalizing-flow">Normalizing Flow</h2>
+<p>Normalizing Flow
+是一种基于<strong>变换</strong>对概率分布进行建模的模型，其通过一系列<strong>离散且可逆的变换</strong>实现任意分布与先验分布（例如标准高斯分布）之间的相互转换。在
+Normalizing Flow
+训练完成后，就可以直接从高斯分布中进行采样，并通过逆变换得到原始分布中的样本，实现生成的过程。</p>
+<p>从这个角度看，Normalizing Flow 和 Diffusion Model
+是有一些相通的，其做法的对比如下表所示。从表中可以看到，两者大致的过程是非常类似的，尽管依然有些地方不一样，但这两者应该可以通过一定的方法得到一个比较统一的表示。</p>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 44%" />
+<col style="width: 44%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>模型</th>
+<th>前向过程</th>
+<th>反向过程</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Normalizing Flow</td>
+<td>通过显式的可学习变换将样本分布变换为标准高斯分布</td>
+<td>从标准高斯分布采样，并通过上述变换的逆变换得到生成的样本</td>
+</tr>
+<tr class="even">
+<td>Diffusion Model</td>
+<td>通过不可学习的 schedule
+对样本进行加噪，多次加噪变换为标准高斯分布</td>
+<td>从标准高斯分布采样，通过模型隐式地学习反向过程的噪声，去噪得到生成样本</td>
+</tr>
+</tbody>
+</table>
+<h2 id="continuous-normalizing-flow">Continuous Normalizing Flow</h2>
+<p>Continuous Normalizing Flow（CNF），也就是连续标准化流，可以看作
+Normalizing Flow 的一般形式。CNF 将原本 Normalizing Flow
+中离散的变换替换为连续的变换，并用常微分方程（ODE）来表示，可以写成以下的形式：
+<span class="math display">\[
+\frac{\mathrm{d}\mathbf{z}_t}{\mathrm{d}t}=v(\mathbf{z}_t,t)
+\]</span> 其中 <span class="math inline">\(t\in[0,1]\)</span>，<span
+class="math inline">\(\mathbf{z}_t\)</span> 可以看作时间 <span
+class="math inline">\(t\)</span> 下的数据点，<span
+class="math inline">\(v(\mathbf{z}_t,t)\)</span>
+是一个向量场，定义了数据点在每个时间下的变化大小与方向，这个向量场通常由神经网络来学习。当这个向量场完成了学习后，就可以用迭代法来求解：
+<span class="math display">\[
+\mathbf{z}_{t+\Delta t}=\mathbf{z}_t+\Delta t\cdot v(\mathbf{z}_t,t)
+\]</span>
+也就是说，一旦我们得知从标准高斯分布到目标分布的变换向量场，就可以从标准高斯分布采样，然后通过上述迭代过程得到目标分布中的一个近似解，完成生成的过程。这和离散的
+Normalizing Flow 是一致的。</p>
+<p>在 Normalizing Flow 中存在 Change of Variable
+Theory，这个定理是用来保证概率分布在进行变化时，概率密度在全体分布上的积分始终为
+1 的一个式子，其形式为： <span class="math display">\[
+p(\mathbf{x})=\pi(\mathbf{z})\left|\mathrm{det}\
+\frac{\mathrm{d}\mathbf{z}}{\mathrm{d}\mathbf{x}}\right|=\pi(\mathbf{f}^{-1}(\mathbf{x}))\left|\mathrm{det}\
+\mathbf{J}(\mathbf{f}^{-1}(\mathbf{x}))\right|
+\]</span> 在 Flow Matching 的论文中，也给出了形式类似的公式，称为
+push-forward equation，定义为： <span class="math display">\[
+p_t=[\phi_t]_*p_0
+\]</span> 其中的 push-forward 运算符，也就是星号，定义为： <span
+class="math display">\[
+[\phi_t]_*p_0(x)=p_0(\phi_t^{-1}(x))\mathrm{det}\left[\frac{\partial\phi_t^{-1}}{\partial
+x}(x)\right]
+\]</span> 可以看出形式也是类似的。</p>
+<h1 id="flow-matching">Flow Matching</h1>
+<p>图像生成任务的核心在于建模样本如何从简单的先验分布（如标准高斯分布
+<span class="math inline">\(\mathcal{N}(0,
+\mathbf{I})\)</span>）转换到复杂的数据分布 <span
+class="math inline">\(p_{\text{data}}(x)\)</span>。与基于去噪的扩散模型通过学习逐步去噪过程不同，Flow
+Matching
+直接建模样本在两个分布之间的连续时间传输过程。从数学角度来看，Flow
+Matching 学习一个时间相关的向量场 <span
+class="math inline">\(v_t(x)\)</span>，该向量场定义了从先验分布 <span
+class="math inline">\(p_0\)</span> 到目标分布 <span
+class="math inline">\(p_1\)</span> 的概率路径 <span
+class="math inline">\(\{p_t\}_{t \in
+[0,1]}\)</span>。这种方法将图像生成问题转化为最优传输问题：如何找到一个连续的概率流，使得
+<span class="math inline">\(p_0 = \mathcal{N}(0, \mathbf{I})\)</span> 和
+<span class="math inline">\(p_1 =
+p_{\text{data}}(x)\)</span>。因此，Flow Matching
+的核心思想是在已知源分布 <span class="math inline">\(p_0\)</span>
+和目标分布 <span class="math inline">\(p_1\)</span>
+之间构造一条时间参数化的概率路径 <span class="math inline">\(\{p_t\}_{t
+\in [0,1]}\)</span>，并学习生成该概率路径的速度场 <span
+class="math inline">\(v_t(x)\)</span>。</p>
+<p><img src="/chengYi-xun/img/flow_matching.png"
+alt="Flow Matching通过建模时间相关速度场学习从噪声到数据的平滑路径。" /></p>
+<p>下图展示了 Flow Matching 中关键变量的定义：<span
+class="math inline">\(x_0\)</span> 表示初始噪声，<span
+class="math inline">\(x_1\)</span> 表示目标数据，<span
+class="math inline">\(x_t\)</span> 表示时间 <span
+class="math inline">\(t\)</span> 处的中间状态。 <span
+class="math inline">\(x_t = (1-t)x_0 + tx_1 = x_0 +
+t(x_1-x_0)\)</span>，其中t一般定义为采样时间步的方差，在代码中一般用sigma表示，sigma的范围是从0到1。（一般用采样时间步的归一化表示）。<span
+class="math inline">\(x_0 + t(x_1-x_0)\)</span>可以理解成从<span
+class="math inline">\(x_0\)</span>的起点开始，朝着<span
+class="math inline">\(x_{0-&gt;1}\)</span>的方向步进了t的长度。</p>
+<p><img src="/chengYi-xun/img/flow.jpeg"
+alt="Flow Matching 变量定义示意图" /></p>
+<p>具体的实现步骤包括：</p>
+<p>建模过程首先从每个分布中采样一个点，然后用路径连接它们。最常用的连接方式是直线路径：<span
+class="math inline">\(x(t) = (1-t)x_0 +
+tx_1\)</span>。这种线性插值方法在<span
+class="math inline">\(x_0\)</span>和<span
+class="math inline">\(x_1\)</span>之间建立了最直接的连接路径。虽然也可以使用其他插值方法如球面插值，但线性插值因其简单性和良好的实际效果而被广泛采用。</p>
+<p>目标是学习一个时间相关的速度场<span
+class="math inline">\(v(x,t)\)</span>，该速度场描述轨迹上每个点的瞬时速度。由于我们已经从路径定义中知道了真实速度，神经网络的任务是近似<span
+class="math inline">\(v(x,t) = x_1 - x_0\)</span>。</p>
+<p>训练过程就是使模型的预测速度与真实速度匹配。</p>
+<p><span class="math display">\[\mathcal{L} =
+\mathbb{E}_{x_0,x_1,t}\left[\left\|f_\theta(x(t),t) -
+\frac{d}{dt}x(t)\right\|^2\right]\]</span></p>
+<p>• <span class="math inline">\(x(t) = (1-t)x_0 + tx_1\)</span>:
+噪声和数据的插值点</p>
+<p>• <span class="math inline">\(f_\theta(x(t),t)\)</span>:
+神经网络预测的速度</p>
+<p>• <span class="math inline">\(\frac{d}{dt}x(t) = x_1 - x_0\)</span>:
+真实速度</p>
+<p>• <span class="math inline">\(\mathbb{E}_{x_0,x_1,t}\)</span>:
+随机噪声/数据对和插值时间的期望</p>
+<p><strong>开源代码参考：</strong> 在实际的 PyTorch 实现中（例如 Stable
+Diffusion 3 或 Flux 的训练代码），Flow Matching 的 Loss
+计算极其简单直观：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># x_1: 真实图片 (目标)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># x_0: 纯高斯噪声 (起点)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># t: 随机采样的时间步 [0, 1]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 1. 线性插值得到当前时刻的 x_t</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">x_t </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x_0 </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x_1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 2. 计算真实的速度场 (目标速度)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">target_velocity </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x_1 </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x_0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 3. 神经网络预测速度场</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">predicted_velocity </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> model</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(x_t, t)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 4. 计算 MSE Loss</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mse_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(predicted_velocity, target_velocity)</span></span></code></pre></div>
+<h1 id="flow-matching采样过程">Flow Matching采样过程</h1>
+<p>在训练阶段，网络学习了将点从噪声移动到数据的速度场<span
+class="math inline">\(v(x,t)\)</span>。训练结束后同时访问<span
+class="math inline">\(x_0\)</span>和<span
+class="math inline">\(x_1\)</span>，但在生成阶段只有<span
+class="math inline">\(x_0\)</span>。采样的目标是取一个噪声点并将其推进到<span
+class="math inline">\(p_1\)</span>分布，最终获得类似自然图像的结果。</p>
+<p>采样过程从样本<span class="math inline">\(x_0 \sim
+p_0\)</span>(例如标准高斯噪声)开始，然后定义从<span
+class="math inline">\(t = 0\)</span>到<span class="math inline">\(t =
+1\)</span>的时间网格，将其均分割成一系列步骤。在每个时间步，我们向前求解ODE来更新样本，采样过程一般使用欧拉积分进行迭代，欧拉积分是一阶离散的近似数值积分，为了更加精确，也会有人使用4阶龙格库塔积分进行更精细的数值积分。</p>
+<p><span class="math display">\[x_{t+\Delta t} = x_t + \Delta t \cdot
+f_\theta(x_t, t)\]</span></p>
+<p>• <span class="math inline">\(x_t\)</span>: 时间 <span
+class="math inline">\(t\)</span> 处的当前样本</p>
+<p>• <span class="math inline">\(\Delta t\)</span>: 步长（例如对于 <span
+class="math inline">\(N\)</span> 步采样，<span
+class="math inline">\(\Delta t = \frac{1}{N}\)</span>）</p>
+<p>• <span class="math inline">\(f_\theta(x_t, t)\)</span>:
+学习到的速度场——指示在此时间点如何更新样本</p>
+<p>• <span class="math inline">\(x_{t+\Delta t}\)</span>:
+使用预测速度前进一步后轨迹上的下一个样本</p>
+<p>速度场<span
+class="math inline">\(v(x,t)\)</span>在每个步骤中与当前的<span
+class="math inline">\(x\)</span>和<span
+class="math inline">\(t\)</span>一起使用，以获得<span
+class="math inline">\(v(t)\)</span>的估计。一旦到达<span
+class="math inline">\(t =
+1\)</span>，就得到了一个完整看起来像自然图像的样本。这个过程类似于跟随流场，我们沿着学习的速度路径将样本"推向"数据方向。</p>
+<p>上述的不管是欧拉数值积分，还是龙格库塔积分，他们都是一种确定性积分，所以是一条确定性路径。最终的生成样本的随机性只来源于0时刻的随机采样的高斯白噪声。
+所以SD3的实现中给出了另一种形式，即随机路径。通过估计与终点图像配对的起点噪声，构建新的随机噪声作为方向向前随机步进一步（详细见推导代码实现）。</p>
+<p>最后，在这里我们直观的展现出Flow
+Matching和其他方法在不同分布寻找路径的区别，四种时间连续过程 <span
+class="math inline">\((x_t)_{0≤t≤1}\)</span>，将源样本 <span
+class="math inline">\(x_0\)</span> 传输到目标样本 <span
+class="math inline">\(x_1\)</span>。这些过程分别是连续状态空间中的流、连续状态空间中的扩散、连续状态空间中的跳跃过程（密度用等高线可视化），以及离散状态空间中的跳跃过程（状态用圆盘表示，概率用颜色可视化）。</p>
+<p><img src="/chengYi-xun/img/flow_and_diffusion.png"
+alt="Flow Matching And Diffusion" /></p>
+<h1 id="代码">代码</h1>
+<h3 id="时间步调度器初始化">时间步调度器初始化</h3>
+<p>Flow
+Matching的时间步调度器控制采样过程中的时间分布。通过非线性映射可以调整采样密度，让模型在关键区域有更密集的采样。</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 时间步初始化</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> np.</span><span style="color:#383A42;--shiki-dark:#61AFEF">linspace</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, num_train_timesteps, num_train_timesteps, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">np.float32)[::</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">copy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">from_numpy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(timesteps).</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.float32)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> num_train_timesteps</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">if</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> use_dynamic_shifting:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> shift </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (shift </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#E45649;--shiki-dark:#E5C07B">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> num_train_timesteps</span></span></code></pre></div>
+<p>shift参数通过公式 <span class="math inline">\(\sigma&#39; =
+\frac{\text{shift} \cdot \sigma}{1 + (\text{shift} - 1) \cdot
+\sigma}\)</span> 对时间轴进行非线性变换。当shift &gt;
+1时，采样会偏向早期时间步；当shift &lt; 1时，采样会偏向后期时间步。</p>
+<h3 id="时间步采样策略">时间步采样策略</h3>
+<p>训练时需要为每个batch采样不同的时间步，提供了三种采样策略：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_density_for_timestep_sampling</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">    weighting_scheme</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> str</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> batch_size</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> int</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-dark:#ABB2BF"> </span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">    logit_mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> float</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> None</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> logit_std</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> float</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> None</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">    mode_scale</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> float</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> None</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> device</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> =</span><span style="color:#50A14F;--shiki-dark:#98C379"> "cpu"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> generator</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> None</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> weighting_scheme </span><span style="color:#383A42;--shiki-dark:#56B6C2">==</span><span style="color:#50A14F;--shiki-dark:#98C379"> "logit_normal"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">normal</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">mean</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">logit_mean, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">std</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">logit_std, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(batch_size,), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">device, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">generator</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">generator)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sigmoid</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(u)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    elif</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> weighting_scheme </span><span style="color:#383A42;--shiki-dark:#56B6C2">==</span><span style="color:#50A14F;--shiki-dark:#98C379"> "mode"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">rand</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(batch_size,), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">device, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">generator</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">generator)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> u </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> mode_scale </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cos</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(math.pi </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> u </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> u)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    else</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">rand</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(batch_size,), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">device, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">generator</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">generator)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> u</span></span></code></pre></div>
+<ul>
+<li><strong>logit_normal</strong>:
+通过sigmoid函数将正态分布映射到[0,1]区间，可以控制采样集中在特定时间段</li>
+<li><strong>mode</strong>: 使用余弦变换 <span
+class="math inline">\(u&#39; = 1 - u - \text{mode_scale} \cdot
+(\cos^2(\frac{\pi u}{2}) - 1 + u)\)</span> 创建偏向特定模式的分布</li>
+<li><strong>uniform</strong>: 标准均匀分布</li>
+</ul>
+<h3 id="训练循环核心">训练循环核心</h3>
+<p>Flow Matching的训练目标是学习速度场 <span
+class="math inline">\(v_t(x_t)\)</span>，使得模型能够预测从噪声到数据的最优传输路径。</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 训练步骤</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> step, batch </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> enumerate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(train_dataloader):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # VAE编码</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    pixel_values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> batch[</span><span style="color:#50A14F;--shiki-dark:#98C379">"pixel_values"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">vae.dtype)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> vae.</span><span style="color:#383A42;--shiki-dark:#61AFEF">encode</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(pixel_values).latent_dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> vae.config.shift_factor) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> vae.config.scaling_factor</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randn_like</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(model_input)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    bsz </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_input.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 时间步采样</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    u </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_density_for_timestep_sampling</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        weighting_scheme</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">args.weighting_scheme,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        batch_size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">bsz,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        logit_mean</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">args.logit_mean,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        logit_std</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">args.logit_std,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        mode_scale</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">args.mode_scale,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    indices </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (u </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_scheduler.config.num_train_timesteps).</span><span style="color:#383A42;--shiki-dark:#61AFEF">long</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_scheduler.timesteps[indices]</span></span></code></pre></div>
+<h3 id="flow-matching前向过程">Flow Matching前向过程</h3>
+<p>根据线性插值公式 <span class="math inline">\(x_t = (1-\sigma_t)x_1 +
+\sigma_t x_0\)</span> 构造噪声样本，其中 <span
+class="math inline">\(x_0\)</span> 是噪声，<span
+class="math inline">\(x_1\)</span> 是数据：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 构造噪声样本</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> get_sigmas</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(timesteps, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">n_dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">model_input.ndim, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">model_input.dtype)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noisy_model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 模型预测</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    prompt_embeds </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> batch[</span><span style="color:#50A14F;--shiki-dark:#98C379">"prompt_embeds"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">weight_dtype)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    model_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">noisy_model_input,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        timestep</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">timesteps,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        encoder_hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">prompt_embeds,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        return_dict</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 计算损失</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    target </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_input</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((model_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> target) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> get_sigmas</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">timesteps</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> n_dim</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">4</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> dtype</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#ABB2BF">torch.float32</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 从 noise_scheduler 中取出所有预定义的 sigma 序列，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 并将其移动到与当前加速器（如 GPU）一致的 device 和 dtype。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 这些 sigma 通常是噪声调度表，用来控制不同时间步的噪声强度。</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_scheduler.sigmas.</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">accelerator.device, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">dtype)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 同样，从调度器中取出完整的时间步表（通常是从大到小的整数序列，如 [999, 998, ..., 0]）。</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    schedule_timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_scheduler.timesteps.</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(accelerator.device)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 将传入的 timesteps 也放到相同的 device 上，以保证比较时不会出错。</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps.</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(accelerator.device)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 遍历传入的每一个时间步 t，在 schedule_timesteps 中找到它对应的索引位置。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # (schedule_timesteps == t) 会返回一个布尔张量，nonzero() 找到为 True 的索引位置。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # .item() 提取成 Python 标量。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 最终 step_indices 是一个 Python 列表，表示每个输入 timestep 在调度表中的索引。</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    step_indices </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [(schedule_timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">==</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t).</span><span style="color:#383A42;--shiki-dark:#61AFEF">nonzero</span><span style="color:#383A42;--shiki-dark:#ABB2BF">().</span><span style="color:#383A42;--shiki-dark:#61AFEF">item</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 根据这些索引，从 sigmas 表中取出对应的 sigma 值。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # flatten() 保证 sigma 是一维的，例如形状为 [batch_size]。</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas[step_indices].</span><span style="color:#383A42;--shiki-dark:#61AFEF">flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 为了让 sigma 可以和 model_input (如 [B, C, H, W]) 正确广播，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 需要不断扩展维度直到它与输入的维度数 n_dim 相同。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 例如原来 [B] → [B, 1] → [B, 1, 1] → [B, 1, 1, 1]</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    while</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(sigma.shape) </span><span style="color:#383A42;--shiki-dark:#56B6C2">&#x3C;</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> n_dim:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigma.</span><span style="color:#383A42;--shiki-dark:#61AFEF">unsqueeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 返回最终形状的 sigma 张量，例如 [B, 1, 1, 1]</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigma</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">class</span><span style="color:#C18401;--shiki-dark:#E5C07B"> FlowMatchEulerDiscreteScheduler</span><span style="color:#C18401;--shiki-dark:#ABB2BF">(</span><span style="color:#C18401;--shiki-dark:#E5C07B">SchedulerMixin</span><span style="color:#C18401;--shiki-dark:#ABB2BF">, </span><span style="color:#C18401;--shiki-dark:#E5C07B">ConfigMixin</span><span style="color:#C18401;--shiki-dark:#ABB2BF">)</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    _compatibles </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    order </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#4078F2;--shiki-dark:#61AFEF">    @register_to_config</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    def</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> __init__</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E5C07B;--shiki-dark-font-style:italic">        self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        num_train_timesteps</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> int</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> 1000</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> float</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> 1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        use_dynamic_shifting</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        base_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#986801;--shiki-dark:#ABB2BF"> Optional[</span><span style="color:#0184BC;--shiki-dark:#56B6C2">float</span><span style="color:#986801;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        max_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#986801;--shiki-dark:#ABB2BF"> Optional[</span><span style="color:#0184BC;--shiki-dark:#56B6C2">float</span><span style="color:#986801;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 1.15</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        base_image_seq_len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#986801;--shiki-dark:#ABB2BF"> Optional[</span><span style="color:#0184BC;--shiki-dark:#56B6C2">int</span><span style="color:#986801;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 256</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        max_image_seq_len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#986801;--shiki-dark:#ABB2BF"> Optional[</span><span style="color:#0184BC;--shiki-dark:#56B6C2">int</span><span style="color:#986801;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 4096</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">        invert_sigmas</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> bool</span><span style="color:#383A42;--shiki-dark:#56B6C2"> =</span><span style="color:#986801;--shiki-dark:#D19A66"> False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    ):</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> np.</span><span style="color:#383A42;--shiki-dark:#61AFEF">linspace</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, num_train_timesteps, num_train_timesteps, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">np.float32)[::</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">copy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">from_numpy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(timesteps).</span><span style="color:#383A42;--shiki-dark:#61AFEF">to</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.float32)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> num_train_timesteps</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        if</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> use_dynamic_shifting:</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">            # when use_dynamic_shifting is True, we apply the timestep shifting on the fly based on the image resolution</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> shift </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (shift </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E45649;--shiki-dark:#E5C07B">        self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> num_train_timesteps</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#D19A66">        ...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.</span></span>
+<span class="line"></span>
+<span class="line"></span></code></pre></div>
+<p>速度场的真实值为 <span class="math inline">\(v_t = x_0 - x_1 =
+\text{noise} -
+\text{data}\)</span>，模型通过最小化预测速度场与真实速度场的MSE损失来学习。</p>
+<h3 id="推理过程">推理过程</h3>
+<p>推理时从纯噪声开始，通过求解ODE逐步生成图像：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 初始化</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randn</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(shape, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">generator</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">generator, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">device, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dtype</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">dtype)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> scheduler.timesteps</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> i, t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> enumerate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(timesteps):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 条件引导</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.do_classifier_free_guidance:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        latent_model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([latents] </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    else</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        latent_model_input </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 预测速度场</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noise_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">latent_model_input,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        timestep</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">t.</span><span style="color:#383A42;--shiki-dark:#61AFEF">expand</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(latent_model_input.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]),</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        encoder_hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">prompt_embeds,</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        return_dict</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # CFG引导</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.do_classifier_free_guidance:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noise_pred_uncond, noise_pred_text </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_pred.</span><span style="color:#383A42;--shiki-dark:#61AFEF">chunk</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noise_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_pred_uncond </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.guidance_scale </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (noise_pred_text </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise_pred_uncond)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 更新样本</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> scheduler.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noise_pred, t, latents, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">return_dict</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span></code></pre></div>
+<h3 id="调度器步进函数">调度器步进函数</h3>
+<p>调度器的step函数实现了两种采样模式：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E5C07B;--shiki-dark-font-style:italic">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> model_output</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> timestep</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> return_dict</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 获取当前和下一个sigma</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sigma_idx </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.step_index</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    current_sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.sigmas[sigma_idx]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.sigmas[sigma_idx </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> current_sigma</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.config.stochastic_sampling:</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 随机采样：估计起点并构造新路径</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        x0 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sample </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> current_sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_output</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randn_like</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(sample)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        prev_sample </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_sigma) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x0 </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_sigma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    else</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 确定性采样：欧拉方法</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        prev_sample </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sample </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dt </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_output</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#E45649;--shiki-dark:#E5C07B">    self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">._step_index </span><span style="color:#383A42;--shiki-dark:#56B6C2">+=</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> prev_sample</span></span></code></pre></div>
+<p><strong>确定性采样</strong>使用欧拉方法求解ODE：<span
+class="math inline">\(x_{t+\Delta t} = x_t + \Delta t \cdot
+v_t(x_t)\)</span></p>
+<p><strong>随机采样</strong>通过以下步骤引入随机性：</p>
+<ol type="1">
+<li>估计起点噪声：<span class="math inline">\(x_0 = x_t - \sigma_t \cdot
+v_t\)</span></li>
+<li>生成新的随机噪声</li>
+<li>从新路径采样：<span class="math inline">\(x_{t+\Delta t} =
+(1-\sigma_{t+\Delta t})x_0 + \sigma_{t+\Delta
+t}\cdot\text{noise}\)</span></li>
+</ol>
+<p>这种设计让Flow
+Matching既可以确定性生成（保证质量），也可以随机生成（增加多样性）。</p>
+<h1 id="rectified-flow-与-optimal-transport-ot-cfm">Rectified Flow 与
+Optimal Transport (OT-CFM)</h1>
+<p>在 Flow Matching 的框架下，<strong>Rectified Flow (RF)</strong>
+是最著名、最简单的一个具体实现。它的核心特征是强制规定从数据 <span
+class="math inline">\(x_0\)</span> 到噪声 <span
+class="math inline">\(x_1 \sim \mathcal{N}(0, I)\)</span>
+的概率路径必须是最简单的直线：<span class="math inline">\(x_t = (1-t)x_0
++ t x_1\)</span>。</p>
+<p>然而，在最初训练 RF 时（称为 1-Rectified Flow），由于噪声 <span
+class="math inline">\(x_1\)</span> 和图像 <span
+class="math inline">\(x_0\)</span>
+是<strong>独立随机配对</strong>的，这会导致不同图像的生成轨迹在空间中发生<strong>严重交叉</strong>。一旦轨迹交叉，速度场就会变得极度非线性，ODE
+求解器必须用非常小的步长（很多步）才能准确积分。</p>
+<p>为了解决这个问题，原论文提出了一种叫做 <strong>Reflow</strong>
+的迭代微调技术：</p>
+<ol type="1">
+<li>先用训练好的 1-RF 模型生成一批图像，记录下每个噪声 <span
+class="math inline">\(x_1\)</span> 和它最终生成的图像 <span
+class="math inline">\(x_0\)</span>
+的<strong>确定性映射对</strong>。</li>
+<li>用这些<strong>已经绑定好</strong>的数据对去训练一个新的模型（2-Rectified
+Flow）。 这个过程在数学上等价于在寻找<strong>最优传输（Optimal
+Transport）</strong>的解，能把交叉的轨迹彻底“拉直”成互不交叉的平行直线。轨迹越直，ODE
+积分误差越小，最终甚至只需要 1 步 Euler 步进就能生成高质量图像。</li>
+</ol>
+<p><strong>工程实践中的演进（如 FLUX / SD3）</strong> 虽然理论上的
+Reflow 很优美，但在工业界训练大模型时，先生成几十亿张图片再去训练 2-RF
+的成本太高了。因此，<strong>当前最前沿的开源大模型（如 Stable Diffusion
+3、FLUX）在实践中并没有使用多阶段的迭代 Reflow</strong>。</p>
+<p>相反，它们在第一阶段训练（1-RF）时，直接在每个 Batch
+内部使用<strong>最优传输（Optimal Transport,
+OT）算法</strong>对噪声和图像进行配对，这种方法被称为 <strong>OT-CFM
+(Optimal Transport Conditional Flow
+Matching)</strong>。通过在训练源头上强制让每个噪声点去寻找离它“最近”的真实图像，模型在单阶段训练中就能直接学到几乎不交叉的直线轨迹，从而实现极少步数的高质量生成。</p>
+<h1 id="总结与算法对比">总结与算法对比</h1>
+<p><strong>算法对比：Flow Matching vs DDPM</strong></p>
+<ul>
+<li><strong>路径</strong>：DDPM
+的加噪路径是弯曲且充满随机性的（马尔可夫链），而 Flow Matching（特别是
+Rectified Flow）的路径是两点之间的直线。</li>
+<li><strong>速度</strong>：因为直线路径更平滑，ODE
+求解器可以用更大的步长（更少的步数）进行采样，这使得 Flow Matching
+的生成速度远快于传统的 DDPM。</li>
+<li><strong>实现</strong>：Flow Matching 的 Loss
+计算极其简单（预测速度与真实速度的 MSE），不需要像 DDPM
+那样推导复杂的变分下界（ELBO）和各时间步的权重。</li>
+</ul>
+<p><strong>开源代码参考</strong>： 目前最前沿的开源图像大模型，如
+<strong>Stable Diffusion 3</strong> 和
+<strong>Flux</strong>，都已经全面抛弃了 DDPM，转而采用 Flow
+Matching（Rectified Flow）作为其核心的生成机制。你可以在
+<code>diffusers</code> 库的 <code>FlowMatchEulerDiscreteScheduler</code>
+中看到其采样过程的实现。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, D. H., &amp; Le, M.
+(2022). <em>Flow Matching for Generative Modeling</em>. ICLR 2023.</li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/685921518">深入解析Flow
+Matching技术</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1Wv3xeNEds/">【AI知识分享】你一定能听懂的扩散模型Flow
+Matching基本原理深度解析</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://littlenyima.github.io/posts/51-flow-matching-for-diffusion-models/">flow_matching</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://littlenyima.github.io/posts/12-basic-concepts-of-normalizing-flow/">Normalizing
+Flow</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/14-sd3/">笔记｜生成模型（十四）：Stable
+Diffusion 3 架构解析 (MMDiT)</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/13-flow_matching/">https://chengyi-xun.github.io/chengYi-xun/posts/13-flow_matching/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（十二）：Normalizing Flow理论与实现</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-based-models"><span class="toc-number">1.</span> <span class="toc-text">Flow-based Models</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#normalizing-flow"><span class="toc-number">1.1.</span> <span class="toc-text">Normalizing Flow</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#continuous-normalizing-flow"><span class="toc-number">1.2.</span> <span class="toc-text">Continuous Normalizing Flow</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-matching"><span class="toc-number">2.</span> <span class="toc-text">Flow Matching</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-matching%E9%87%87%E6%A0%B7%E8%BF%87%E7%A8%8B"><span class="toc-number">3.</span> <span class="toc-text">Flow Matching采样过程</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81"><span class="toc-number">4.</span> <span class="toc-text">代码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%97%B6%E9%97%B4%E6%AD%A5%E8%B0%83%E5%BA%A6%E5%99%A8%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="toc-number">4.0.1.</span> <span class="toc-text">时间步调度器初始化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%97%B6%E9%97%B4%E6%AD%A5%E9%87%87%E6%A0%B7%E7%AD%96%E7%95%A5"><span class="toc-number">4.0.2.</span> <span class="toc-text">时间步采样策略</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AE%AD%E7%BB%83%E5%BE%AA%E7%8E%AF%E6%A0%B8%E5%BF%83"><span class="toc-number">4.0.3.</span> <span class="toc-text">训练循环核心</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#flow-matching%E5%89%8D%E5%90%91%E8%BF%87%E7%A8%8B"><span class="toc-number">4.0.4.</span> <span class="toc-text">Flow Matching前向过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8E%A8%E7%90%86%E8%BF%87%E7%A8%8B"><span class="toc-number">4.0.5.</span> <span class="toc-text">推理过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%B0%83%E5%BA%A6%E5%99%A8%E6%AD%A5%E8%BF%9B%E5%87%BD%E6%95%B0"><span class="toc-number">4.0.6.</span> <span class="toc-text">调度器步进函数</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#rectified-flow-%E4%B8%8E-optimal-transport-ot-cfm"><span class="toc-number">5.</span> <span class="toc-text">Rectified Flow 与
+Optimal Transport (OT-CFM)</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%80%BB%E7%BB%93%E4%B8%8E%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94"><span class="toc-number">6.</span> <span class="toc-text">总结与算法对比</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/13-flow_matching/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/13-flow_matching/',
+      title: '笔记｜生成模型（十三）：Flow Matching理论与实现',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

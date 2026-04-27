@@ -1,0 +1,824 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（八）：SDE统一DDPM和SMLD | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="⬅️ 上一篇：笔记｜生成模型（七）：Score-Based理论 ➡️ 下一篇：笔记｜生成模型（九）：Classifier Guidance 理论与实现  随机微分方程简介 首先介绍常微分方程和随机微分方程的基本知识，为后续讨论奠定基础。我们先从一个常微分方程（ODE）例子开始： \[ \frac{\mathrm{d}x}{\mathrm{d}t}&#x3D;f(x,t)\quad\mathrm{or}\q">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（八）：SDE统一DDPM和SMLD">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/8-SDE/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="⬅️ 上一篇：笔记｜生成模型（七）：Score-Based理论 ➡️ 下一篇：笔记｜生成模型（九）：Classifier Guidance 理论与实现  随机微分方程简介 首先介绍常微分方程和随机微分方程的基本知识，为后续讨论奠定基础。我们先从一个常微分方程（ODE）例子开始： \[ \frac{\mathrm{d}x}{\mathrm{d}t}&#x3D;f(x,t)\quad\mathrm{or}\q">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-08T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.491Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/8-SDE/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（八）：SDE统一DDPM和SMLD',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（八）：SDE统一DDPM和SMLD</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.491Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（八）：SDE统一DDPM和SMLD"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/7-score-match/">笔记｜生成模型（七）：Score-Based理论</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/">笔记｜生成模型（九）：Classifier
+Guidance 理论与实现</a></p>
+</blockquote>
+<h1 id="随机微分方程简介">随机微分方程简介</h1>
+<p>首先介绍常微分方程和随机微分方程的基本知识，为后续讨论奠定基础。我们先从一个常微分方程（ODE）例子开始：</p>
+<p><span class="math display">\[
+\frac{\mathrm{d}x}{\mathrm{d}t}=f(x,t)\quad\mathrm{or}\quad\mathrm{d}x=f(x,t)\mathrm{d}t
+\]</span></p>
+<p>其中 <span class="math inline">\(f(x,t)\)</span> 是关于 <span
+class="math inline">\(x\)</span> 和 <span
+class="math inline">\(t\)</span> 的函数，描述了 <span
+class="math inline">\(x\)</span> 随时间的变化趋势，如下图左侧所示。</p>
+<p><img src="/chengYi-xun/img/ode.jpeg"
+alt="常微分方程与随机微分方程" /></p>
+<p>直观地讲，<span class="math inline">\(f(x,t)\)</span>
+对应于图中的青色箭头，确定某一时刻的 <span
+class="math inline">\(x(t)\)</span> 后，沿着箭头方向可以找到下一时刻的
+<span class="math inline">\(x(t+\Delta
+t)\)</span>。这个常微分方程的解析解为：</p>
+<p><span class="math display">\[
+x(t)=x(0)+\int_0^t f(x,\tau)\mathrm{d}\tau
+\]</span></p>
+<p>然而，实际应用中我们使用的 <span
+class="math inline">\(f(x,t)\)</span>
+通常是比较复杂的函数（如神经网络），求解析解往往不切实际。因此，通常采用迭代法求数值解：</p>
+<p><span class="math display">\[
+x(t+\Delta t)\approx x(t)+f(x(t),t)\Delta t
+\]</span></p>
+<p>在迭代过程中，每次沿箭头方向线性移动一小段距离，经多次迭代得到解析解的近似，如上图左侧绿色曲线所示。</p>
+<p>从上述描述可知，常微分方程描述了一个确定性过程。对于非确定性过程（如从分布中采样），则需要使用随机微分方程（SDE）描述。SDE
+相比 ODE 形式上增加了一个高斯噪声项：</p>
+<p><span class="math display">\[
+\frac{\mathrm{d}x}{\mathrm{d}t}=\underbrace{f(x,t)}_{漂移系数}+\underbrace{\sigma(x,t)}_{扩散系数}\omega_t\quad\mathrm{or}\quad\mathrm{d}x=f(x,t)\mathrm{d}t+\sigma(x,t)\mathrm{d}\omega_t
+\]</span></p>
+<p>采样时类似 ODE，可进行迭代采样：</p>
+<p><span class="math display">\[
+x(t+\Delta t)\approx x(t)+f(x(t),t)\Delta t+\sigma(x(t),t)\sqrt{\Delta
+t}\mathcal{N}(0,I)
+\]</span></p>
+<p>由于采样过程中存在高斯噪声，多次采样会得到不同轨迹，如上图右侧的一系列绿色折线所示。</p>
+<h1 id="基于-sde-的-score-based-models">基于 SDE 的 Score-based
+Models</h1>
+<p>在上一篇文章中，我们介绍了基于分数的生成模型（Score-based
+Models）的基本思想：通过在不同噪声尺度下学习 Score
+Function，然后用朗之万动力学（Langevin MCMC）从噪声中逐步恢复数据。</p>
+<p>但那里的噪声尺度是离散的有限个（<span class="math inline">\(\sigma_1,
+\sigma_2, \ldots,
+\sigma_L\)</span>），步与步之间是突变的。一个自然的想法是：<strong>如果把噪声尺度推广到连续的无穷多个呢？</strong>
+这就引出了 SDE
+框架——用一个连续的随机微分方程来描述加噪过程。这种连续化带来了三个重要好处：更高质量的生成样本、精确的对数似然计算，以及统一
+DDPM 和 SMLD 两大流派的理论视角。</p>
+<h2 id="使用-sde-描述扰动过程">使用 SDE 描述扰动过程</h2>
+<p>当离散的噪声尺度推广为连续时间后，扰动过程变成了一个连续时间的随机过程，如下图所示：</p>
+<p><img src="/chengYi-xun/img/ode.gif" alt="连续的加噪过程" /></p>
+<p>为表示上述随机过程，可用随机微分方程描述：</p>
+<p><span class="math display">\[
+\mathrm{d}x=f(x,t)\mathrm{d}t+g(t)\mathrm{d}w
+\]</span></p>
+<p>用 <span class="math inline">\(p_t(x)\)</span> 表示 <span
+class="math inline">\(x(t)\)</span> 的概率密度函数，可知 <span
+class="math inline">\(p_0(x)=p(x)\)</span>
+是未加噪时的真实数据分布，经过足够多时间步 <span
+class="math inline">\(T\)</span> 的扰动后，<span
+class="math inline">\(p_T(x)\)</span> 接近先验分布 <span
+class="math inline">\(\pi(x)\)</span>。从这一角度看，扰动过程与扩散模型的扩散过程本质上是一致的。</p>
+<p>扰动随机过程可采用多种形式的 SDE，例如：</p>
+<p><span class="math display">\[
+\mathrm{d}x=e^t\mathrm{d}w
+\]</span></p>
+<p>这表示用均值为 0、方差呈指数增长的高斯噪声对分布进行扰动。</p>
+<h2 id="使用反向-sde-进行采样">使用反向 SDE 进行采样</h2>
+<p>正向过程用 SDE 描述加噪后，逆向过程（从噪声恢复数据）同样可以用一个
+SDE 来表达。Anderson (1982) 证明了：对于前向 SDE</p>
+<p><span class="math display">\[\mathrm{d}x = f(x,t)\mathrm{d}t +
+g(t)\mathrm{d}w\]</span></p>
+<p>其逆向过程为：</p>
+<p><span class="math display">\[
+\mathrm{d}x=\left[f(x,t)-g^2(t){\color{green}\nabla_x\log
+p_t(x)}\right]\mathrm{d}t+g(t)\mathrm{d}\bar{w}
+\]</span></p>
+<p>此处 <span class="math inline">\(\mathrm{d}t\)</span>
+表示反向时间方向（从 <span class="math inline">\(t=T\)</span> 到 <span
+class="math inline">\(t=0\)</span>），<span
+class="math inline">\(\mathrm{d}\bar{w}\)</span> 是逆向布朗运动。</p>
+<p><strong>直觉理解</strong>：逆向 SDE 相比前向多出了绿色的 <span
+class="math inline">\(-g^2(t)\nabla_x\log p_t(x)\)</span> 项——这就是
+<strong>Score Function</strong>。在前向过程中，<span
+class="math inline">\(g(t)\mathrm{d}w\)</span>
+不断注入噪声让分布发散；在逆向过程中，Score
+项扮演"纠偏力"，将发散的分布重新拉回数据流形，实现从噪声到数据的生成。</p>
+<p><strong>简明推导</strong>：将前向 SDE 离散化后，<span
+class="math inline">\(x_{t+\Delta t} | x_t \sim \mathcal{N}(x_t +
+f\Delta t, \; g^2\Delta t \cdot I)\)</span>。利用贝叶斯公式求逆向分布
+<span class="math inline">\(p(x_t | x_{t+\Delta t})\)</span>，再对 <span
+class="math inline">\(\log p(x_t)\)</span>
+做一阶泰勒展开并配方，可以得到逆向分布的均值中自然出现 <span
+class="math inline">\(-g^2 \nabla_x \log p_t\)</span> 项。当 <span
+class="math inline">\(\Delta t \to 0\)</span>
+时即得到上式。完整的离散化推导可参见<a
+href="/chengYi-xun/posts/55-flow-grpo/">笔记｜强化学习（五）：Flow-GRPO</a>
+中 Anderson 定理部分。</p>
+<p>上式的核心启示是：<strong>无论前向 SDE
+的形式如何，逆向过程的学习目标都归结为同一件事——用网络学习分布的 Score
+Function <span class="math inline">\(\nabla_x\log
+p_t(x)\)</span>。</strong></p>
+<p>获得 score function 后，可从反向 SDE
+中采样，最简单的方法是欧拉–丸山方法（Euler-Maruyama） 方法： <span
+class="math display">\[
+\begin{aligned}
+\Delta x &amp;\leftarrow[f(x,t)-g^2(t)s_\theta(x,t)]\Delta
+t+g(t)\sqrt{|\Delta t|}z_t\\
+x &amp;\leftarrow x+\Delta x\\
+t &amp;\leftarrow t+\Delta t
+\end{aligned}
+\]</span></p>
+<p>其中 <span
+class="math inline">\(z\sim\mathcal{N}(0,I)\)</span>，可通过直接对高斯噪声采样得到。上式中
+<span class="math inline">\(f(x,t)\)</span> 和 <span
+class="math inline">\(g(t)\)</span> 均有解析形式，<span
+class="math inline">\(\Delta t\)</span> 可选取较小值，仅 <span
+class="math inline">\(s_\theta(x,t)\)</span>
+为参数模型。采样过程可通过下图直观感受：</p>
+<p><img src="/chengYi-xun/img/rever_ode.gif"
+alt="通过反向扰动过程进行采样" /></p>
+<div class="note info no-icon flat"><p>Euler-Maruyama 方法是求解随机微分方程 (SDE) 的一种数值方法，是常规
+Euler 方法在处理随机过程时的扩展。对于一个标准形式的 SDE：</p>
+<p><span class="math display">\[\mathrm{d}x = f(x,t)\mathrm{d}t +
+g(t)\mathrm{d}w_t\]</span></p>
+<p>其中 <span class="math inline">\(f(x,t)\)</span> 是漂移项，<span
+class="math inline">\(g(t)\)</span> 是扩散系数，<span
+class="math inline">\(w_t\)</span> 是维纳过程（布朗运动）。</p>
+<p>Euler-Maruyama 的离散近似为：</p>
+<p><span class="math display">\[x_{t+\Delta t} = x_t + f(x_t,t)\Delta t
++ g(t)\sqrt{\Delta t}z_t\]</span></p>
+<p>其中 <span class="math inline">\(z_t \sim \mathcal{N}(0,I)\)</span>
+是从标准正态分布采样的随机变量，<span class="math inline">\(\Delta
+t\)</span> 是时间步长。</p>
+<p><strong>性质：</strong></p>
+<ol type="1">
+<li><strong>弱收敛性</strong>：当 <span class="math inline">\(\Delta t
+\to 0\)</span> 时，数值解收敛到真实解的分布</li>
+<li><strong>强收敛性</strong>：对于光滑系数的 SDE，收敛阶为 <span
+class="math inline">\(\mathcal{O}(\sqrt{\Delta t})\)</span></li>
+<li><strong>简单性</strong>：计算简单，易于实现，是求解 SDE
+最基本的方法</li>
+<li><strong>稳定性</strong>：对于步长 <span class="math inline">\(\Delta
+t\)</span> 较大时可能不稳定，需要选择足够小的步长</li>
+<li><strong>确定性+随机性</strong>：包含确定性部分 <span
+class="math inline">\(f(x_t,t)\Delta t\)</span> 和随机部分 <span
+class="math inline">\(g(t)\sqrt{\Delta t}z_t\)</span></li>
+</ol>
+<p><strong>与经典 Euler 方法的区别：</strong></p>
+<ul>
+<li>经典 Euler 方法只处理确定性部分，适用于 ODE</li>
+<li>Euler-Maruyama 方法增加了随机项，适用于 SDE</li>
+<li>随机项的缩放因子为 <span class="math inline">\(\sqrt{\Delta
+t}\)</span> 而非 <span class="math inline">\(\Delta
+t\)</span>（这是由维纳过程的性质决定的）</li>
+</ul>
+<p><strong>维纳过程与 <span class="math inline">\(\sqrt{\Delta
+t}\)</span> 缩放因子的关系：</strong></p>
+<p>维纳过程（Wiener process）是布朗运动的数学模型，具有如下性质： <span
+class="math display">\[\text{Var}(w_{t+\Delta t} - w_t) = \Delta
+t\]</span> 即维纳过程 <span class="math inline">\(w_t\)</span>
+在时间间隔 <span class="math inline">\(\Delta t\)</span>
+内的变化量的方差与 <span class="math inline">\(\Delta t\)</span>
+成正比，这意味着增量服从均值为 0，方差为 <span
+class="math inline">\(\Delta t\)</span> 的正态分布： <span
+class="math display">\[w_{t+\Delta t} - w_t \sim \mathcal{N}(0, \Delta
+t)\]</span></p>
+<p>将标准正态随机变量 <span class="math inline">\(z \sim
+\mathcal{N}(0,1)\)</span> 转换为维纳过程的增量，需要： <span
+class="math display">\[w_{t+\Delta t} - w_t = \sqrt{\Delta t} \cdot
+z\]</span> （根据正态分布的性质，如果 <span class="math inline">\(z \sim
+\mathcal{N}(0,1)\)</span>，那么 <span class="math inline">\(\sqrt{\Delta
+t} \cdot z \sim \mathcal{N}(0, \Delta t)\)</span> ） 因此在
+Euler-Maruyama 方法中，随机项系数为： <span class="math display">\[g(t)
+\mathrm{d}w_t \approx g(t)\sqrt{\Delta t}z_t\]</span></p>
+<p><strong>这与常规 Euler 方法的区别</strong>：</p>
+<ul>
+<li>ODE 中的变化率与时间成正比（一阶关系）：<span
+class="math inline">\(\Delta x \propto \Delta t\)</span></li>
+<li>而维纳过程的变化与时间的平方根成正比（二次变差关系）：<span
+class="math inline">\(\Delta w \propto \sqrt{\Delta t}\)</span></li>
+</ul>
+<p>这是随机过程与确定性过程的本质区别，也是为什么 SDE
+需要特殊的数值求解方法。</p>
+</div>
+<h2 id="使用-score-matching-进行训练">使用 score matching 进行训练</h2>
+<p>逆向采样的关键在于 Score Function <span
+class="math inline">\(\nabla_x\log
+p_t(x)\)</span>，我们需要用一个参数化网络 <span
+class="math inline">\(s_\theta(x,t)\)</span> 来近似它。训练目标仍然是
+score matching——让网络输出逼近真实 Score。</p>
+<p>回顾离散情况（上篇文章），我们在有限个噪声尺度 <span
+class="math inline">\(\{\sigma_i\}\)</span> 下分别计算 L2
+损失并求和。连续化后，求和变为对时间 <span
+class="math inline">\(t\)</span> 的积分（或等价地，取均匀时间分布 <span
+class="math inline">\(\mathcal{U}(0,T)\)</span> 的期望）：</p>
+<p><span class="math display">\[
+\mathbb{E}_{t\in\mathcal{U}(0,T)}\mathbb{E}_{p_t(x)}\left[\lambda(t)||\nabla_x\log
+p_t(x)-s_\theta(x,t)||_2^2\right]
+\]</span></p>
+<p>其中权重函数 <span class="math inline">\(\lambda(t)\)</span>
+控制不同时刻的学习力度，通常取 <span
+class="math inline">\(\lambda(t)\propto 1/\mathbb{E}[\|\nabla_{x(t)}\log
+p(x(t)|x(0))\|_2^2]\)</span>，确保各时间步的梯度量级一致，避免某些时刻的损失主导整个优化过程。</p>
+<p>值得讨论的是，在离散情况下，<span
+class="math inline">\(\lambda(t)\)</span> 的选取为 <span
+class="math inline">\(\lambda(t)=\sigma_t^2\)</span>。若此处也使用类似形式
+<span class="math inline">\(\lambda(t)=g^2(t)\)</span>，可推导出 <span
+class="math inline">\(p_0(x)\)</span> 和 <span
+class="math inline">\(p_\theta(x)\)</span> 之间的 KL
+散度与上述损失间的关系：</p>
+<p><span class="math display">\[
+\mathrm{KL}(p_0(x)||p_\theta(x))\le\frac{T}{2}\mathbb{E}_{t\in\mathcal{U}(0,T)}\mathbb{E}_{p_t(x)}\left[\lambda(t)||\nabla_x\log
+p_t(x)-s_\theta(x,t)||_2^2\right]+\mathrm{KL}(p_T||\pi)
+\]</span></p>
+<p><strong>这个不等式的直觉</strong>：左侧是我们关心的"生成分布与真实分布之间的差距"；右侧第一项是
+score matching 损失（用 <span class="math inline">\(g^2(t)\)</span>
+加权），第二项是先验分布的近似误差（通常可忽略）。也就是说，<strong>只要
+Score 学得足够准，生成的分布就会逼近真实分布</strong>。权重 <span
+class="math inline">\(\lambda(t) = g^2(t)\)</span> 被称为 likelihood
+weighting
+function——它让模型在噪声较大的时间步投入更多学习精力，因为那些时刻的
+Score 更难估计。</p>
+<h3 id="score-的另一种计算方式去噪即-score">Score
+的另一种计算方式：去噪即 Score</h3>
+<p>除了用独立网络 <span class="math inline">\(s_\theta(x,t)\)</span>
+直接拟合 Score，还有一种更优雅的方式——<strong>从去噪模型中反推
+Score</strong>。</p>
+<p>如果模型学会了从噪声图 <span class="math inline">\(x_t\)</span>
+预测干净数据 <span
+class="math inline">\(\hat{x}_0\)</span>（即去噪任务），那么通过 Tweedie
+公式，可以直接从预测结果算出 Score：</p>
+<p><span class="math display">\[\nabla_{x_t}\log p(x_t | x_0) =
+-\frac{x_t - \hat{\mu}_t}{\sigma_t^2}\]</span></p>
+<p>其中 <span class="math inline">\(\hat{\mu}_t\)</span> 由模型预测的
+<span class="math inline">\(\hat{x}_0\)</span>
+确定。这意味着<strong>去噪模型天然就包含了 Score
+信息</strong>，不需要单独的 Score 网络。这一思路在后续的 Flow Matching
+和 Flow-GRPO 中被广泛使用——速度场模型 <span
+class="math inline">\(v_\theta\)</span> 可以反推 <span
+class="math inline">\(\hat{x}_0\)</span>，进而获得 Score（详见<a
+href="/chengYi-xun/posts/55-flow-grpo/">笔记｜强化学习（五）：Flow-GRPO</a>
+中 Tweedie 公式推导）。</p>
+<h1 id="讨论">讨论</h1>
+<p>到这里，我们已经建立了完整的 SDE-based 生成模型框架：用前向 SDE
+描述加噪、用反向 SDE + Score Function 进行采样、用 Score Matching
+训练模型。一个自然的问题是：<strong>这个框架与之前学过的模型有什么关系？</strong>
+下面从三个角度展开：</p>
+<ul>
+<li><strong>与 DDPM 的联系</strong>：SDE 框架是 DDPM 的连续极限推广</li>
+<li><strong>SDE 与 ODE
+的等价转换</strong>：同一个生成过程可以有确定性和随机性两种描述</li>
+<li><strong>条件生成</strong>：SDE 框架如何自然地支持条件生成</li>
+</ul>
+<h2 id="和-ddpm-的联系">和 DDPM 的联系</h2>
+<p>通过上文介绍，我们发现用 SDE 描述的 score-based model
+与扩散模型有许多相似之处。在 DDPM 中，前向过程描述为：</p>
+<p><span class="math display">\[
+x_{t}=\sqrt{1-\beta_t}x_{t-1}+\sqrt{\beta_t}\epsilon_{t-1},\quad\epsilon_{t-1}\sim\mathcal{N}(0,I)
+\]</span></p>
+<p>这是一个离散过程，<span
+class="math inline">\(t\in\{0,1,\cdots,T\}\)</span>。为将 DDPM
+转变为连续形式，可将所有时间步除以 <span
+class="math inline">\(T\)</span>，即 <span
+class="math inline">\(t\in\{0,\frac{1}{T},\cdots,\frac{T-1}{T},1\}\)</span>。当
+<span class="math inline">\(T\rightarrow\infty\)</span>，DDPM
+变为连续过程。代入上式：</p>
+<p><span class="math display">\[
+x(t+\Delta t)=\sqrt{1-\beta(t+\Delta t)\Delta
+t}~x(t)+\sqrt{\beta(t+\Delta t)\Delta t}~\epsilon(t)
+\]</span></p>
+<p>泰勒展开后近似得到：</p>
+<p><span class="math display">\[
+\begin{aligned}
+x(t+\Delta t)&amp;=\sqrt{1-\beta(t+\Delta t)\Delta
+t}~x(t)+\sqrt{\beta(t+\Delta t)\Delta t}~\epsilon(t)\\
+&amp;\approx x(t)-\frac{1}{2}\beta(t+\Delta t)\Delta
+t~x(t)+\sqrt{\beta(t+\Delta t)\Delta t}~\epsilon(t)\\
+&amp;\approx x(t)-\frac{1}{2}\beta(t)\Delta t x(t)+\sqrt{\beta(t)\Delta
+t}\epsilon(t)
+\end{aligned}
+\]</span></p>
+<p>当 <span class="math inline">\(T\rightarrow\infty\)</span>，即 <span
+class="math inline">\(\Delta t\rightarrow0\)</span> 时，有：</p>
+<p><span class="math display">\[
+\mathrm{d}x=-\frac{\beta(t)x}{2}\mathrm{d}t+\sqrt{\beta(t)}\mathrm{d}w
+\]</span></p>
+<p>推导表明，从 DDPM 前向过程出发，可得到与 score-based model 形式相符的
+SDE 方程，因此也可使用 score matching、Langevin MCMC
+等策略进行学习和采样。详细推导可参见 <em><a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2011.13456">Score-Based Generative Modeling
+through Stochastic Differential Equations</a></em> 附录 B。</p>
+<h2 id="sde-与-ode-的等价转换">SDE 与 ODE 的等价转换</h2>
+<p>SDE 和 ODE
+之间存在一个深刻的对偶关系：<strong>对于同一个数据生成过程，存在一个 SDE
+和一个 ODE，它们在每个时刻 <span class="math inline">\(t\)</span>
+的边缘分布 <span class="math inline">\(p_t(x)\)</span>
+完全相同，但轨迹不同。</strong></p>
+<h3 id="sde-ode去掉随机性">SDE → ODE（去掉随机性）</h3>
+<p>对于反向 SDE：</p>
+<p><span class="math display">\[\mathrm{d}x = [f(x,t) -
+g^2(t)\nabla_x\log p_t(x)]\mathrm{d}t +
+g(t)\mathrm{d}\bar{w}\]</span></p>
+<p>如果去掉噪声项 <span
+class="math inline">\(g(t)\mathrm{d}\bar{w}\)</span>，并将 Score 系数从
+<span class="math inline">\(g^2\)</span> 减半为 <span
+class="math inline">\(\frac{1}{2}g^2\)</span>，就得到与之<strong>边缘分布相同</strong>的
+ODE（称为 Probability Flow ODE）：</p>
+<p><span class="math display">\[\mathrm{d}x = \left[f(x,t) -
+\frac{1}{2}g^2(t)\nabla_x\log p_t(x)\right]\mathrm{d}t\]</span></p>
+<p><strong>直觉理解</strong>：在 SDE 中，噪声 <span
+class="math inline">\(g\mathrm{d}\bar{w}\)</span> 让分布扩散，而 <span
+class="math inline">\(-g^2 \cdot \text{Score}\)</span>
+把扩散拉回来，两者相互抵消后的"净效果"等价于 <span
+class="math inline">\(-\frac{1}{2}g^2 \cdot \text{Score}\)</span>
+的确定性修正。ODE 直接用这个净效果来移动粒子，不需要噪声。</p>
+<p>由于 ODE 是确定性的，前向和反向过程都可逆，因此可精确计算
+log-likelihood（类似 DDPM 和 DDIM 的关系），并与 normalizing flow
+有相似之处。</p>
+<h3 id="ode-sde注入随机性">ODE → SDE（注入随机性）</h3>
+<p>反过来，如果我们已经有一个 ODE（如 Flow Matching 中学到的速度场 <span
+class="math inline">\(v_\theta\)</span>），也可以将其转换为 SDE——在 ODE
+的基础上注入噪声 <span
+class="math inline">\(g(t)\mathrm{d}\bar{w}\)</span>，同时添加 Score
+修正 <span class="math inline">\(-\frac{1}{2}g^2 \nabla_x\log
+p_t\)</span> 来抵消噪声带来的分布偏移：</p>
+<p><span class="math display">\[\mathrm{d}x = \left[v_\theta(x,t) -
+\frac{1}{2}g^2(t)\nabla_x\log p_t(x)\right]\mathrm{d}t +
+g(t)\mathrm{d}\bar{w}\]</span></p>
+<p>这种 ODE→SDE 转换在后续的 <strong>Flow-GRPO</strong>
+框架中至关重要——它让确定性的 Flow Matching
+模型获得了随机采样能力，为强化学习的"探索"提供了基础（详见<a
+href="/chengYi-xun/posts/55-flow-grpo/">笔记｜强化学习（五）：Flow-GRPO</a>）。</p>
+<p>两者关系如下图所示，ODE 概率流比 SDE
+更平滑，但两者最终得到的分布相同：</p>
+<p><img src="/chengYi-xun/img/ode2.jpeg" alt="SDE 和 ODE 比较" /></p>
+<h2 id="条件生成">条件生成</h2>
+<p>生成模型的一个常见需求是<strong>条件生成</strong>：不是随机生成图像，而是在给定条件
+<span
+class="math inline">\(y\)</span>（如类别标签、文本描述）下生成特定的
+<span class="math inline">\(x\)</span>。在 DDPM
+框架中，条件生成需要额外的技巧（如 Classifier
+Guidance），无法从理论上直接推导。而 SDE
+框架提供了一个优雅的显式解法。</p>
+<p><strong>核心思路</strong>：利用贝叶斯公式将条件分布的 Score
+分解为两部分。从贝叶斯公式出发：</p>
+<p><span class="math display">\[
+p(x|y)=\frac{p(x)p(y|x)}{\int p(x)p(y|x)\mathrm{d}x}
+\]</span></p>
+<p>两侧取对数再对 <span class="math inline">\(x\)</span>
+求梯度（分母是关于 <span class="math inline">\(x\)</span>
+的积分常数，梯度为零），得到：</p>
+<p><span class="math display">\[
+\underbrace{\nabla_x\log p(x|y)}_{\text{条件 Score}} =
+\underbrace{\nabla_x\log p(x)}_{\text{无条件 Score}} +
+\underbrace{\nabla_x\log p(y|x)}_{\text{似然梯度}}
+\]</span></p>
+<p>这个分解告诉我们：<strong>条件生成的 Score = 无条件 Score +
+似然的梯度方向修正</strong>。</p>
+<ul>
+<li>第一项 <span class="math inline">\(\nabla_x\log
+p(x)\)</span>：就是我们已经用 score matching 学好的无条件 Score
+网络</li>
+<li>第二项 <span class="math inline">\(\nabla_x\log
+p(y|x)\)</span>：在已知条件 <span class="math inline">\(y\)</span>
+和当前样本 <span class="math inline">\(x\)</span> 的情况下，似然 <span
+class="math inline">\(p(y|x)\)</span> 的梯度指向"让 <span
+class="math inline">\(x\)</span> 更符合条件 <span
+class="math inline">\(y\)</span>"的方向</li>
+</ul>
+<p>两者结合后代入反向
+SDE，即可实现条件生成。这一分解思路直接启发了后续的 Classifier Guidance
+方法（详见下一篇文章）。</p>
+<h1 id="总结">总结</h1>
+<p>本文将离散的 Score-based Models 推广为连续的 SDE
+框架，核心结论可归纳为以下几点：</p>
+<ul>
+<li><strong>统一描述</strong>：前向加噪 = SDE，逆向生成 = 反向 SDE +
+Score Function。通过指定不同的 <span
+class="math inline">\(f(x,t)\)</span> 和 <span
+class="math inline">\(g(t)\)</span>，可以统一 DDPM 和 SMLD
+两大流派。</li>
+<li><strong>SDE ↔︎ ODE 对偶</strong>：同一个生成过程既可以用
+SDE（随机采样）表示，也可以用 Probability Flow
+ODE（确定性采样）表示，两者共享相同的边缘分布 <span
+class="math inline">\(p_t(x)\)</span>。反过来，ODE 也可以通过注入噪声 +
+Score 修正转化为 SDE，这一思路在后续 Flow-GRPO 中被广泛使用。</li>
+<li><strong>去噪即 Score</strong>：通过 Tweedie 公式，去噪模型天然包含了
+Score 信息，不需要单独训练 Score 网络。</li>
+<li><strong>条件生成</strong>：贝叶斯分解使条件 Score = 无条件 Score +
+似然梯度，直接启发了 Classifier Guidance。</li>
+</ul>
+<p>SDE 是一个强大的统一框架——它不仅连接了已有的生成模型流派，也为后续的
+Flow Matching、Classifier-Free Guidance 等方法提供了理论基础。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S.,
+&amp; Poole, B. (2020). <em>Score-Based Generative Modeling through
+Stochastic Differential Equations</em>. ICLR 2021.</li>
+<li>Anderson, B. D. O. (1982). <em>Reverse-time diffusion equation
+models</em>. Stochastic Processes and their Applications, 12(3),
+313-326.</li>
+<li><a
+target="_blank" rel="noopener" href="https://yang-song.net/blog/2021/score/#score-based-generative-modeling-with-multiple-noise-perturbations">Generative
+Modeling by Estimating Gradients of the Data Distribution</a></li>
+<li><a target="_blank" rel="noopener" href="https://cvpr2022-tutorial-diffusion-models.github.io/">CVPR
+2022 Tutorial: Denoising Diffusion-based Generative Modeling:
+Foundations and Applications</a></li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/589106222">一文解释 Diffusion
+Model (二) Score-based SDE 理论推导</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://littlenyima.github.io/posts/17-score-based-modeling-with-sde/">基于
+SDE 的模型</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/">笔记｜生成模型（九）：Classifier
+Guidance 理论与实现</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/8-SDE/">https://chengyi-xun.github.io/chengYi-xun/posts/8-SDE/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（七）：Score-Based理论</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜生成模型（九）：Classifier Guidance 理论与实现</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E9%9A%8F%E6%9C%BA%E5%BE%AE%E5%88%86%E6%96%B9%E7%A8%8B%E7%AE%80%E4%BB%8B"><span class="toc-number">1.</span> <span class="toc-text">随机微分方程简介</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%9F%BA%E4%BA%8E-sde-%E7%9A%84-score-based-models"><span class="toc-number">2.</span> <span class="toc-text">基于 SDE 的 Score-based
+Models</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8-sde-%E6%8F%8F%E8%BF%B0%E6%89%B0%E5%8A%A8%E8%BF%87%E7%A8%8B"><span class="toc-number">2.1.</span> <span class="toc-text">使用 SDE 描述扰动过程</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8%E5%8F%8D%E5%90%91-sde-%E8%BF%9B%E8%A1%8C%E9%87%87%E6%A0%B7"><span class="toc-number">2.2.</span> <span class="toc-text">使用反向 SDE 进行采样</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8-score-matching-%E8%BF%9B%E8%A1%8C%E8%AE%AD%E7%BB%83"><span class="toc-number">2.3.</span> <span class="toc-text">使用 score matching 进行训练</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#score-%E7%9A%84%E5%8F%A6%E4%B8%80%E7%A7%8D%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F%E5%8E%BB%E5%99%AA%E5%8D%B3-score"><span class="toc-number">2.3.1.</span> <span class="toc-text">Score
+的另一种计算方式：去噪即 Score</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E8%AE%A8%E8%AE%BA"><span class="toc-number">3.</span> <span class="toc-text">讨论</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%92%8C-ddpm-%E7%9A%84%E8%81%94%E7%B3%BB"><span class="toc-number">3.1.</span> <span class="toc-text">和 DDPM 的联系</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#sde-%E4%B8%8E-ode-%E7%9A%84%E7%AD%89%E4%BB%B7%E8%BD%AC%E6%8D%A2"><span class="toc-number">3.2.</span> <span class="toc-text">SDE 与 ODE 的等价转换</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#sde-ode%E5%8E%BB%E6%8E%89%E9%9A%8F%E6%9C%BA%E6%80%A7"><span class="toc-number">3.2.1.</span> <span class="toc-text">SDE → ODE（去掉随机性）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ode-sde%E6%B3%A8%E5%85%A5%E9%9A%8F%E6%9C%BA%E6%80%A7"><span class="toc-number">3.2.2.</span> <span class="toc-text">ODE → SDE（注入随机性）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9D%A1%E4%BB%B6%E7%94%9F%E6%88%90"><span class="toc-number">3.3.</span> <span class="toc-text">条件生成</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/8-SDE/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/8-SDE/',
+      title: '笔记｜生成模型（八）：SDE统一DDPM和SMLD',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

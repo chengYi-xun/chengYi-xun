@@ -1,0 +1,1136 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜生成模型（十五）：Flux 架构解析 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为生成模型系列第十五篇。继 Stable Diffusion 3（SD3）之后，由原 SD 核心团队创立的 Black Forest Labs 推出了 Flux 系列模型。Flux 沿用了 Flow Matching 与 Diffusion Transformer（DiT）的底层框架，但在特征对齐、位置编码、网络结构以及蒸馏策略上进行了深度的重构与优化。本文将从数学原理与网络设计的角度，全面">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜生成模型（十五）：Flux 架构解析">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/15-flux/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为生成模型系列第十五篇。继 Stable Diffusion 3（SD3）之后，由原 SD 核心团队创立的 Black Forest Labs 推出了 Flux 系列模型。Flux 沿用了 Flow Matching 与 Diffusion Transformer（DiT）的底层框架，但在特征对齐、位置编码、网络结构以及蒸馏策略上进行了深度的重构与优化。本文将从数学原理与网络设计的角度，全面">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-15T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.488Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Diffusion Models">
+<meta property="article:tag" content="Flux">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/15-flux/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜生成模型（十五）：Flux 架构解析',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜生成模型（十五）：Flux 架构解析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.488Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜生成模型（十五）：Flux 架构解析"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为生成模型系列第十五篇。继 Stable Diffusion 3（SD3）之后，由原 SD
+核心团队创立的 Black Forest Labs 推出了 Flux 系列模型。Flux 沿用了 Flow
+Matching 与 Diffusion
+Transformer（DiT）的底层框架，但在特征对齐、位置编码、网络结构以及蒸馏策略上进行了深度的重构与优化。本文将从数学原理与网络设计的角度，全面解析
+Flux 的核心架构。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/14-sd3/">笔记｜生成模型（十四）：Stable
+Diffusion 3 架构解析 (MMDiT)</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/51-rl-basics/">笔记｜强化学习（一）：强化学习基础与策略梯度</a></p>
+</blockquote>
+<h2 id="一-引言flux-的定位与变体">一、 引言：Flux 的定位与变体</h2>
+<p>在 2024 年 8 月发布时，FLUX.1
+是开源社区规模最大的文本到图像（Text-to-Image）生成模型之一 [1]。相比于
+2B 参数量级的 SD3，FLUX.1 将 Transformer 骨干网络的参数量大幅扩展至
+<strong>12B（120
+亿）</strong>。相关研究表明，这种对模型容量的暴力扩展（Scaling
+up）能够显著提升模型对复杂物理规律、空间关系以及长文本指令的遵循能力 [3,
+5]。</p>
+<p>FLUX.1 包含三个主要变体，它们共享相同的 12B
+参数基础架构，但在推理效率与开源协议上有所不同：</p>
+<ul>
+<li><strong>FLUX.1
+[pro]</strong>：闭源的最强基座模型，采用标准的无分类器指引（Classifier-Free
+Guidance, CFG）进行多步采样。</li>
+<li><strong>FLUX.1
+[dev]</strong>：开源非商用版本。通过<strong>指引蒸馏（Guidance
+Distillation）</strong>技术 [6]，将 CFG
+的双路前向计算压缩为单路，在保持生成质量的同时将推理效率提升一倍。</li>
+<li><strong>FLUX.1 [schnell]</strong>：开源商用版本（Apache
+2.0）。通过<strong>潜空间对抗扩散蒸馏（LADD）</strong>技术
+[7]，将原本需要数十步的采样过程极速压缩至 1~4 步。</li>
+</ul>
+<h2 id="二-flux-整体架构与数据流解析">二、 Flux
+整体架构与数据流解析</h2>
+<p>Flux 的核心架构是一种混合了双流（Double Stream）与单流（Single
+Stream）的 Transformer 网络
+[5]。我们首先通过数据流的视角，梳理其从文本/图像输入到最终输出的完整计算图。</p>
+<p><img src="/chengYi-xun/img/flux_architecture_new.jpg"
+alt="Flux 整体架构（图源：周弈帆博客）" /></p>
+<h3 id="文本编码与全局条件注入text-encoding-conditioning">2.1
+文本编码与全局条件注入（Text Encoding &amp; Conditioning）</h3>
+<p>Flux 采用了双文本编码器策略，但相比 SD3 进行了精简，移除了
+OpenCLIP-bigG，仅保留 <strong>CLIP-L/14</strong> 与
+<strong>T5-v1.1-XXL</strong> [5]。</p>
+<ol type="1">
+<li><p><strong>Token 级特征（细粒度语义）</strong>：T5-XXL 提取长度为
+512 的文本特征序列，主要负责长指令遵循与复杂逻辑解析。该序列将直接作为
+Transformer 的文本流输入。</p></li>
+<li><p><strong>全局条件向量（Global Conditioning
+Vector）</strong>：模型需要一个全局向量来统领整个生成过程。Flux
+将以下三种标量/向量映射到相同的隐藏维度（3072维）并求和，构建出统一的全局条件向量
+<span class="math inline">\(\mathbf{c}_{\text{global}}\)</span>（在
+diffusers 源码中常被称为 <code>temb</code>）：</p>
+<ul>
+<li><strong>时间步 <span
+class="math inline">\(t\)</span></strong>：经过正弦位置编码（Sinusoidal
+Embedding）与 MLP 映射。</li>
+<li><strong>指引强度 <span
+class="math inline">\(s\)</span></strong>（仅限 [dev]
+版本）：同样经过正弦编码与 MLP 映射。</li>
+<li><strong>全局文本语义</strong>：CLIP-L 提取的 Pooled Output 经 MLP
+映射。</li>
+</ul></li>
+</ol>
+<p><span class="math display">\[ \mathbf{c}_{\text{global}} =
+\text{MLP}(\text{Sinusoidal}(t)) + \text{MLP}(\text{Sinusoidal}(s)) +
+\text{MLP}(\text{CLIP}_{\text{pooled}}) \]</span></p>
+<p>这个 <span class="math inline">\(\mathbf{c}_{\text{global}}\)</span>
+向量极其关键，它将通过自适应层归一化（Adaptive Layer Normalization,
+AdaLN）机制 [8]，在 Transformer
+的每一层中动态调制（Modulate）特征的缩放（Scale）与平移（Shift）。</p>
+<h3 id="图像潜空间与-pixel-unshuffle">2.2 图像潜空间与 Pixel
+Unshuffle</h3>
+<p>在图像输入端，Flux 使用预训练的 VAE 将 RGB 图像压缩到潜空间（Latent
+Space）。假设输入图像分辨率为 <span class="math inline">\(H \times
+W\)</span>，VAE 编码后的 Latent 形状为 <span class="math inline">\(C
+\times \frac{H}{8} \times \frac{W}{8}\)</span>（Flux 中 <span
+class="math inline">\(C=16\)</span>），记 <span class="math inline">\(h
+= \frac{H}{8}\)</span>，<span class="math inline">\(w =
+\frac{W}{8}\)</span>。</p>
+<p>为了将 2D 的 Latent 转换为 Transformer 所需的 1D Token 序列 <span
+class="math inline">\((B, L, D)\)</span>，传统方法（如 ViT [11] 或 SD3
+[8]）通常使用步长与核大小相同的卷积层（Patch Embedding）。而 Flux
+摒弃了卷积，采用了一种无参数的 <strong>Pixel Unshuffle</strong>（又称
+Space-to-Depth）操作 [5, 12]：将空间维度上 <span class="math inline">\(2
+\times 2\)</span> 的相邻像素块展平，并堆叠至通道维度。</p>
+<p>从 4D Latent 到 <span class="math inline">\((B, L, D)\)</span> Token
+序列的完整流程包含三步：</p>
+<p><strong>第一步：Pixel Unshuffle — 空间换通道。</strong> 将每 <span
+class="math inline">\(2 \times 2\)</span>
+的空间邻域折叠进通道维度。这是一个纯粹的张量重排（双射操作），不含任何可学习参数：</p>
+<p><span class="math display">\[
+(N, 16, h, w) \xrightarrow{\text{PixelUnshuffle}(r{=}2)} (N,\ 16 \times
+2 \times 2,\ \frac{h}{2},\ \frac{w}{2}) = (N, 64, \frac{h}{2},
+\frac{w}{2})
+\]</span></p>
+<p>此时张量仍为 4D 形式，空间分辨率减半，通道数增为原来的 4
+倍。每个空间位置现在"看到"了原始 <span class="math inline">\(2 \times
+2\)</span> 邻域的全部信息。</p>
+<p><strong>第二步：Flatten 空间维度 — 得到 Token 序列。</strong>
+将后两个空间维度展平为序列长度 <span
+class="math inline">\(L\)</span>：</p>
+<p><span class="math display">\[
+(N, 64, \frac{h}{2}, \frac{w}{2}) \xrightarrow{\text{flatten}} (N,\
+\underbrace{\frac{h}{2} \times \frac{w}{2}}_{L},\
+\underbrace{64}_{D&#39;})
+\]</span></p>
+<p>至此已得到 <span class="math inline">\((B, L, D&#39;)\)</span> 形式的
+Token 序列，其中 <span class="math inline">\(L = \frac{hw}{4}\)</span>
+为 Token 数量，<span class="math inline">\(D&#39; = 64\)</span> 为每个
+Token 的初始特征维度。</p>
+<p><strong>第三步：线性投影 — 对齐 Transformer 隐藏维度。</strong>
+通过一个线性层 <code>nn.Linear(64, 3072)</code> 将每个 Token 从 64
+维映射到 Transformer 的工作维度 <span class="math inline">\(D =
+3072\)</span>：</p>
+<p><span class="math display">\[
+(N, L, 64) \xrightarrow{\text{Linear}} (N, L, 3072)
+\]</span></p>
+<blockquote>
+<p>在 Flux 官方源码 [5] 中，上述三步被 einops 的 <code>rearrange</code>
+与一个线性层简洁地实现为： <div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># sampling.py — prepare()：Pixel Unshuffle + Flatten（一步完成）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">img </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> rearrange</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(img, </span><span style="color:#50A14F;--shiki-dark:#98C379">"b c (h ph) (w pw) -> b (h w) (c ph pw)"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">ph</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">pw</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># model.py — Flux.__init__()：线性投影</span></span>
+<span class="line"><span style="color:#E45649;--shiki-dark:#E5C07B">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.img_in </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> nn.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Linear</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#E45649;--shiki-dark:#E5C07B">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.in_channels, </span><span style="color:#E45649;--shiki-dark:#E5C07B">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.hidden_size)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Linear(64, 3072)</span></span></code></pre></div></p>
+</blockquote>
+<p><strong>为什么不直接 Flatten？</strong> 如果不做 Pixel
+Unshuffle，直接将 <span class="math inline">\((N, 16, h, w)\)</span>
+展平为 <span class="math inline">\((N, h \times w,
+16)\)</span>，每个空间像素各自成为一个 Token，则序列长度为 <span
+class="math inline">\(h \times w\)</span>。而 Transformer
+自注意力的计算量为 <span
+class="math inline">\(O(L^2)\)</span>，对序列长度极其敏感：</p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 42%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方案</th>
+<th>Token 数 <span class="math inline">\(L\)</span></th>
+<th>注意力 FLOPs（相对值）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>直接 Flatten（不做 Patch）</td>
+<td><span class="math inline">\(h \times w\)</span></td>
+<td><span class="math inline">\(1\times\)</span></td>
+</tr>
+<tr class="even">
+<td>Pixel Unshuffle（<span class="math inline">\(2 \times 2\)</span>
+Patch）</td>
+<td><span class="math inline">\(\frac{hw}{4}\)</span></td>
+<td><span class="math inline">\(\frac{1}{16}\times\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>以 1024×1024 图像为例，VAE 编码后 Latent 尺寸为 128×128。不做 Patch
+将产生 16384 个 Token；做 <span class="math inline">\(2\times2\)</span>
+合并后仅 4096 个 Token——注意力计算量降至 <span
+class="math inline">\(\frac{1}{16}\)</span>。</p>
+<p><strong>为什么 Patch 大小是 <span class="math inline">\(2 \times
+2\)</span> 而不是更大？</strong> 需要注意，Flux 的 Patchification
+操作在<strong>潜空间（Latent Space）</strong>而非像素空间中进行。原始
+ViT [11] 在像素空间使用 <span class="math inline">\(16 \times
+16\)</span> 的 Patch 是因为输入分辨率高达 <span
+class="math inline">\(224 \times 224\)</span>；而 Flux 的输入已经过 VAE
+的 <span class="math inline">\(8\times\)</span> 下采样（如 1024×1024
+图像被压缩至 128×128 的 Latent），空间信息已高度压缩。在此基础上再用大
+Patch 会造成严重的信息损失。</p>
+<p>Peebles &amp; Xie (2023) [13] 在 DiT（Diffusion
+Transformer）中系统地对比了 Patch 大小为 8、4、2
+三种配置，发现：<strong>Patch 越小，Token
+数越多，生成质量（FID）越好</strong>。其最优模型 DiT-XL/2 正是使用 <span
+class="math inline">\(2 \times 2\)</span> Patch。(Wang et al., 2025)
+进一步发现了 Patchification 的 Scaling Law：<strong>减小 Patch
+大小可以一致性地提升性能，理论最优为 <span class="math inline">\(1
+\times 1\)</span>（像素级 Token 化）</strong>。但 <span
+class="math inline">\(1 \times 1\)</span> 对应的序列长度太大（<span
+class="math inline">\(h \times w\)</span>），计算成本过高。因此 <span
+class="math inline">\(2 \times 2\)</span>
+是在<strong>生成质量与计算效率</strong>之间的最佳折中点——在潜空间中以极低的信息损失换取
+<span class="math inline">\(4\times\)</span> 的序列压缩。</p>
+<p><strong>设计动机——去除归纳偏置（Inductive Bias）</strong></p>
+<blockquote>
+<p><strong>什么是归纳偏置？</strong>
+归纳偏置是模型在架构设计中对数据所做的<strong>先验假设</strong>，它限制了模型的假设空间，使其在有限数据下更容易泛化。CNN
+具有两种强归纳偏置：</p>
+<ul>
+<li><strong>局部性（Locality）</strong>：卷积核只关注局部邻域（如 <span
+class="math inline">\(3 \times
+3\)</span>），假设相邻像素高度相关，而忽略远距离像素的关系；</li>
+<li><strong>平移等变性（Translation
+Equivariance）</strong>：同一卷积核在所有空间位置上共享权重。数学上，若
+<span class="math inline">\(\phi\)</span> 为卷积操作、<span
+class="math inline">\(T_s\)</span> 为平移 <span
+class="math inline">\(s\)</span> 个像素的算子，则 <span
+class="math inline">\(\phi(T_s(x)) =
+T_s(\phi(x))\)</span>——即输入图像平移多少，输出特征图也跟着平移多少。直观地说，不管一只猫出现在图像的左上角还是右下角，卷积核检测到的响应模式完全相同，只是响应的位置跟着移动了。（注意这与<strong>平移不变性</strong>
+<span class="math inline">\(\phi(T_s(x)) = \phi(x)\)</span>
+不同，后者需要全局池化才能近似实现。）</li>
+</ul>
+<p>这些先验使 CNN
+在小数据集上非常高效，但也限制了它捕获全局、长程依赖关系的能力。Transformer
+则几乎不带空间先验——它必须完全从数据中"学习"这些关系，因此需要更大规模的训练数据，但在数据充足时能达到更高的性能上限
+[11]。</p>
+</blockquote>
+<p>与 ViT [11] 和 SD3 [8] 使用的可学习卷积 Patch Embedding 不同，Pixel
+Unshuffle
+是一个确定性的双射（Bijective）重排，<strong>彻底移除了卷积层引入的归纳偏置</strong>。卷积
+Patch Embedding
+的权重矩阵本质上是在学习"如何聚合局部像素"，其感受野大小和权重共享结构仍隐含地编码了局部性假设。而
+Pixel Unshuffle
+只做纯粹的空间→通道重排，不对像素之间的关系施加任何先验——所有的空间关系学习完全交由
+Transformer 的全局自注意力机制来完成。</p>
+<p>Dosovitskiy et al. [11] 在 ViT
+的实验中已证明：当数据量与模型规模足够大时，去除归纳偏置反而能获得更高的性能上限。对于
+Flux 这样拥有 12B
+参数、在海量数据上训练的模型而言，这一设计选择尤为合理。此外，该操作完全可逆——解码时只需应用逆操作
+Pixel Shuffle 即可无损还原空间分辨率 [12]。</p>
+<h3 id="三维旋转位置编码3d-rope">2.3 三维旋转位置编码（3D RoPE）</h3>
+<p>SD3 采用的是传统的加性二维正弦位置编码 [8]。Flux
+则引入了自然语言处理中广泛使用的<strong>旋转位置编码（Rotary Positional
+Embedding, RoPE）</strong> [2]，并将其扩展至三维空间 [5]。</p>
+<p>RoPE 的核心思想是不在输入端直接叠加位置向量，而是在计算注意力机制的
+Query (<span class="math inline">\(\mathbf{q}\)</span>) 和 Key (<span
+class="math inline">\(\mathbf{k}\)</span>)
+时，左乘一个与位置相关的正交旋转矩阵 <span
+class="math inline">\(\mathbf{R}_{\Theta, m}\)</span>。这使得内积 <span
+class="math inline">\(\mathbf{q}_m^\top \mathbf{k}_n\)</span>
+能够自然地表达 Token 之间的<strong>相对位置关系</strong> [2]。</p>
+<p>在 Flux 中，每个 Token 被赋予一个三维坐标 <span
+class="math inline">\((t, h, w)\)</span>：</p>
+<ul>
+<li><strong>文本 Token</strong>：没有空间概念，坐标统一设为 <span
+class="math inline">\((0, 0, 0)\)</span>。</li>
+<li><strong>图像 Token</strong>：位于特征图第 <span
+class="math inline">\(i\)</span> 行 <span
+class="math inline">\(j\)</span> 列的 Token，坐标设为 <span
+class="math inline">\((0, i, j)\)</span>。</li>
+</ul>
+<p>这三个维度的坐标分别被编码为长度为 16、56、56 的 RoPE
+向量，拼接后总长度为 128（恰好等于单个注意力头的特征维度）。</p>
+<p><strong>为什么用 3D RoPE 而非 2D RoPE？</strong>
+乍看之下，对于单张图像的文生图任务，所有图像 Token 的 <span
+class="math inline">\(t\)</span> 维度恒为 0，似乎 <span
+class="math inline">\(t\)</span> 是多余的——2D RoPE 只编码 <span
+class="math inline">\((h, w)\)</span> 就够了。但这个第三维度 <span
+class="math inline">\(t\)</span>
+实际上是一个<strong>语义索引维度</strong>，为 Flux
+的多图扩展预留了架构接口。</p>
+<p>Flux Kontext 论文 [14]
+明确阐述了这一设计意图：在上下文图像编辑（In-Context
+Editing）任务中，模型需要同时处理<strong>目标图像</strong>和<strong>参考图像</strong>，两者共享相同的
+<span class="math inline">\((h, w)\)</span> 空间网格。此时 <span
+class="math inline">\(t\)</span> 维度充当"虚拟时间步"（virtual time
+step），用于在不破坏空间结构的前提下区分不同的图像流：</p>
+<p><span class="math display">\[
+\mathbf{u}_{\text{target}} = (0, h, w), \qquad \mathbf{u}_{y_i} = (i, h,
+w), \quad i = 1, \dots, N
+\]</span></p>
+<p>其中目标图像的 <span class="math inline">\(t = 0\)</span>，第 <span
+class="math inline">\(i\)</span> 张参考图像的 <span
+class="math inline">\(t = i\)</span>。这在官方源码中也有直接体现：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># sampling.py — prepare_kontext()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">img_cond_ids </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zeros</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(height </span><span style="color:#383A42;--shiki-dark:#56B6C2">//</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, width </span><span style="color:#383A42;--shiki-dark:#56B6C2">//</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">img_cond_ids[</span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # t 维度设为 1，区分参考图与目标图</span></span></code></pre></div>
+<p>因此，Flux 选择 3D RoPE 的原因可以归纳为三点：</p>
+<ol type="1">
+<li><strong>多图区分</strong>：2D RoPE 只能编码空间位置 <span
+class="math inline">\((h,
+w)\)</span>，无法区分同一空间位置上来自不同图像的 Token。<span
+class="math inline">\(t\)</span> 维度提供了这个额外的区分能力，使得
+Kontext 可以原生支持最多 10 张参考图 [14]。</li>
+<li><strong>视频扩展</strong>：<span class="math inline">\(t\)</span>
+维度天然对应视频的时间轴。VideoRoPE (Wang et al., 2025b) 等工作已证明 3D
+RoPE 在视频生成中的有效性。Flux 从一开始就采用 3D
+编码，未来扩展到视频生成时无需修改架构。</li>
+<li><strong>零成本预留</strong>：对于基础的文生图任务，<span
+class="math inline">\(t \equiv 0\)</span> 对 RoPE
+旋转矩阵不产生影响（旋转角为
+0），因此不会引入额外的计算开销或性能损失——它只是一个"休眠"维度，在需要时才被激活。</li>
+</ol>
+<p>3D RoPE 赋予了 Flux
+极强的空间外推能力，使其能够完美适应任意长宽比与高分辨率的图像生成，同时为多图编辑和视频生成提供了统一的位置编码框架
+[5, 14]。</p>
+<h2 id="三-混合-transformer-骨干网络">三、 混合 Transformer
+骨干网络</h2>
+<p>Flux 的 Transformer 骨干网络由 19 层双流块（Double Stream Blocks）和
+38 层单流块（Single Stream Blocks）串联而成
+[5]。这种混合架构在表达能力与计算效率之间取得了绝佳的平衡。</p>
+<h3 id="双流块double-stream-blocks跨模态对齐">3.1 双流块（Double Stream
+Blocks）：跨模态对齐</h3>
+<p>网络的前 19 层采用了与 SD3 MMDiT 结构一致的双流块
+[8]。在这一阶段，文本序列 <span
+class="math inline">\(\mathbf{X}_{\text{txt}}\)</span> 与图像序列 <span
+class="math inline">\(\mathbf{X}_{\text{img}}\)</span>
+保持物理上的隔离。</p>
+<p><strong>计算流程</strong>：</p>
+<ol type="1">
+<li><strong>独立调制与投影</strong>：文本和图像分别通过各自的 AdaLN
+层（受 <span class="math inline">\(\mathbf{c}_{\text{global}}\)</span>
+调制），并使用独立的权重矩阵投影出各自的 <span
+class="math inline">\(\mathbf{Q}, \mathbf{K}, \mathbf{V}\)</span>。</li>
+<li><strong>联合注意力（Joint Attention）</strong>：将两者的 <span
+class="math inline">\(\mathbf{Q}, \mathbf{K}, \mathbf{V}\)</span>
+在序列维度上拼接，执行全局的自注意力计算。这一步是模态间信息交换的唯一通道。</li>
+<li><strong>独立前馈网络（MLP）</strong>：注意力计算完成后，序列被重新拆分为文本和图像两部分，分别输入各自的
+MLP 进行非线性变换。</li>
+</ol>
+<p><strong>设计动机</strong>：在网络浅层，文本（离散语义）与图像（连续像素）的特征空间存在巨大的语义鸿沟（Modality
+Gap）。使用独立的权重矩阵处理不同的模态，能够提供足够的自由度让模型完成初步的特征对齐
+[5, 8]。</p>
+<h3 id="单流块single-stream-blocks深度融合与并行计算">3.2 单流块（Single
+Stream Blocks）：深度融合与并行计算</h3>
+<p>在经过 19 层双流块的初步对齐后，网络后段的 38 层无缝切换至单流块
+[5]。</p>
+<p><img src="/chengYi-xun/img/flux_single_stream.jpg"
+alt="Single Stream Block 结构（图源：Demystifying Flux Architecture, arXiv:2507.09595）" /></p>
+<p><strong>计算流程</strong>：</p>
+<ol type="1">
+<li><strong>序列拼接</strong>：文本与图像序列在进入单流块前被永久拼接为一个统一的长序列
+<span class="math inline">\(\mathbf{X}_{\text{joint}} =
+[\mathbf{X}_{\text{txt}}, \mathbf{X}_{\text{img}}]\)</span>。</li>
+<li><strong>共享权重</strong>：所有 Token 共享同一套
+AdaLN、自注意力权重与 MLP 权重。</li>
+<li><strong>并行计算架构</strong>：Flux 借鉴了 ViT-22B 的设计
+[3]，打破了传统 Transformer 中 Attention 和 MLP
+串行计算的惯例。在单流块中，归一化后的特征同时输入给 Attention 层和 MLP
+层，两者的输出在通道维度拼接后，通过一个统一的线性层进行融合： <span
+class="math display">\[ \mathbf{X}_{\text{out}} = \mathbf{X}_{\text{in}}
++
+\text{Linear}(\text{Concat}(\text{Attention}(\mathbf{X}_{\text{norm}}),
+\text{MLP}(\mathbf{X}_{\text{norm}}))) \]</span></li>
+</ol>
+<p><strong>设计动机</strong>：在网络深层，多模态特征已经实现了高层次的语义融合，此时继续维持两套权重不仅造成参数冗余，还会阻碍特征的进一步交融。单流架构显著提升了参数利用率；而并行计算设计则大幅减少了计算图的深度，提高了硬件执行效率
+[3, 5]。</p>
+<h2 id="四-核心创新点与数学原理解析">四、 核心创新点与数学原理解析</h2>
+<p>除了骨干网络的重构，Flux
+在训练目标、蒸馏策略与训练稳定性上也引入了多项前沿技术。</p>
+<h3 id="蒸馏技术从指引蒸馏到-ladd">4.1 蒸馏技术：从指引蒸馏到 LADD</h3>
+<p>传统扩散模型依赖无分类器指引（CFG）来增强文本条件的影响力。数学上，CFG
+要求在每个时间步计算两次速度场（或噪声），并进行外推： <span
+class="math display">\[ \hat{v} = v_{\text{uncond}} + s \cdot
+(v_{\text{cond}} - v_{\text{uncond}}) \]</span> 其中 <span
+class="math inline">\(s\)</span> 为指引强度（Guidance
+Scale）。这种双路计算导致推理时间直接翻倍。Flux
+提供了两种截然不同的蒸馏方案来解决这一痛点：</p>
+<p><strong>方案一：指引蒸馏（Guidance Distillation, 用于 FLUX.1
+[dev]）</strong> 该方案的目标是<strong>消除 CFG
+的双倍计算开销</strong>，但保持原有的采样步数（约 50 步） [6]。</p>
+<ul>
+<li><strong>教师模型（FLUX.1
+[pro]）的计算</strong>：在训练的每一步，给定文本条件 <span
+class="math inline">\(c\)</span>、当前潜变量 <span
+class="math inline">\(z_t\)</span> 和时间步 <span
+class="math inline">\(t\)</span>，教师模型首先进行两次前向传播，分别计算无条件输出
+<span class="math inline">\(v_{\text{uncond}}\)</span> 和有条件输出
+<span
+class="math inline">\(v_{\text{cond}}\)</span>。随后，在预设的区间内（如
+<span class="math inline">\([1.0,
+10.0]\)</span>）<strong>随机采样一个指引强度标量 <span
+class="math inline">\(s\)</span></strong>（例如抽到 <span
+class="math inline">\(s=3.5\)</span>），利用 CFG
+公式计算出融合后的目标速度场 <span
+class="math inline">\(\hat{v}_{\text{teacher}}\)</span>。<em>注：教师模型的全局条件向量
+<span class="math inline">\(\mathbf{c}_{\text{global}}\)</span>
+仅包含时间步 <span class="math inline">\(t\)</span> 和文本语义，不包含
+<span class="math inline">\(s\)</span>。</em></li>
+<li><strong>学生模型（FLUX.1
+[dev]）的计算</strong>：学生模型同样接收文本条件 <span
+class="math inline">\(c\)</span>、潜变量 <span
+class="math inline">\(z_t\)</span> 和时间步 <span
+class="math inline">\(t\)</span>。但与教师不同的是，学生模型<strong>将刚才采样到的标量
+<span class="math inline">\(s\)</span>
+作为一个额外的输入参数</strong>（经过正弦编码与 MLP 后，融入全局条件向量
+<span class="math inline">\(\mathbf{c}_{\text{global}}\)</span>
+中）。学生模型仅进行<strong>一次前向传播</strong>，输出 <span
+class="math inline">\(v_{\text{student}}\)</span>。</li>
+<li><strong>优化目标</strong>：通过均方误差损失（MSE），迫使单次前向的
+<span class="math inline">\(v_{\text{student}}\)</span>
+逼近教师模型双次前向组合出的 <span
+class="math inline">\(\hat{v}_{\text{teacher}}\)</span>。</li>
+<li><strong>结果</strong>：蒸馏完成后，推理时只需将期望的 CFG 强度 <span
+class="math inline">\(s\)</span>
+传给模型，即可在单次前向计算中直接获得等效于该 CFG
+强度的生成结果，推理速度翻倍。</li>
+</ul>
+<p><strong>方案二：潜空间对抗扩散蒸馏（LADD, 用于 FLUX.1
+[schnell]）</strong>
+该方案的目标是<strong>极大地压缩采样步数</strong>（从 50 步压缩至 1~4
+步） [7]。为了理解 LADD，我们需要先了解它试图解决的痛点：</p>
+<ul>
+<li><p><strong>早期对抗蒸馏（如 ADD
+[15]）的痛点</strong>：早期的加速方案会让学生模型在 1~4
+步内生成图像，然后用一个外部的、预训练好的图像分类器（如
+DINOv2）作为“判别器”来打分。但 DINOv2
+工作在<strong>像素空间</strong>，这就要求学生模型（在潜空间中去噪的）必须先通过
+<strong>VAE 解码器</strong>将潜变量转换为像素图像，才能送入判别器。虽然
+VAE 解码本身只是一次前向计算，但在训练循环中反复执行会带来严重的瓶颈 [7,
+15]：</p>
+<ul>
+<li><strong>反向传播开销</strong>：对抗损失的梯度需要穿过 VAE
+解码器回传到学生模型，训练时必须保存解码器所有中间层的激活值，显存压力巨大；</li>
+<li><strong>数据膨胀</strong>：像素图像远大于潜变量（如 <span
+class="math inline">\(128 \times 128 \times 16\)</span> 的 Latent 解码为
+<span class="math inline">\(1024 \times 1024 \times 3\)</span>
+的像素图，数据量增大约 12 倍），进一步加剧显存消耗；</li>
+<li><strong>分辨率锁死</strong>：DINOv2 判别器只能处理固定分辨率（如
+<span class="math inline">\(518 \times 518\)</span>），导致 ADD
+训练被限制在固定分辨率，无法支持任意长宽比的生成。</li>
+</ul></li>
+<li><p><strong>LADD 的核心创新：全程在潜空间（Latent
+Space）完成对抗</strong>。LADD
+彻底抛弃了外部的像素级判别器，直接利用强大的<strong>教师模型（FLUX.1
+[pro]）本身</strong>来充当判别器的特征提取器，完全绕开了 VAE
+解码这一环节 [7]。</p></li>
+</ul>
+<p><strong>LADD 的具体训练流程如下</strong>：</p>
+<ol type="1">
+<li><strong>生成阶段（Generator）</strong>：学生模型（[schnell]）接收纯噪声，试图在极少的步数（如
+1~4 步）内，直接预测出一个高质量的潜变量 <span
+class="math inline">\(\hat{z}_0\)</span>。</li>
+<li><strong>判别阶段（Discriminator）</strong>：将学生生成的 <span
+class="math inline">\(\hat{z}_0\)</span> 和真实的潜变量 <span
+class="math inline">\(z_0\)</span>
+分别输入给冻结的教师模型（[pro]）。LADD
+并不看教师模型的最终输出，而是<strong>提取教师模型内部注意力层（Attention
+Layers）的中间特征</strong>。在这些特征之上，接一个轻量级的判别器网络，用来分辨输入到底是“学生生成的
+Fake Latent”还是“真实的 Real Latent” [7]。</li>
+<li><strong>双重优化目标</strong>：
+<ul>
+<li><strong>对抗损失（Adversarial
+Loss）</strong>：学生模型需要不断优化自身，努力生成极其逼真的潜变量，以“骗过”基于教师特征的判别器。这保证了模型在
+1~4 步内就能生成具有极高清晰度和丰富细节（高频信息）的图像。</li>
+<li><strong>分数蒸馏采样（Score Distillation Sampling,
+SDS）</strong>：除了对抗，学生模型还要最小化 SDS 损失。SDS
+利用教师模型预测的速度场/噪声，为学生模型提供明确的梯度方向，确保学生生成的图像在整体语义和结构上（低频信息）严格遵循教师模型的分布
+[7]。</li>
+</ul></li>
+<li><strong>合成数据训练（Synthetic Data
+Training）</strong>：为了保证学生模型在极少步数下依然拥有顶级的图文对齐能力，LADD
+的训练数据并非真实图像，而是由教师模型（[pro]）提前生成好的高质量合成数据。因为真实图文对往往存在描述缺失或错位的问题，而合成数据则能提供“完美对齐”的监督信号。</li>
+<li><strong>结果</strong>：蒸馏后的 [schnell] 模型不仅摆脱了 CFG
+的束缚（无需输入 Guidance），还能在 1~4
+步内生成极高质量的图像，且天然支持多分辨率和任意长宽比。</li>
+</ol>
+<h3 id="分辨率自适应噪声调度resolution-adaptive-noise-scheduling">4.2
+分辨率自适应噪声调度（Resolution-Adaptive Noise Scheduling）</h3>
+<p>在 Flow Matching 框架下，时间步 <span class="math inline">\(t \in [0,
+1]\)</span> 决定了当前状态是偏向纯噪声（<span
+class="math inline">\(t=0\)</span>）还是清晰图像（<span
+class="math inline">\(t=1\)</span>）。推理时，采样器需要在 <span
+class="math inline">\([0, 1]\)</span>
+区间上放置若干时间步，然后沿这些时间步依次求解
+ODE。一个朴素的做法是<strong>均匀放置</strong>时间步（如 <span
+class="math inline">\(t = 1.0, 0.8, 0.6, 0.4, 0.2,
+0.0\)</span>），但这对所有分辨率一视同仁，忽略了一个关键的物理直觉。</p>
+<p><strong>核心直觉：为什么高分辨率需要更多"高噪声"步数？</strong></p>
+<p>想象往一张 <span class="math inline">\(64 \times 64\)</span> 和一张
+<span class="math inline">\(512 \times 512\)</span>
+的图像上添加相同标准差的高斯噪声。低分辨率图像的全局结构（如物体轮廓、大色块）很快就被淹没了；而高分辨率图像由于像素数多、相邻像素强相关，同样强度的噪声对全局结构的破坏要小得多——你仍能"透过噪声"看到大致轮廓
+[8]。这意味着高分辨率图像需要<strong>更强的噪声</strong>才能将信号彻底摧毁。对称地，反向生成时，高分辨率图像必须在<strong>高噪声区域</strong>（即
+<span class="math inline">\(t\)</span> 接近 0
+时）投入更多的积分步数，才能正确恢复其复杂的全局拓扑结构 [8]。</p>
+<p>SD3 论文 [8] 首先提出了这一分辨率自适应的时间步偏移机制，Flux
+继承了这一设计。具体来说，给定均匀分布的基础时间步 <span
+class="math inline">\(t\)</span>，Flux
+通过一个非线性变换将其映射为偏移后的时间步 <span
+class="math inline">\(t&#39;\)</span>：</p>
+<p><span class="math display">\[
+t&#39; = \frac{e^{\mu} \cdot t}{1 + (e^{\mu} - 1) \cdot t}
+\]</span></p>
+<p>其中偏移参数 <span class="math inline">\(\mu\)</span> 根据图像 Token
+总数 <span class="math inline">\(N\)</span>
+<strong>线性插值</strong>得到：</p>
+<p><span class="math display">\[
+\mu = m \cdot N + b, \quad m = \frac{1.15 - 0.5}{4096 - 256}, \quad b =
+0.5 - m \cdot 256
+\]</span></p>
+<p>即 <span class="math inline">\(\mu\)</span> 在 <span
+class="math inline">\(N = 256\)</span>（<span class="math inline">\(16
+\times 16\)</span> Latent，低分辨率）时为 <span
+class="math inline">\(0.5\)</span>，在 <span class="math inline">\(N =
+4096\)</span>（<span class="math inline">\(64 \times 64\)</span>
+Latent，高分辨率）时为 <span
+class="math inline">\(1.15\)</span>。这在官方源码中的实现如下：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># sampling.py</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> time_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">mu</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> sigma</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> t</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> math.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(mu) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (math.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(mu) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> /</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigma)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> get_schedule</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">num_steps</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> image_seq_len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> base_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> max_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">1.15</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">linspace</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, num_steps </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 均匀时间步</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> shift:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        mu </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> get_lin_function</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">y1</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">base_shift, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">y2</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">max_shift)(image_seq_len)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        timesteps </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> time_shift</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(mu, </span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, timesteps)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 非线性偏移</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> timesteps.</span><span style="color:#383A42;--shiki-dark:#61AFEF">tolist</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span></code></pre></div>
+<p>下图展示了不同 <span class="math inline">\(\mu\)</span>
+值下时间步偏移函数的效果。黑色虚线为无偏移（恒等映射），彩色曲线分别对应低、中、高分辨率的偏移程度：</p>
+<p><img src="/chengYi-xun/img/flux_time_shift.png"
+alt="Flux 分辨率自适应时间步偏移函数" /></p>
+<p>可以看到，<span class="math inline">\(\mu\)</span>
+越大（分辨率越高），曲线越向左上方凸起——同一个均匀时间步 <span
+class="math inline">\(t\)</span> 被映射到更高的 <span
+class="math inline">\(t&#39;\)</span>
+值。这意味着采样器在高噪声区域（曲线左侧，对应全局结构的恢复阶段）分配了更密集的步长，而在低噪声区域（曲线右侧，对应细节填充）则以更大步长快速通过
+[8]。</p>
+<h3 id="qk-norm-与-12b-模型训练稳定性">4.3 QK-Norm 与 12B
+模型训练稳定性</h3>
+<p>在将 Transformer 扩展至 12B
+参数时，注意力机制的数值不稳定性会急剧放大。在标准的 Attention
+中，注意力分数由 <span class="math inline">\(\mathbf{Q}\mathbf{K}^\top /
+\sqrt{d}\)</span>
+计算得出。当特征维度或参数量极大时，点积结果容易出现极值，导致 Softmax
+函数进入饱和区（梯度消失）或引发梯度爆炸 [3]。</p>
+<p>Flux 引入了 <strong>QK-Norm</strong> 技术 [3,
+5]：在计算点积之前，先对 Query 和 Key 分别应用 RMSNorm（均方根归一化）：
+<span class="math display">\[ \text{Attention}(\mathbf{Q}, \mathbf{K},
+\mathbf{V}) = \text{Softmax}\left( \text{RMSNorm}(\mathbf{Q}) \cdot
+\text{RMSNorm}(\mathbf{K})^\top \right) \mathbf{V} \]</span>
+这一操作强制 <span class="math inline">\(\|\mathbf{q}\| \approx
+1\)</span> 且 <span class="math inline">\(\|\mathbf{k}\| \approx
+1\)</span>，严格限制了注意力分数的数值上限，从根本上消除了 Softmax
+饱和现象，确保了 12B 极大规模模型的训练稳定性 [3]。</p>
+<p><strong>延伸：QK-Norm 已成为现代大模型的标配。</strong> 到 2025
+年，QK-Norm 已被广泛采用为大规模 Transformer
+的训练稳定性"最佳实践"，包括 Gemma 3、OLMo 2、Qwen 3、Kimi K2
+等主流模型均采用了这一技术 (Tan, 2025)。即便是 DeepSeek-V3（671B
+参数）和 V4（1T+
+参数）这样的超大规模模型，训练过程也被报告为"极其稳定，没有不可恢复的
+Loss 尖峰"(DeepSeek-AI, 2024)。值得注意的是，DeepSeek 使用的
+<strong>MLA（Multi-head Latent Attention）</strong> 架构由于对 Q、K
+做了低秩压缩，无法直接在推理时展开完整的 Q、K 向量来应用标准 QK-Norm
+(Anson &amp; Aitchison,
+2025)。对此，研究者提出了替代方案：如通过参数级别的学习率调控来约束注意力
+logit 的增长速度 (Anson &amp; Aitchison, 2025)，或使用 <strong>Logit
+Soft-Capping</strong>（如 Gemma 2 中的 <span class="math inline">\(c
+\cdot \tanh(\text{logits} / c)\)</span>）对注意力分数做平滑截断 (Tan,
+2025)。但总体趋势是：QK-Norm
+因其简洁性和有效性，正在逐步取代这些后处理方案——Gemma 3 就将 Gemma 2
+中的 Soft-Capping 替换为了 QK-Norm (Tan, 2025)。</p>
+<h2 id="五-延伸flux.2-的架构演进与能力飞跃">五、 延伸：FLUX.2
+的架构演进与能力飞跃</h2>
+<p>2025 年 11 月，Black Forest Labs 推出了全新预训练的 FLUX.2
+[9]。它绝非 FLUX.1
+的简单微调版，而是在底层架构与产品能力上进行了一次“脱胎换骨”的重构
+[10]。为了让大家更直观地理解这次升级，我们将从“底层架构”和“外在能力”两个维度进行剖析。</p>
+<h3 id="底层架构的激进重构">5.1 底层架构的激进重构</h3>
+<ol type="1">
+<li><p><strong>文本编码器大换血：从“关键词匹配器”到“原生多模态大模型”</strong>
+FLUX.1 使用了 CLIP + T5
+的组合，这俩本质上还是传统的文本编码器，对复杂物理规律（比如“镜子里的倒影”、“半透明材质”）的理解比较吃力。
+FLUX.2 直接掀桌子，换成了一个 <strong>24B 参数的视觉语言大模型（VLM）——
+Mistral Small 3.1</strong> [9]。VLM
+是看过海量图文交织数据的，它拥有强大的“世界知识”。这意味着 FLUX.2
+不仅能听懂你的提示词，还能像人类一样理解空间关系和物理属性。为了达到最佳效果，FLUX.2
+巧妙地提取了 Mistral 中间层（第 10、20、30
+层）的特征进行堆叠，因为中间层往往保留了最适合生成图像的语义信息
+[10]。</p></li>
+<li><p><strong>骨干网络大倾斜：单流块的全面胜利</strong> FLUX.1
+证明了一件事：双流块（文本和图像分开处理）虽然好，但太占参数了。只要在网络最前面用几个双流块把特征对齐，后面的工作完全可以交给更高效的单流块（文本图像拼在一起处理）。
+因此，FLUX.2 将 19 层双流 + 38 层单流的比例，极其激进地调整为 <strong>8
+层双流 + 48 层单流</strong> [10]。在 FLUX.2 庞大的 <strong>32B</strong>
+参数中，约 73%
+的参数都被分配给了融合更深入、计算更高效的单流块。</p></li>
+<li><p><strong>极致的架构微调（Tweaks）</strong></p>
+<ul>
+<li><strong>全面移除 Bias 参数</strong>：在神经网络中，线性层的计算为
+<span class="math inline">\(y = Wx + b\)</span>，其中 <span
+class="math inline">\(b\)</span> 就是
+Bias（偏置）参数——它是一个可学习的向量，允许线性变换在输出空间中做平移。在
+Transformer 中，Bias 主要存在于以下位置：(1) <strong>注意力层的 Q/K/V
+投影</strong>和<strong>输出投影</strong>的线性层中（FLUX.1 中
+<code>qkv_bias=True</code>）；(2) <strong>MLP/FFN
+层</strong>的线性层中；(3) <strong>归一化层</strong>中（LayerNorm 的
+<span class="math inline">\(\beta\)</span> 参数本质上也是 Bias，但
+RMSNorm 天然不含此项）。然而在使用了 RMSNorm 的现代 Transformer
+中，归一化操作本身已经会重新调整激活值的分布，使得 Bias
+的平移效果被"抵消"，变得冗余。移除 Bias
+不仅减少了参数量和显存开销，实验上还被发现能提升大模型的训练稳定性。这也是
+LLaMA、PaLM、Qwen 等主流大语言模型的标准做法。</li>
+<li><strong>共享 AdaLN
+调制</strong>：双流块和单流块内部不再各自为战，而是共享调制参数，大幅降低了条件注入的开销。</li>
+<li><strong>升级 SwiGLU 激活函数</strong>：抛弃了老旧的
+GELU，换上了在大语言模型（LLM）中大放异彩的 SwiGLU。</li>
+<li><strong>全新 VAE (AutoencoderKLFlux2)</strong>：重新训练了
+VAE，极大地提升了对高频细节（如微小的文字、织物纹理）的压缩与重建质量
+[9, 10]。</li>
+</ul></li>
+</ol>
+<h3 id="架构驱动的能力质变">5.2 架构驱动的能力质变</h3>
+<p>上述架构变化并非孤立的工程优化——它们共同支撑了 FLUX.2
+在实际生成能力上的显著提升 [9, 10]。</p>
+<ol type="1">
+<li><strong>原生 4MP 高分辨率生成</strong>：FLUX.1 原生输出约 1MP（如
+1024×1024），FLUX.2 则支持原生 4MP（如
+2048×2048）输出，无需后处理放大。这得益于全新
+VAE（AutoencoderKLFlux2）更优的压缩-重建平衡，以及 32B
+骨干网络对高分辨率全局结构的建模能力。</li>
+<li><strong>多图参考一致性（Multi-Reference）</strong>：FLUX.2
+原生支持最多 10
+张参考图同时输入，保持角色、产品或画风在不同场景间的一致性。这一能力直接源自
+3D RoPE 的 <span class="math inline">\(t\)</span>
+维度设计（§2.3）——不同参考图通过不同的 <span
+class="math inline">\(t\)</span> 值编码，在共享空间坐标 <span
+class="math inline">\((h, w)\)</span> 的同时被自注意力机制区分
+[14]。</li>
+<li><strong>生成与编辑的统一</strong>：FLUX.1
+时代，文生图（Generation）和局部编辑（Inpainting/Editing）通常需要独立的模型或工作流。FLUX.2
+将两者统一在同一架构下——同一个 checkpoint
+既能从纯文本生成图像，也能基于参考图进行编辑 [9]。</li>
+<li><strong>可靠的文字渲染（Typography）</strong>：FLUX.2
+能够生成包含复杂排版的图像（如 UI 原型、信息图表中的精细文字）。VLM
+文本编码器（Mistral Small 3.1）对字母序列和排版语义的理解远超传统的
+CLIP/T5 组合，是这一能力的关键 [9]。</li>
+<li><strong>结构化精准控制</strong>：支持 HEX 色值精确匹配（如提示词中写
+<code>#FF5733</code> 即可还原对应颜色）和 JSON
+格式的结构化提示词（Structured
+Prompting），允许开发者以类似代码的方式控制构图、相机参数与光影布局 [9,
+10]。</li>
+</ol>
+<h3 id="flux.1-与-flux.2-核心参数对比">5.3 FLUX.1 与 FLUX.2
+核心参数对比</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">架构维度</th>
+<th style="text-align: left;">FLUX.1</th>
+<th style="text-align: left;">FLUX.2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>骨干参数量</strong></td>
+<td style="text-align: left;">12B</td>
+<td style="text-align: left;"><strong>32B</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>文本编码器</strong></td>
+<td style="text-align: left;">CLIP-L + T5-XXL</td>
+<td style="text-align: left;"><strong>Mistral Small 3.1
+(24B)</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>双流/单流层数</strong></td>
+<td style="text-align: left;">19 / 38</td>
+<td style="text-align: left;"><strong>8 / 48</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>双流参数占比</strong></td>
+<td style="text-align: left;">~54%</td>
+<td style="text-align: left;"><strong>~24%</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Bias 参数</strong></td>
+<td style="text-align: left;">存在</td>
+<td style="text-align: left;"><strong>全部移除</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>AdaLN 调制</strong></td>
+<td style="text-align: left;">逐层独立生成</td>
+<td style="text-align: left;"><strong>块间共享</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>MLP 激活函数</strong></td>
+<td style="text-align: left;">GELU</td>
+<td style="text-align: left;"><strong>SwiGLU</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>VAE</strong></td>
+<td style="text-align: left;">FLUX.1 VAE</td>
+<td style="text-align: left;"><strong>AutoencoderKLFlux2</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>原生分辨率</strong></td>
+<td style="text-align: left;">~1MP</td>
+<td style="text-align: left;"><strong>4MP</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>参考图支持</strong></td>
+<td style="text-align: left;">依赖外部 ControlNet</td>
+<td style="text-align: left;"><strong>原生支持最多 10 张</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Black Forest Labs. (2024). <em>Flux.1 [dev]</em>.
+https://blackforestlabs.ai/</li>
+<li>Su, J. et al. (2024). <em>RoFormer: Enhanced Transformer with Rotary
+Position Embedding</em>. arXiv:2104.09864.</li>
+<li>Dehghani, M. et al. (2023). <em>Scaling Vision Transformers to 22
+Billion Parameters</em>. ICML 2023.</li>
+<li>周弈帆. (2024). <em>FLUX.1 源码深度前瞻解读</em>.
+https://zhouyifan.net/2024/09/03/20240809-flux1/</li>
+<li>Greenberg, O. (2025). <em>Demystifying Flux Architecture</em>.
+arXiv:2507.09595.</li>
+<li>Meng, C. et al. (2023). <em>On Distillation of Guided Diffusion
+Models</em>. CVPR 2023.</li>
+<li>Sauer, A. et al. (2024). <em>Fast High-Resolution Image Synthesis
+with Latent Adversarial Diffusion Distillation</em>.
+arXiv:2403.12015.</li>
+<li>Esser, P. et al. (2024). <em>Scaling Rectified Flow Transformers for
+High-Resolution Image Synthesis</em>. ICML 2024.</li>
+<li>Black Forest Labs. (2025). <em>FLUX.2: Frontier Visual
+Intelligence</em>. https://bfl.ai/blog/flux-2</li>
+<li>HuggingFace. (2025). <em>Diffusers welcomes FLUX-2</em>.
+https://huggingface.co/blog/flux-2</li>
+<li>Dosovitskiy, A. et al. (2021). <em>An Image is Worth 16x16
+Words</em>. ICLR 2021.</li>
+<li>Shi, W. et al. (2016). <em>Efficient Sub-Pixel Convolutional Neural
+Network</em>. CVPR 2016.</li>
+<li>Peebles, W. &amp; Xie, S. (2023). <em>Scalable Diffusion Models with
+Transformers</em>. ICCV 2023.</li>
+<li>Black Forest Labs. (2025). <em>FLUX.1 Kontext</em>.
+arXiv:2506.15742.</li>
+<li>Sauer, A. et al. (2024). <em>Adversarial Diffusion
+Distillation</em>. ECCV 2024.</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/51-rl-basics/">笔记｜强化学习（一）：强化学习基础与策略梯度</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/15-flux/">https://chengyi-xun.github.io/chengYi-xun/posts/15-flux/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Diffusion-Models/">Diffusion Models</a><a class="post-meta__tags" href="/chengYi-xun/tags/Flux/">Flux</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（一）：强化学习基础与策略梯度</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-14</div><div class="title">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</div></div></a></div><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80-%E5%BC%95%E8%A8%80flux-%E7%9A%84%E5%AE%9A%E4%BD%8D%E4%B8%8E%E5%8F%98%E4%BD%93"><span class="toc-number">1.</span> <span class="toc-text">一、 引言：Flux 的定位与变体</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C-flux-%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84%E4%B8%8E%E6%95%B0%E6%8D%AE%E6%B5%81%E8%A7%A3%E6%9E%90"><span class="toc-number">2.</span> <span class="toc-text">二、 Flux
+整体架构与数据流解析</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%96%87%E6%9C%AC%E7%BC%96%E7%A0%81%E4%B8%8E%E5%85%A8%E5%B1%80%E6%9D%A1%E4%BB%B6%E6%B3%A8%E5%85%A5text-encoding-conditioning"><span class="toc-number">2.1.</span> <span class="toc-text">2.1
+文本编码与全局条件注入（Text Encoding &amp; Conditioning）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%9B%BE%E5%83%8F%E6%BD%9C%E7%A9%BA%E9%97%B4%E4%B8%8E-pixel-unshuffle"><span class="toc-number">2.2.</span> <span class="toc-text">2.2 图像潜空间与 Pixel
+Unshuffle</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%89%E7%BB%B4%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%813d-rope"><span class="toc-number">2.3.</span> <span class="toc-text">2.3 三维旋转位置编码（3D RoPE）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89-%E6%B7%B7%E5%90%88-transformer-%E9%AA%A8%E5%B9%B2%E7%BD%91%E7%BB%9C"><span class="toc-number">3.</span> <span class="toc-text">三、 混合 Transformer
+骨干网络</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%8C%E6%B5%81%E5%9D%97double-stream-blocks%E8%B7%A8%E6%A8%A1%E6%80%81%E5%AF%B9%E9%BD%90"><span class="toc-number">3.1.</span> <span class="toc-text">3.1 双流块（Double Stream
+Blocks）：跨模态对齐</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%95%E6%B5%81%E5%9D%97single-stream-blocks%E6%B7%B1%E5%BA%A6%E8%9E%8D%E5%90%88%E4%B8%8E%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97"><span class="toc-number">3.2.</span> <span class="toc-text">3.2 单流块（Single
+Stream Blocks）：深度融合与并行计算</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B-%E6%A0%B8%E5%BF%83%E5%88%9B%E6%96%B0%E7%82%B9%E4%B8%8E%E6%95%B0%E5%AD%A6%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90"><span class="toc-number">4.</span> <span class="toc-text">四、 核心创新点与数学原理解析</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%92%B8%E9%A6%8F%E6%8A%80%E6%9C%AF%E4%BB%8E%E6%8C%87%E5%BC%95%E8%92%B8%E9%A6%8F%E5%88%B0-ladd"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 蒸馏技术：从指引蒸馏到 LADD</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%86%E8%BE%A8%E7%8E%87%E8%87%AA%E9%80%82%E5%BA%94%E5%99%AA%E5%A3%B0%E8%B0%83%E5%BA%A6resolution-adaptive-noise-scheduling"><span class="toc-number">4.2.</span> <span class="toc-text">4.2
+分辨率自适应噪声调度（Resolution-Adaptive Noise Scheduling）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#qk-norm-%E4%B8%8E-12b-%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83%E7%A8%B3%E5%AE%9A%E6%80%A7"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 QK-Norm 与 12B
+模型训练稳定性</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94-%E5%BB%B6%E4%BC%B8flux.2-%E7%9A%84%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B%E4%B8%8E%E8%83%BD%E5%8A%9B%E9%A3%9E%E8%B7%83"><span class="toc-number">5.</span> <span class="toc-text">五、 延伸：FLUX.2
+的架构演进与能力飞跃</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%BA%95%E5%B1%82%E6%9E%B6%E6%9E%84%E7%9A%84%E6%BF%80%E8%BF%9B%E9%87%8D%E6%9E%84"><span class="toc-number">5.1.</span> <span class="toc-text">5.1 底层架构的激进重构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E9%A9%B1%E5%8A%A8%E7%9A%84%E8%83%BD%E5%8A%9B%E8%B4%A8%E5%8F%98"><span class="toc-number">5.2.</span> <span class="toc-text">5.2 架构驱动的能力质变</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#flux.1-%E4%B8%8E-flux.2-%E6%A0%B8%E5%BF%83%E5%8F%82%E6%95%B0%E5%AF%B9%E6%AF%94"><span class="toc-number">5.3.</span> <span class="toc-text">5.3 FLUX.1 与 FLUX.2
+核心参数对比</span></a></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/15-flux/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/15-flux/',
+      title: '笔记｜生成模型（十五）：Flux 架构解析',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

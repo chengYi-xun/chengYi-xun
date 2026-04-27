@@ -1,0 +1,1766 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO) | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic 架构。然而，包括 REINFORCE 在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从 TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning fro">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/52-trpo-ppo/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic 架构。然而，包括 REINFORCE 在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从 TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning fro">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-17T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.489Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/52-trpo-ppo/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.489Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic
+架构。然而，包括 REINFORCE
+在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从
+TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning from
+Human Feedback，基于人类反馈的强化学习）的基石——PPO 算法。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/51-rl-basics/">笔记｜强化学习（一）：强化学习基础与策略梯度</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/53-dpo/">笔记｜强化学习（三）：大模型对齐的另一条路：DPO
+(Direct Preference Optimization)</a></p>
+</blockquote>
+<h1 id="关键概念回顾q-函数与优势函数">关键概念回顾：Q
+函数与优势函数</h1>
+<p>在深入本文之前，我们先回顾上一篇中两个最重要的概念。</p>
+<p><strong>动作价值函数 <span class="math inline">\(Q^\pi(s,
+a)\)</span></strong>
+衡量的不是"当前这一步动作有多好"，而是<strong>"选择这个动作后，一直走完全程能拿多少分"</strong>。具体来说：在状态
+<span class="math inline">\(s\)</span> 下选择动作 <span
+class="math inline">\(a\)</span>，然后从下一步开始按策略 <span
+class="math inline">\(\pi\)</span>
+继续行动直到结束，所获得的<strong>期望累积奖励</strong>。</p>
+<p>以面试为例（假设面试有 3 轮）：<span class="math inline">\(Q^\pi(s_1,
+\text{讲项目}) = \underbrace{r_1}_{\text{第1轮得分}} + \gamma \cdot
+\underbrace{\mathbb{E}[r_2 + \gamma
+r_3]}_{\text{后续按策略}\pi\text{走的期望得分}}\)</span>。它评估的是"从选择这个动作开始的整个未来"，而非仅仅当前一步的得分。</p>
+<p><strong>优势函数 <span class="math inline">\(A^\pi(s, a) = Q^\pi(s,
+a) - V^\pi(s)\)</span></strong>
+则回答：<strong>这个动作比"盲选"好多少？</strong> <span
+class="math inline">\(V^\pi(s)\)</span>
+是按策略随机选动作的平均期望得分，<span
+class="math inline">\(Q^\pi(s,a)\)</span> 是指定选动作 <span
+class="math inline">\(a\)</span> 的期望得分。两者之差 <span
+class="math inline">\(A\)</span> 就是动作 <span
+class="math inline">\(a\)</span> 的"优势"——<span class="math inline">\(A
+&gt; 0\)</span> 说明比平均好，<span class="math inline">\(A &lt;
+0\)</span> 说明比平均差。</p>
+<p>但要注意：在实际训练中，我们<strong>算不出真实的</strong> <span
+class="math inline">\(Q\)</span> 和 <span
+class="math inline">\(V\)</span>，只能用有限的采样数据去<strong>估计</strong>它们。上一篇介绍了三种从粗到精的估计方法：</p>
+<ol type="1">
+<li><strong>REINFORCE（蒙特卡洛估计）</strong>：跑完一整局面试，用实际拿到的总分
+<span class="math inline">\(G_t = r_1 + r_2 + \cdots\)</span> 直接替代
+<span class="math inline">\(Q(s_t,
+a_t)\)</span>。无偏但方差极大——后续轮次的随机性全混入了对当前动作的评价。</li>
+<li><strong>REINFORCE + Baseline</strong>：用 <span
+class="math inline">\(G_t - V_\phi(s_t)\)</span> 近似优势 <span
+class="math inline">\(A\)</span>，其中 <span
+class="math inline">\(V_\phi\)</span> 是一个 Critic
+神经网络通过大量采样拟合出的"各状态平均得分"。减去基线后信号在零附近波动，方差显著降低，但仍需等到面试结束才能计算。</li>
+<li><strong>Actor-Critic（TD
+估计）</strong>：用<strong>自举</strong>——只走一步就估计 <span
+class="math inline">\(Q(s_t, a_t) \approx r_t + \gamma
+V_\phi(s_{t+1})\)</span>，然后 <span class="math inline">\(\delta_t =
+r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)\)</span> 近似优势 <span
+class="math inline">\(A\)</span>。不用等到结束就能更新，但因为 <span
+class="math inline">\(V_\phi\)</span>
+本身是估计值，所以引入了偏差。</li>
+</ol>
+<p>无论哪种方法，估计都是有噪声的、不精确的。这一点在理解下面的"步长控制"问题时至关重要。</p>
+<hr />
+<h1
+id="策略梯度的核心困境为什么迈大步会让训练崩溃">策略梯度的核心困境：为什么"迈大步"会让训练崩溃</h1>
+<p>在上一篇中，我们讲到了如何通过策略梯度让模型"变聪明"。在所有策略梯度方法——包括最基础的
+REINFORCE——中，我们通过梯度上升来更新策略参数 <span
+class="math inline">\(\theta\)</span>： <span class="math display">\[
+\theta_{\text{new}} = \theta_{\text{old}} + \alpha \nabla_\theta
+J(\theta)
+\]</span></p>
+<p>这里的学习率 <span class="math inline">\(\alpha\)</span>
+决定了更新的<strong>步长</strong>。策略梯度只给出了"哪个方向能提升策略"的指引，但<strong>完全没有告诉我们"沿这个方向能安全地走多远"</strong>——这种信息的缺失，是所有策略梯度方法不稳定性的根源。下面我们从具体的例子出发，逐步揭示这个问题的三个层面。</p>
+<h2 id="第一层优势估计失效">第一层：优势估计失效</h2>
+<p><strong>先用上一篇的面试例子来理解这个问题。</strong></p>
+<p>还记得我们训练的 AI 面试助手吗？假设经过几轮训练，AI 在第 1
+轮（自我介绍）已经学到了一个不错的策略：</p>
+<ul>
+<li><span class="math inline">\(\pi_\text{old}\)</span>("讲项目经历"
+<span class="math inline">\(| s_1\)</span>) = 70%</li>
+<li><span class="math inline">\(\pi_\text{old}\)</span>("讲兴趣爱好"
+<span class="math inline">\(| s_1\)</span>) = 30%</li>
+</ul>
+<p>为了量化这一点，假设各动作的 Q 值为 <span
+class="math inline">\(Q(s_1, \text{讲项目}) = 15\)</span>，<span
+class="math inline">\(Q(s_1, \text{讲兴趣}) =
+5\)</span>。在旧策略下，基准线为：</p>
+<p><span class="math display">\[V^{\pi_\text{old}}(s_1) = 0.7 \times 15
++ 0.3 \times 5 = 12\]</span></p>
+<p>所以 <span class="math inline">\(A^{\pi_\text{old}}(s_1,
+\text{讲项目}) = 15 - 12 = +3\)</span>，<span
+class="math inline">\(A^{\pi_\text{old}}(s_1, \text{讲兴趣}) = 5 - 12 =
+-7\)</span>。</p>
+<p><strong>太激进的更新会怎样？</strong> 如果学习率 <span
+class="math inline">\(\alpha\)</span>
+设得太大，一次更新后策略可能变成：</p>
+<ul>
+<li><span class="math inline">\(\pi_\text{new}\)</span>("讲项目经历"
+<span class="math inline">\(| s_1\)</span>) = 99%</li>
+<li><span class="math inline">\(\pi_\text{new}\)</span>("讲兴趣爱好"
+<span class="math inline">\(| s_1\)</span>) = 1%</li>
+</ul>
+<p>看起来没毛病？但问题在于——<strong><span
+class="math inline">\(\hat{A}\)</span>
+的计算前提是"策略不变"</strong>。回忆上面的定义，<span
+class="math inline">\(\hat{A}\)</span> 是在旧策略 <span
+class="math inline">\(\pi_\text{old}\)</span>（70%/30%）下估算出来的，它的基准线
+<span class="math inline">\(V^{\pi_\text{old}}(s_1)\)</span>
+也是旧策略下的平均得分。如果策略发生了大幅变化，<span
+class="math inline">\(\hat{A}\)</span>
+赖以成立的前提就被打破了，估计值就不再准确。</p>
+<p>具体来看，新策略（99/1）下基准线变成了：</p>
+<p><span class="math display">\[V^{\pi_\text{new}}(s_1) = 0.99 \times 15
++ 0.01 \times 5 = 14.9\]</span></p>
+<p>所以 <span class="math inline">\(A^{\pi_\text{new}}(s_1,
+\text{讲项目}) = 15 - 14.9 = +0.1\)</span>。同一个动作，优势从 <span
+class="math inline">\(+3\)</span> 暴跌到 <span
+class="math inline">\(+0.1\)</span>——因为当你几乎只选"讲项目"时，它已经就是平均水平了，自然没什么"优势"可言。但在更新过程中，我们用的始终是
+<span class="math inline">\(\hat{A} =
++3\)</span>（旧策略下的值），相当于用了一个比真实值大 30
+倍的信号来推动参数，导致更新幅度远超合理范围。</p>
+<p>更关键的是，在实际训练中，策略是一个参数共享的神经网络 <span
+class="math inline">\(\pi_\theta(a|s)\)</span>。当你大幅修改参数 <span
+class="math inline">\(\theta\)</span>
+以改变某个状态下的策略时，所有其他状态下的策略也会被连带改变。例如，你猛拉参数让第
+1 轮 99% 选"讲项目"，但同一个网络在第 2
+轮（技术面）的输出也被打乱了——整个策略可能全面崩溃。</p>
+<p>这就引出了第一个问题：<strong><span
+class="math inline">\(\hat{A}\)</span>
+是在"假设策略不变"的前提下估计的，但更新本身又会改变策略</strong>。步子越大，策略变化越大，<span
+class="math inline">\(\hat{A}\)</span>
+就越不准确，更新就越不可靠。但这只是问题的冰山一角。</p>
+<h2
+id="第二层参数空间与策略空间的鸿沟">第二层：参数空间与策略空间的鸿沟</h2>
+<p>上面的例子展示了"步子迈太大"的危险。但为什么控制步长在策略梯度中如此困难？根本原因在于：<strong>参数空间中的"距离"和策略空间中的"距离"没有简单的对应关系。</strong></p>
+<p>学习率 <span class="math inline">\(\alpha\)</span> 控制的是参数 <span
+class="math inline">\(\theta\)</span> 在欧几里得空间中移动的幅度。但策略
+<span class="math inline">\(\pi_\theta(a|s)\)</span> 是通过 softmax
+等非线性函数从 <span class="math inline">\(\theta\)</span>
+映射出来的概率分布。这种非线性映射导致：<strong>参数空间中大小相同的一步，在策略空间中引起的分布变化可能截然不同</strong>——沿某些方向，参数微调就会导致概率分布剧变（例如
+softmax
+在接近饱和区时的极端敏感性）；沿另一些方向，参数大幅变化却几乎不影响输出分布。</p>
+<p>打个比方：想象你在山上徒步，只有一个指南针（梯度方向）和一个固定步幅（学习率）。往北走
+10 米可能让你翻过一座山脊（策略剧变），往东走 10
+米却只是在平地上挪了一下（策略几乎不变）。<strong>没有任何固定的步幅能在所有方向上都安全。</strong>
+这正是后文 TRPO 引入 Fisher
+信息矩阵的根本原因——它描述了"地形的局部曲率"，告诉我们哪些方向敏感、哪些方向安全。</p>
+<h2
+id="第三层正反馈崩溃循环强化学习独有的致命问题">第三层：正反馈崩溃循环——强化学习独有的致命问题</h2>
+<p>如果仅仅是"更新幅度不好控制"，那和监督学习中调学习率的困难并无本质区别。<strong>真正让策略梯度训练如此脆弱的，是强化学习独有的特性——数据分布的非平稳性（Non-stationarity）。</strong></p>
+<p>在监督学习中，训练数据是固定的数据集。即使某一步更新方向有误、模型暂时变差，下一步还能从同一批正确的数据中恢复。但在强化学习中，<strong>训练数据是由策略自身产生的</strong>——策略决定了智能体与环境的交互方式，从而决定了它能看到什么数据。这就形成了一个致命的<strong>正反馈崩溃循环</strong>（参考
+<a
+target="_blank" rel="noopener" href="https://codefrydev.in/Reinforcement/curriculum/volume-05/chapter-01/">The
+Problem with Standard Policy Gradients</a>）：</p>
+<ol type="1">
+<li><strong>大步更新</strong> → 策略发生大幅变化</li>
+<li><strong>策略变差</strong> →
+采集到的轨迹质量下降（因为坏策略做出坏决策）</li>
+<li><strong>垃圾数据</strong> → 基于这些数据计算出的梯度方向更差</li>
+<li><strong>更差的梯度</strong> → 参数被推向更糟糕的区域</li>
+<li><strong>回到第 1 步</strong> → 恶性循环，训练不可逆转地崩溃</li>
+</ol>
+<p>在监督学习中，这个循环不存在——你训练一个图像分类器，即使某一步更新让准确率下降了，ImageNet
+数据集还在那里，下一批数据照样是正确的标注。但在强化学习中，一旦策略崩溃，采到的全是垃圾数据，模型就再也学不回来了。</p>
+<h2 id="实验证据reinforce-有多不稳定">实验证据：REINFORCE
+有多不稳定</h2>
+<p>上述问题不只是理论推导，实验数据也清楚地展示了这一点。在经典的
+CartPole 环境中，<a
+target="_blank" rel="noopener" href="https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo">Trust
+Region Methods: From REINFORCE to TRPO to PPO</a>
+给出了一组精心控制的对比实验——三种方法使用<strong>完全相同的网络结构和超参数</strong>（两层
+64 单元的 tanh MLP），唯一的区别是更新规则：</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">方法</th>
+<th style="text-align: center;">达到 400 分所需迭代</th>
+<th style="text-align: center;">训练稳定性</th>
+<th style="text-align: center;">步长控制机制</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">REINFORCE</td>
+<td style="text-align: center;">~79 轮</td>
+<td style="text-align: center;">全程剧烈震荡</td>
+<td
+style="text-align: center;"><strong>无</strong>——完全依赖手动调学习率</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">TRPO</td>
+<td style="text-align: center;">~18 轮</td>
+<td style="text-align: center;">较稳定，偶有波动</td>
+<td style="text-align: center;">KL 散度硬约束（<span
+class="math inline">\(\delta = 0.01\)</span>）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">PPO</td>
+<td style="text-align: center;">~15 轮</td>
+<td style="text-align: center;">最稳定，达标后持续保持</td>
+<td style="text-align: center;">clip 裁剪（<span class="math inline">\(r
+\in [0.8, 1.2]\)</span>）</td>
+</tr>
+</tbody>
+</table>
+<p>KL 散度监控进一步揭示了根源：<strong>REINFORCE
+每次更新对策略的改变幅度是无界的</strong>（unbounded
+KL）。虽然学习率限制了参数空间中的步长，但如上节所述，这并不等于限制了策略空间中的变化。相比之下，TRPO
+将 KL 散度显式约束在 <span class="math inline">\(\delta \approx
+0.01\)</span> 附近，PPO 通过裁剪机制隐式控制在约 0.02
+以下——两者都给出了策略空间中的"护栏"。</p>
+<h2 id="问题小结">问题小结</h2>
+<p>总结来看，策略梯度方法面临的步长困境有三个层面，逐层叠加：</p>
+<ol type="1">
+<li><strong>优势估计的前提被破坏</strong>：<span
+class="math inline">\(\hat{A}\)</span>
+在旧策略下计算，策略大幅变化后估计失效</li>
+<li><strong>参数-策略映射的非线性</strong>：固定学习率无法在所有方向上保证安全步长</li>
+<li><strong>正反馈崩溃循环</strong>：坏更新 → 坏数据 → 更坏的更新 →
+不可逆转的崩溃</li>
+</ol>
+<p>这三个问题对<strong>所有策略梯度方法普遍存在</strong>，包括最基础的
+REINFORCE。REINFORCE
+的特殊困境在于：它<strong>没有任何步长控制机制</strong>，只能依赖手动调节的学习率，但正如第二层所分析的，没有任何固定学习率能在所有情况下都安全。</p>
+<p>我们需要一种方法来<strong>直接限制策略的变化幅度</strong>（而非参数的变化幅度），保证模型稳扎稳打地变好。接下来的两节，我们将看到
+TRPO 和 PPO 分别如何解决这个问题。</p>
+<hr />
+<h1 id="trpo画个圈圈在圈里找最优解">TRPO：画个圈圈，在圈里找最优解</h1>
+<p>前面我们从三个层面剖析了策略梯度的步长困境。现在来看解决方案。Schulman
+等人在 2015 年提出了 TRPO (Trust Region Policy Optimization) 算法（<a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1502.05477">原始论文</a>），核心思路可以拆解为两步：</p>
+<ol type="1">
+<li><strong>构造替代目标函数</strong>：利用重要性采样，使得一批旧数据可以被复用多次，解决样本效率问题。</li>
+<li><strong>施加 KL
+散度约束</strong>：直接在策略空间（而非参数空间）中限制每次更新的幅度，解决步长控制的核心问题。</li>
+</ol>
+<p><strong>核心思想用例子说</strong>：既然怕 AI
+面试助手一次更新走得太远（从 70% 跳到
+99%），那我就给它画一个"信任区域"——你每次更新后的新策略，和旧策略之间的"差距"不能超过一个阈值
+<span class="math inline">\(\delta\)</span>。</p>
+<h2 id="替代目标函数-surrogate-objective">替代目标函数 (Surrogate
+Objective)</h2>
+<p><strong>为什么叫"替代"？</strong>
+我们<strong>真正想优化</strong>的目标是新策略的期望回报 <span
+class="math inline">\(J(\theta) = \mathbb{E}_{\tau \sim
+\pi_\theta}[\sum_t \gamma^t
+r_t]\)</span>。但这个真实目标<strong>没法直接优化</strong>——计算它需要用新策略
+<span class="math inline">\(\pi_\theta\)</span> 去采集数据，而参数 <span
+class="math inline">\(\theta\)</span>
+每一步都在变，不可能每次梯度更新都重新采样。实际训练中我们手头只有旧策略
+<span class="math inline">\(\pi_\text{old}\)</span>
+采集的数据。因此我们需要构造一个"替代品"——一个可以用旧数据计算、且在旧策略邻域内能忠实反映真实目标的近似函数。如何用这批旧数据来评估并优化新策略
+<span class="math inline">\(\pi_\text{new}\)</span> 的效果？</p>
+<p>关键工具是<strong>重要性比率（Probability Ratio）</strong>： <span
+class="math display">\[
+r_t(\theta) =
+\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}
+\]</span></p>
+<p><span class="math inline">\(r\)</span>
+衡量的是新策略相对于旧策略对某个动作的"偏好变化倍率"。在面试例子中，假设新策略把"讲项目经历"的概率从
+70% 提升到 84%： <span class="math display">\[r = \frac{0.84}{0.70} =
+1.2\]</span></p>
+<p><span class="math inline">\(r = 1.2\)</span>
+意味着新策略选这个动作的概率是旧策略的 1.2 倍。TRPO 用 <span
+class="math inline">\(r\)</span> 乘以旧策略下估计的优势 <span
+class="math inline">\(\hat{A}\)</span>，构建<strong>替代目标函数</strong>来近似新策略的实际表现：
+<span class="math display">\[\mathcal{L}^{\text{CPI}}(\theta) =
+\mathbb{E}_{t} \left[ r_t(\theta) \hat{A}_t \right]\]</span></p>
+<p>上标 <span class="math inline">\(\text{CPI}\)</span> 来自 Kakade
+&amp; Langford (2002) 提出的 <strong>Conservative Policy
+Iteration</strong>（保守策略迭代），这是最早引入替代目标思想的工作。</p>
+<p>直觉很简单：如果 <span class="math inline">\(\hat{A} &gt;
+0\)</span>（好动作），<span class="math inline">\(r &gt;
+1\)</span>（新策略增加了这个动作的概率），那么 <span
+class="math inline">\(r \cdot \hat{A}\)</span>
+就是一个正的信号，说明新策略比旧策略更好。</p>
+<p><strong>"替代"的数学含义。</strong> 替代目标和真实目标 <span
+class="math inline">\(J(\theta)\)</span>
+之间有严格的数学关系，就像泰勒展开中的一阶近似和原函数的关系：</p>
+<ol type="1">
+<li><strong>在旧策略处两者相等</strong>：当 <span
+class="math inline">\(\theta = \theta_\text{old}\)</span> 时，<span
+class="math inline">\(r_t = 1\)</span>，<span
+class="math inline">\(\mathcal{L}^{\text{CPI}}(\theta_\text{old}) =
+\mathbb{E}_t[\hat{A}_t] = 0\)</span>。真实目标的改进量同样为 <span
+class="math inline">\(0\)</span>（策略没变，表现不变）。</li>
+<li><strong>在旧策略处梯度相同</strong>：<span
+class="math inline">\(\nabla_\theta \mathcal{L}^{\text{CPI}}
+\big|_{\theta=\theta_\text{old}} = \nabla_\theta J(\theta)
+\big|_{\theta=\theta_\text{old}}\)</span>。这保证了在旧策略的邻域内，替代目标的上升方向就是真实目标的上升方向。</li>
+<li><strong>远离旧策略后偏离加剧</strong>：当 <span
+class="math inline">\(\theta\)</span> 偏离 <span
+class="math inline">\(\theta_\text{old}\)</span>
+越远，替代目标对真实表现的近似就越不准确——这正是后文 KL
+约束和裁剪机制存在的根本原因。</li>
+</ol>
+<p>但为什么乘一个比率 <span class="math inline">\(r\)</span>
+就能用旧数据评估新策略？这背后的数学工具叫做<strong>重要性采样（Importance
+Sampling）</strong>。</p>
+<p><strong>为什么不直接用新策略重新采样？</strong>
+最直觉的方案是：既然想评估新策略 <span
+class="math inline">\(\pi_\theta\)</span>，就让它去采集新数据。但在实际训练中，每一步梯度更新都会改变参数
+<span
+class="math inline">\(\theta\)</span>。如果每次更新后都要重新采样，训练流程就变成：</p>
+<blockquote>
+<ol type="1">
+<li>用当前策略 <span class="math inline">\(\pi_\theta\)</span>
+采集一批数据 ← <strong>开销巨大！</strong></li>
+<li>用这批数据计算梯度，更新一步 <span class="math inline">\(\theta \to
+\theta&#39;\)</span></li>
+<li>丢掉所有数据（因为数据是 <span
+class="math inline">\(\pi_\theta\)</span> 采的，对 <span
+class="math inline">\(\pi_{\theta&#39;}\)</span> 已经"过期"了）</li>
+<li>回到第 1 步，用 <span
+class="math inline">\(\pi_{\theta&#39;}\)</span> 重新采集……</li>
+</ol>
+</blockquote>
+<p>这正是基础策略梯度（REINFORCE）的做法，<strong>每批数据只用一次就废弃</strong>，样本效率极低。对大语言模型来说，采集一条样本意味着完整的自回归生成，成本极高。</p>
+<p><strong>重要性采样的数学原理。</strong>
+重要性采样提供了一条"用旧数据评估新策略"的严格路径。设 <span
+class="math inline">\(q\)</span> 为实际采样用的分布，<span
+class="math inline">\(p\)</span> 为想要评估的分布，对任意函数 <span
+class="math inline">\(f\)</span>，有恒等变换： <span
+class="math display">\[
+\mathbb{E}_{x \sim p}[f(x)] = \sum_x p(x) f(x) = \sum_x q(x) \cdot
+\frac{p(x)}{q(x)} \cdot f(x) = \mathbb{E}_{x \sim
+q}\left[\frac{p(x)}{q(x)} f(x)\right]
+\]</span></p>
+<p>其中 <span class="math inline">\(\frac{p(x)}{q(x)}\)</span>
+称为<strong>重要性权重（Importance
+Weight）</strong>，它修正了两个分布之间的偏差。在策略优化中，令 <span
+class="math inline">\(q =
+\pi_{\theta_\text{old}}\)</span>（旧策略），<span
+class="math inline">\(p = \pi_\theta\)</span>（新策略），<span
+class="math inline">\(f = \hat{A}_t\)</span>（优势函数），代入得：</p>
+<p><span class="math display">\[
+\mathbb{E}_{(s,a) \sim \pi_\theta}[\hat{A}_t] = \mathbb{E}_{(s,a) \sim
+\pi_{\theta_\text{old}}}\left[\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)}
+\hat{A}_t\right] = \mathbb{E}_{(s,a) \sim
+\pi_{\theta_\text{old}}}[r_t(\theta) \hat{A}_t]
+\]</span></p>
+<p>因此 <span class="math inline">\(r_t(\theta)\)</span>
+并非一个随意取的比值，而恰恰是重要性采样中的<strong>重要性权重</strong>。替代目标
+<span class="math inline">\(\mathcal{L}^{\text{CPI}}(\theta) =
+\mathbb{E}_t[r_t(\theta) \hat{A}_t]\)</span>
+是一个重要性采样估计量——用旧策略的样本配合权重 <span
+class="math inline">\(r_t(\theta)\)</span>，<strong>无偏地</strong>估计新策略下的期望优势。</p>
+<p><strong>用面试例子具象化。</strong> 旧策略（70/30）采集了 1000
+次模拟面试，其中 700 次选了"讲项目"，300 次选了"讲兴趣"。新策略想变成
+84%/16%。直接用这 1000
+条数据算平均优势，得到的是旧策略下的期望——"讲项目"占了 70%
+的权重。但新策略选"讲项目"的频率更高，这类样本应该占更大权重。重要性权重
+<span class="math inline">\(r = 0.84/0.70 = 1.2\)</span>
+把每条"讲项目"的样本<strong>放大 1.2 倍</strong>；"讲兴趣"的权重 <span
+class="math inline">\(r = 0.16/0.30 \approx 0.53\)</span>
+则<strong>缩小到约 0.53
+倍</strong>。加权后，虽然数据来自旧策略，但期望等价于在新策略下计算的结果。</p>
+<p>有了重要性采样，训练流程可以做到"一鱼多吃"：</p>
+<blockquote>
+<ol type="1">
+<li>用当前策略 <span class="math inline">\(\pi_\text{old}\)</span>
+采集一批数据 ← <strong>只采一次！</strong></li>
+<li>用这批数据做 <span class="math inline">\(K\)</span> 次梯度更新：
+<ul>
+<li>每次通过 <span class="math inline">\(r = \pi_\theta /
+\pi_\text{old}\)</span> 修正分布偏差</li>
+<li>通过约束机制保证 <span class="math inline">\(\pi_\theta\)</span>
+不会偏离 <span class="math inline">\(\pi_\text{old}\)</span> 太远（确保
+IS 估计仍然可靠）</li>
+</ul></li>
+<li>更新完毕后，<span class="math inline">\(\pi_\text{old} \leftarrow
+\pi_\theta\)</span>，回到第 1 步</li>
+</ol>
+</blockquote>
+<p>同一批数据被反复利用 <span class="math inline">\(K\)</span>
+次，样本效率大幅提升。但重要性采样有一个已知缺陷：当新旧策略差距过大时，权重
+<span class="math inline">\(r\)</span>
+的方差会爆炸，估计变得极不稳定。与此同时，替代目标本身对 <span
+class="math inline">\(r\)</span> 也没有任何限制——如果直接最大化 <span
+class="math inline">\(\mathcal{L}^{\text{CPI}}\)</span>，优化器会无限增大好动作的概率（让
+<span class="math inline">\(r \to
+\infty\)</span>），又回到了"步子迈太大"的问题。</p>
+<h2 id="kl-散度约束">KL 散度约束</h2>
+<p><strong>KL 散度的定义</strong>：KL 散度（Kullback-Leibler
+Divergence）用于度量两个概率分布之间的"距离"。对于两个离散分布 <span
+class="math inline">\(P\)</span> 和 <span
+class="math inline">\(Q\)</span>：</p>
+<p><span class="math display">\[\text{KL}[P \| Q] = \sum_x P(x) \log
+\frac{P(x)}{Q(x)}\]</span></p>
+<p>它可以理解为：<strong>如果真实分布是 <span
+class="math inline">\(P\)</span>，用 <span
+class="math inline">\(Q\)</span> 去近似 <span
+class="math inline">\(P\)</span> 会损失多少信息量</strong>。KL
+散度越大，两个分布差距越大；当 <span class="math inline">\(P =
+Q\)</span> 时，<span class="math inline">\(\text{KL} = 0\)</span>。</p>
+<p><strong>用面试例子计算</strong>：旧策略 <span
+class="math inline">\(\pi_\text{old} = (0.7, 0.3)\)</span>，假设新策略
+<span class="math inline">\(\pi_\text{new} = (0.84, 0.16)\)</span>：</p>
+<p><span class="math display">\[\text{KL}[\pi_\text{old} \|
+\pi_\text{new}] = 0.7 \log \frac{0.7}{0.84} + 0.3 \log \frac{0.3}{0.16}
+= 0.7 \times (-0.18) + 0.3 \times 0.63 \approx 0.063\]</span></p>
+<p>如果新策略变成 <span class="math inline">\(\pi_\text{new} = (0.99,
+0.01)\)</span>：</p>
+<p><span class="math display">\[\text{KL}[\pi_\text{old} \|
+\pi_\text{new}] = 0.7 \log \frac{0.7}{0.99} + 0.3 \log \frac{0.3}{0.01}
+= 0.7 \times (-0.35) + 0.3 \times 3.40 \approx 0.78\]</span></p>
+<p>KL 散度从 0.063 飙升到 0.78——数值直接反映了策略偏移的剧烈程度。</p>
+<p><strong>TRPO 的做法</strong>：将替代目标和 KL
+约束结合，构成一个<strong>带约束的优化问题</strong>——在保证新旧策略的 KL
+散度不超过阈值 <span class="math inline">\(\delta\)</span>
+的前提下，最大化替代目标函数：</p>
+<p><span class="math display">\[
+\max_\theta \; \mathbb{E}_{t} \left[ r_t(\theta) \hat{A}_t \right]
+\]</span> <span class="math display">\[
+\text{subject to} \quad \mathbb{E}_t \left[
+\text{KL}[\pi_{\theta_{\text{old}}}(\cdot|s_t) \| \pi_\theta(\cdot|s_t)]
+\right] \le \delta
+\]</span></p>
+<p><span class="math inline">\(\delta\)</span> 通常设为 0.01
+这样的小值。如果以面试例子来说，当 <span class="math inline">\(\delta =
+0.01\)</span> 时，策略从 70%/30% 最多只能调到大约
+74%/26%——每次只迈一小步。这样就保证了 <span
+class="math inline">\(\hat{A}\)</span>
+在更新前后几乎不变，旧的优势估计始终有效。</p>
+<p><strong>TRPO 的缺点</strong>：TRPO
+在理论上非常严谨，保证了策略的单调改进。但它的求解过程要求<strong>二阶优化</strong>，这在大规模深度网络上带来了严重的实际困难。</p>
+<p><strong>为什么不能只用一阶梯度？</strong>
+前文"第二层"已经指出，参数空间和策略空间的几何结构截然不同。TRPO
+的约束加在<strong>概率分布空间</strong>上（KL
+散度），而梯度下降操作在<strong>参数空间</strong>中。一阶梯度只能告诉你"哪个方向能提升目标函数"，但无法告诉你"沿这个方向走多远，分布才会变化到
+KL 约束的边界"。</p>
+<p>还是用前面的徒步比喻来说明：假设 KL 约束是"只能离当前位置走 100
+米"。一阶梯度告诉你"正北方向最陡"，于是你往北走 100
+米。但地形的不均匀性意味着——往北走 1 米海拔就升 50
+米（分布极敏感），往东走 100 米海拔才升 1 米（分布不敏感）——径直往北走
+100 米，等于在分布空间中远远飞出了信任区域。</p>
+<p><strong>Fisher 信息矩阵</strong> <span
+class="math inline">\(F\)</span>
+恰恰描述了这种"地形"——参数空间到分布空间的<strong>局部映射关系</strong>。<span
+class="math inline">\(F\)</span>
+在某个方向的值越大，说明分布对该方向的参数变化越敏感（只能走小步）；值越小，说明越不敏感（可以走大步）。下面我们通过严格推导，展示自然梯度
+<span class="math inline">\(F^{-1}g\)</span> 是如何从 TRPO
+的约束优化问题中自然涌现的。</p>
+<h3 id="自然梯度-f-1g-的推导">自然梯度 <span
+class="math inline">\(F^{-1}g\)</span> 的推导</h3>
+<p>TRPO 的优化目标是：在 KL 散度不超过 <span
+class="math inline">\(\delta\)</span>
+的约束下，找到使替代目标最大化的参数更新方向 <span
+class="math inline">\(d = \theta -
+\theta_\text{old}\)</span>。将两个函数在 <span
+class="math inline">\(\theta_\text{old}\)</span> 处做泰勒展开：</p>
+<p><strong>替代目标</strong>的一阶展开（<span
+class="math inline">\(d\)</span> 很小时，一阶近似足够）： <span
+class="math display">\[\mathcal{L}(\theta_\text{old} + d) \approx
+\mathcal{L}(\theta_\text{old}) + g^T d\]</span> 其中 <span
+class="math inline">\(g = \nabla_\theta
+\mathcal{L}|_{\theta_\text{old}}\)</span> 是策略梯度。</p>
+<p><strong>KL 散度</strong>的二阶展开。记 <span
+class="math inline">\(D(\theta) := \text{KL}[\pi_{\theta_\text{old}} \|
+\pi_\theta]\)</span>，在 <span class="math inline">\(\theta =
+\theta_\text{old}\)</span> 处对 <span class="math inline">\(d = \theta -
+\theta_\text{old}\)</span> 做标准泰勒展开：</p>
+<p><span class="math display">\[D(\theta_\text{old} + d) =
+\underbrace{D(\theta_\text{old})}_{\text{零阶项}} +
+\underbrace{\nabla_\theta D(\theta)\big|_{\theta_\text{old}}^T
+d}_{\text{一阶项}} + \underbrace{\frac{1}{2} d^T \nabla_\theta^2
+D(\theta)\big|_{\theta_\text{old}} d}_{\text{二阶项}} +
+O(\|d\|^3)\]</span></p>
+<p>下面逐项说明为什么前两项恰好为零，只剩下二阶项：</p>
+<p><strong>(1) 零阶项 <span class="math inline">\(=
+0\)</span></strong>：<span class="math inline">\(D(\theta_\text{old}) =
+\text{KL}[\pi_{\theta_\text{old}} \| \pi_{\theta_\text{old}}] =
+0\)</span>，自己和自己的 KL 散度为零。</p>
+<p><strong>(2) 一阶项 <span class="math inline">\(=
+0\)</span></strong>：这一步的关键不是"极值点性质"，而是一个适用于任意
+<span class="math inline">\(\theta\)</span>
+的恒等式——<strong>得分函数（Score Function）的期望恒为零</strong>：</p>
+<p><span class="math display">\[\mathbb{E}_{\pi_\theta}[\nabla_\theta
+\log \pi_\theta(x)] = 0\]</span></p>
+<p><strong>证明</strong>：从期望定义出发，用对数导数恒等式 <span
+class="math inline">\(\nabla_\theta \log \pi_\theta =
+\frac{\nabla_\theta \pi_\theta}{\pi_\theta}\)</span> 代入：</p>
+<p><span class="math display">\[\mathbb{E}_{\pi_\theta}[\nabla_\theta
+\log \pi_\theta(x)] = \sum_x \pi_\theta(x) \cdot \frac{\nabla_\theta
+\pi_\theta(x)}{\pi_\theta(x)} = \sum_x \nabla_\theta \pi_\theta(x) =
+\nabla_\theta \underbrace{\sum_x \pi_\theta(x)}_{=1} = \nabla_\theta(1)
+= 0\]</span></p>
+<p>最后一步利用了概率分布的归一化约束 <span class="math inline">\(\sum_x
+\pi_\theta(x) = 1\)</span>。直觉上，<span
+class="math inline">\(\nabla_\theta \log \pi_\theta\)</span>
+告诉我们"参数 <span class="math inline">\(\theta\)</span>
+往哪个方向调，能增加 <span class="math inline">\(x\)</span>
+的概率"。但在自身分布下取期望，"增加某些 <span
+class="math inline">\(x\)</span> 概率"的推力和"减少另一些 <span
+class="math inline">\(x\)</span> 概率"的推力恰好抵消——因为概率总和始终为
+1。</p>
+<p>KL 散度的一阶导数 <span class="math inline">\(\nabla_\theta
+D(\theta)\big|_{\theta_\text{old}} =
+-\mathbb{E}_{\pi_{\theta_\text{old}}}[\nabla_\theta \log
+\pi_\theta]\big|_{\theta = \theta_\text{old}}\)</span>，代入 <span
+class="math inline">\(\theta = \theta_\text{old}\)</span>
+后正好套用上述恒等式，所以一阶项 <span class="math inline">\(=
+0\)</span>。</p>
+<p><strong>(3) 二阶项的 Hessian <span class="math inline">\(=
+F\)</span>（Fisher 信息矩阵）</strong>：KL 散度对 <span
+class="math inline">\(\theta\)</span> 的 Hessian 在 <span
+class="math inline">\(\theta_\text{old}\)</span> 处等于：</p>
+<p><span class="math display">\[\nabla_\theta^2
+D(\theta)\big|_{\theta_\text{old}} = F :=
+\mathbb{E}_{\pi_{\theta_\text{old}}}\left[\nabla_\theta \log \pi_\theta
+\cdot (\nabla_\theta \log
+\pi_\theta)^T\right]\bigg|_{\theta_\text{old}}\]</span></p>
+<p>这就是 <strong>Fisher
+信息矩阵</strong>。它是一个半正定矩阵，描述了策略分布对参数变化的局部敏感程度。</p>
+<p><strong>三项代回</strong>，得到 KL 散度的严格二阶近似： <span
+class="math display">\[\text{KL}[\pi_{\theta_\text{old}} \|
+\pi_{\theta_\text{old}+d}] = 0 + 0 + \frac{1}{2} d^T F d + O(\|d\|^3)
+\approx \frac{1}{2} d^T F d\]</span></p>
+<p><span class="math inline">\(\frac{1}{2}d^TFd\)</span>
+是一个二次型，描述了"沿方向 <span class="math inline">\(d\)</span>
+走一步，策略分布会偏移多少"。</p>
+<p>将近似代入 TRPO 的约束优化问题，得到： <span
+class="math display">\[\max_d \; g^T d \quad \text{s.t.} \quad
+\frac{1}{2} d^T F d \le \delta\]</span></p>
+<p>用<strong>拉格朗日乘子法</strong>求解。构造拉格朗日函数 <span
+class="math inline">\(L(d, \lambda) = g^T d - \lambda (\frac{1}{2} d^T F
+d - \delta)\)</span>，对 <span class="math inline">\(d\)</span>
+求导并令其为零： <span class="math display">\[\nabla_d L = g - \lambda F
+d = 0 \implies d^* = \frac{1}{\lambda} F^{-1} g\]</span></p>
+<p><strong>这就是自然梯度的由来</strong>：最优更新方向 <span
+class="math inline">\(d^*\)</span> 正比于 <span
+class="math inline">\(F^{-1}g\)</span>。常数因子 <span
+class="math inline">\(\frac{1}{\lambda}\)</span> 可以通过代入 KL 约束
+<span class="math inline">\(\frac{1}{2}(d^*)^T F d^* = \delta\)</span>
+确定（这就是代码中计算 <code>max_step</code> 的那一步）。</p>
+<p>直觉上，<span class="math inline">\(F^{-1}\)</span>
+对梯度做了"地形校正"：在分布敏感的方向上（<span
+class="math inline">\(F\)</span> 的特征值大），<span
+class="math inline">\(F^{-1}\)</span>
+会压缩步长；在分布不敏感的方向上（<span class="math inline">\(F\)</span>
+的特征值小），<span class="math inline">\(F^{-1}\)</span>
+会放大步长——使得最终的更新在<strong>分布空间中各方向均匀推进</strong>，最高效地利用有限的
+KL 预算。</p>
+<blockquote>
+<p><strong>延伸阅读：</strong>
+关于自然梯度的更完整推导（包括黎曼几何视角），推荐 <a
+target="_blank" rel="noopener" href="https://agustinus.kristia.de/blog/natural-gradient/">Natural
+Gradient Descent — Agustinus Kristiadi</a>。</p>
+</blockquote>
+<h3 id="共轭梯度法不存-f也能算-f-1g">共轭梯度法：不存 <span
+class="math inline">\(F\)</span>，也能算 <span
+class="math inline">\(F^{-1}g\)</span></h3>
+<p>上面推导出最优方向是 <span
+class="math inline">\(F^{-1}g\)</span>，但计算它等价于求解线性方程组
+<span class="math inline">\(Fx = g\)</span>。</p>
+<p><strong>问题是：<span class="math inline">\(F\)</span>
+太大了，根本存不下。</strong> <span class="math inline">\(F\)</span>
+是一个 <span class="math inline">\(d \times d\)</span> 的矩阵（<span
+class="math inline">\(d\)</span>
+是参数数量，可达百万甚至上亿）。对于一个 100 万参数的网络，<span
+class="math inline">\(F\)</span> 有 <span
+class="math inline">\(10^{12}\)</span>（一万亿）个元素，任何计算机都装不下，更不用说求逆了。</p>
+<p><strong>共轭梯度法（Conjugate Gradient, CG）</strong>
+提供了一条捷径：<strong>不需要知道整个 <span
+class="math inline">\(F\)</span>，只需要能回答"给定任意方向 <span
+class="math inline">\(v\)</span>，<span
+class="math inline">\(Fv\)</span> 等于多少？"这一个问题。</strong></p>
+<p>用一个比喻来理解。想象你蒙着眼睛在一个碗形的山谷里找最低点（即 <span
+class="math inline">\(Fx = g\)</span> 的解）。你看不到整个地形（<span
+class="math inline">\(F\)</span>
+太大了），但你有一根"探测杆"：把它插进地面的任意方向 <span
+class="math inline">\(v\)</span>，它会告诉你"这个方向上地面有多陡"（这就是
+<span class="math inline">\(Fv\)</span>）。</p>
+<p><strong>最笨的方法</strong>是沿最陡方向一直走（梯度下降），但你会发现自己走出一条<strong>锯齿形</strong>路径——往东走一步，发现南北方向更陡了，于是拐弯往南走，结果又发现东西方向更陡了……反反复复，很慢才能到达谷底。</p>
+<p><strong>共轭梯度法的聪明之处</strong>在于：每一步不只是沿"最陡"方向走，而是选择一个<strong>经过修正的方向</strong>，使得这一步的进展<strong>永远不会被后续步骤撤销</strong>。数学上，这通过让搜索方向之间满足
+<span class="math inline">\(F\)</span>-正交（<span
+class="math inline">\(p_i^T F p_j =
+0\)</span>，称为"共轭"）来实现。结果是，CG 不走回头路，理论上最多 <span
+class="math inline">\(d\)</span> 步就能精确到达谷底；在实际 TRPO
+中，<strong>只需约 10 步就能得到足够好的近似解</strong>。</p>
+<p>每一步 CG 只需要做一次"插探测杆"操作（计算 <span
+class="math inline">\(Fv\)</span>）。在 TRPO 中，<span
+class="math inline">\(Fv\)</span>
+可以通过<strong>两次反向传播</strong>高效得到——第一次对 KL
+散度求梯度，第二次对梯度和 <span class="math inline">\(v\)</span>
+的内积再求梯度（参考 <a
+target="_blank" rel="noopener" href="https://www.telesens.co/2018/06/09/efficiently-computing-the-fisher-vector-product-in-trpo/">Efficiently
+Computing the Fisher Vector Product in TRPO</a>）。因此，10 步 CG 需要约
+20 次反向传播——相比 PPO 每次更新只需 1
+次反向传播，计算开销高出一个量级。</p>
+<blockquote>
+<p><strong>想深入了解 CG 的数学细节？</strong> 推荐 <a
+target="_blank" rel="noopener" href="https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf">An
+Introduction to the Conjugate Gradient Method Without the Agonizing
+Pain</a>（CMU 经典教程），以及 <a
+target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Derivation_of_the_conjugate_gradient_method">Wikipedia:
+Derivation of the Conjugate Gradient Method</a>。</p>
+</blockquote>
+<p><strong>复杂网络结构的问题。</strong> 这一要求使得 TRPO
+难以与现代深度网络结合：<strong>Dropout</strong>
+在每次前向传播中随机丢弃神经元，使有效网络结构不断变化，FIM
+在随机子网络上的估计变得不稳定；<strong>BatchNorm</strong>
+的归一化统计量依赖于当前 mini-batch
+中的所有样本，引入了样本间的相互依赖，而 FIM
+的推导假设样本独立；<strong>Transformer</strong>
+中的多头注意力、残差连接等组件使得损失函数的 Hessian
+结构极其复杂，二阶导数的计算既慢又不稳定。这些因素叠加在一起，使得 TRPO
+在参数动辄上亿的现代深度网络上几乎无法实际使用。</p>
+<p>在下面的 TRPO 和 PPO 代码中，优势函数 <span
+class="math inline">\(\hat{A}_t\)</span> 的估计都使用
+<strong>GAE（Generalized Advantage
+Estimation）</strong>，其理论推导和代码实现详见<a
+href="/chengYi-xun/posts/51-rl-basics/#广义优势估计（GAE）：蒙特卡洛与-TD-的统一框架">上一篇的
+GAE 章节</a>。这里只回顾核心公式——GAE 通过参数 <span
+class="math inline">\(\lambda\)</span> 在偏差（<span
+class="math inline">\(\lambda \to 0\)</span>，单步 TD）和方差（<span
+class="math inline">\(\lambda \to 1\)</span>，蒙特卡洛）之间权衡：</p>
+<p><span class="math display">\[
+\hat{A}_t^{\text{GAE}(\gamma,\lambda)} = \sum_{l=0}^{T-t-1} (\gamma
+\lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) -
+V(s_t)
+\]</span></p>
+<h2 id="trpo-的实现">TRPO 的实现</h2>
+<p>下面用 PyTorch 风格的伪代码展示 TRPO 的完整训练流程。注意其中 Step 4
+和 Step 5 的二阶优化和线搜索——这正是 TRPO 的计算瓶颈所在。</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> copy  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 深拷贝旧策略，供 rollout 与 KL 基准使用</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 价值损失等常用算子</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 模型定义</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># actor:  策略网络 π_θ(a|s), 输入状态, 输出动作概率分布</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># critic: 价值网络 V_φ(s), 输入状态, 输出标量价值</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ActorModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim, action_dim)   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前待优化的策略网络</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> CriticModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim)             </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 估计 V(s)，供 GAE 与回报回归</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">old_actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> copy.</span><span style="color:#383A42;--shiki-dark:#61AFEF">deepcopy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor)   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 旧策略的冻结副本</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 仅 Critic 用一阶优化</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">delta </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.01</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # KL 约束阈值</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 1: 数据采集 (Rollout)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 用旧策略 π_old 与环境交互, 采集一批轨迹 (trajectory)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 每条数据是一个五元组: (状态 s_t, 动作 a_t, 奖励 r_t, log π_old(a_t|s_t), done_t)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">buffer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []                    </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 存放本批轨迹样本</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()            </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 环境初始状态</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(T):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():      </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 采样阶段不反传，节省计算</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> old_actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 用旧策略 π_old 得到动作分布，保证数据与行为策略一致</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        action </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 从该分布采样动作 a_t</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 记录 log π_old(a_t|s_t)，供后续重要性比率</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_state, reward, done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 环境转移与即时奖励</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    buffer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((state, action, reward, log_prob, done))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同时存 done，供 GAE 切割回合边界</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_state </span><span style="color:#A626A4;--shiki-dark:#C678DD">if</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done </span><span style="color:#A626A4;--shiki-dark:#C678DD">else</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 回合结束则重置</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">states, actions, rewards, old_log_probs, dones </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> collate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(buffer)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 整理为张量批次</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 2: 优势估计 (GAE)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(states)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 各状态价值估计 V_φ(s)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # GAE：结合多步回报与 TD 残差，降低方差、估计 A^π 的近似 Â</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_gae</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(rewards, values, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">gamma</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.99</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lam</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.95</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dones</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">dones)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 优势标准化：零均值单位方差量级，稳定策略梯度尺度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">std</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1e-8</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> values  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 用作 Critic 回归目标（广义回报）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 3: 计算替代目标和 KL 散度</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(states)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前参数 θ 下的新策略分布</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actions)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π_θ(a_t|s_t)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 重要性采样比率 r = π_θ/π_old，用对数差避免数值下溢</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_log_probs)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 替代目标 L^CPI = E[r·Â]，近似策略改进</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">old_dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> old_actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(states)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 旧策略在相同状态上的分布</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 批量平均 KL(π_old || π_θ)：度量新策略相对旧策略偏离多少（信任区域约束依据）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">kl </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.distributions.</span><span style="color:#383A42;--shiki-dark:#61AFEF">kl_divergence</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(old_dist, dist).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 4: 自然梯度 — 求解 F⁻¹g (二阶优化!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 4a. 策略梯度 g = ∇_θ L^CPI</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">g </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(torch.autograd.</span><span style="color:#383A42;--shiki-dark:#61AFEF">grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(surrogate, actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 将各层梯度拼成一向量</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 4b. Fisher-向量积 Fv (避免显式构建 d×d 的 F 矩阵)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> fisher_vector_product</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">v</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 先对 KL 求梯度，再与 v 做内积后对 θ 再求导，得到 Fv（Fisher×方向 v）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    kl_grad </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(torch.autograd.</span><span style="color:#383A42;--shiki-dark:#61AFEF">grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(kl, actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">create_graph</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">))</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#61AFEF"> flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(torch.autograd.</span><span style="color:#383A42;--shiki-dark:#61AFEF">grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(kl_grad </span><span style="color:#383A42;--shiki-dark:#56B6C2">@</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> v, actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">())) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> v  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 0.1*v 为阻尼项，数值稳定</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 4c. 共轭梯度法近似求解 F⁻¹g (迭代 10 次)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 不显式求逆 F，迭代解 F·x≈g，得到自然梯度方向 x∝F⁻¹g</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">step_dir </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> conjugate_gradient</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(fisher_vector_product, g, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">max_iter</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">10</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 5: 线搜索确定步长 (确保 KL ≤ δ 且目标提升)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 由 KL≈½ d^T F d 与约束 δ 反推最大步长（自然梯度步长的尺度）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">max_step </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sqrt</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#56B6C2"> *</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> delta </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (step_dir </span><span style="color:#383A42;--shiki-dark:#56B6C2">@</span><span style="color:#383A42;--shiki-dark:#61AFEF"> fisher_vector_product</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(step_dir)))</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">old_params </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> flatten_params</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor).</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 线搜索起点：当前 Actor 参数</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> shrink </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0.5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0.25</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">0.125</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]:  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 回溯系数：逐步缩小步长</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    new_params </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_params </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> shrink </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> max_step </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> step_dir  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 沿自然梯度方向试探更新</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#61AFEF">    assign_params</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor, new_params)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    new_surr </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_surrogate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor, states, actions, old_log_probs, advantages)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 试探点的替代目标</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    new_kl </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_kl</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(old_actor, actor, states)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 试探点的平均 KL</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> new_kl </span><span style="color:#383A42;--shiki-dark:#56B6C2">&#x3C;=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> delta </span><span style="color:#A626A4;--shiki-dark:#C678DD">and</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> new_surr </span><span style="color:#383A42;--shiki-dark:#56B6C2">>=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> surrogate:  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同时满足 KL 预算且 surrogate 不下降则接受</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        break</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#61AFEF">    assign_params</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor, old_params)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 不满足则回退</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 6: 更新 Critic (标准一阶优化)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">F.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mse_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#61AFEF">critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(states), returns).</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic 拟合回报/价值目标</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 7: 同步旧策略</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">old_actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">load_state_dict</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">state_dict</span><span style="color:#383A42;--shiki-dark:#ABB2BF">())  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 下一轮 rollout 以更新后的 π 为行为策略基准</span></span></code></pre></div>
+<p>注意：上面的代码是 vanilla RL（经典强化学习）场景中的
+TRPO。<strong>TRPO 从未被应用于大模型
+RLHF</strong>——原因正是前文详述的二阶优化瓶颈：Fisher
+矩阵和共轭梯度法在数十亿参数的语言模型上根本无法计算。当 2022-2023 年
+RLHF 成为大模型对齐的核心技术时，学界直接选择了 PPO 而跳过了
+TRPO。这正是 PPO
+诞生的全部意义——用一阶裁剪替代二阶约束，使信任区域方法能够扩展到工业级大模型。关于三种方法（REINFORCE、TRPO、PPO）在同一环境下的直观对比，可参考
+<a
+target="_blank" rel="noopener" href="https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo">Trust
+Region Methods: From REINFORCE to TRPO to
+PPO</a>，该博客提供了从零实现三种算法并在 CartPole
+上对比的完整代码。</p>
+<hr />
+<h1 id="ppo大道至简的裁剪艺术">PPO：大道至简的"裁剪"艺术</h1>
+<p><strong>核心思考出发点</strong>：TRPO 虽然理论完美，但求解 KL
+约束所需的二阶优化（Fisher
+矩阵、共轭梯度）算得太慢了，根本没法用在参数动辄上亿的深度神经网络上。能不能用一种极其简单的方法，达到和
+TRPO 一样的"不出圈"效果呢？</p>
+<p>OpenAI 在 2017 年给出了答案：<strong>PPO (Proximal Policy
+Optimization)</strong>（<a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1707.06347">原始论文</a>）。PPO
+的核心思路是：用简单的一阶裁剪操作替代 TRPO 的二阶 KL 约束。PPO
+不去精确求解"KL 约束内的最优方向"（那需要 Fisher
+矩阵来理解分布空间的几何），而是直接用 <span
+class="math inline">\(\text{clip}(r, 1-\epsilon, 1+\epsilon)\)</span>
+限制每个动作的概率比率——这是一个粗糙但有效的近似，不需要理解参数-分布映射的精确关系。因此
+PPO <strong>只需要标准的一阶梯度</strong>，可以直接使用 Adam
+等优化器，对网络结构没有任何限制——Dropout、BatchNorm、多头注意力、残差连接等组件都不影响其正常工作。</p>
+<h2 id="裁剪目标函数-clipped-surrogate-objective">裁剪目标函数 (Clipped
+Surrogate Objective)</h2>
+<p><strong>先看例子</strong>：还是面试助手的场景。<span
+class="math inline">\(\epsilon = 0.2\)</span> 意味着我们允许重要性比率
+<span class="math inline">\(r\)</span> 在 <span
+class="math inline">\([0.8, 1.2]\)</span> 的范围内变化。</p>
+<p>回到前面的数字——旧策略 70% 选"讲项目经历"，优势 <span
+class="math inline">\(\hat{A} = +3\)</span>。</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">新策略概率</th>
+<th style="text-align: center;"><span class="math inline">\(r =
+\pi_\text{new}/\pi_\text{old}\)</span></th>
+<th style="text-align: center;">裁剪前的信号 <span
+class="math inline">\(r \cdot \hat{A}\)</span></th>
+<th style="text-align: center;">裁剪后的信号</th>
+<th style="text-align: left;">发生了什么？</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">77%</td>
+<td style="text-align: center;">1.1</td>
+<td style="text-align: center;">3.3</td>
+<td style="text-align: center;">3.3</td>
+<td style="text-align: left;">在安全范围内，正常更新</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">84%</td>
+<td style="text-align: center;">1.2</td>
+<td style="text-align: center;">3.6</td>
+<td style="text-align: center;">3.6</td>
+<td style="text-align: left;">恰好在边界，正常更新</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">91%</td>
+<td style="text-align: center;">1.3</td>
+<td style="text-align: center;">3.9</td>
+<td style="text-align: center;"><strong>3.6</strong></td>
+<td style="text-align: left;"><span class="math inline">\(r &gt;
+1.2\)</span>，被裁剪！梯度变为 0，<strong>不许再往上推了</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">99%</td>
+<td style="text-align: center;">1.41</td>
+<td style="text-align: center;">4.24</td>
+<td style="text-align: center;"><strong>3.6</strong></td>
+<td style="text-align: left;">远超上界，完全被拦住</td>
+</tr>
+</tbody>
+</table>
+<p>PPO 的裁剪机制就像一个"刹车"：当新策略试图偏离旧策略太远时（<span
+class="math inline">\(r\)</span> 超出 <span
+class="math inline">\([1-\epsilon, 1+\epsilon]\)</span>），梯度被截断为
+0，阻止继续偏移。</p>
+<p><strong>一般化的算法原理</strong>：</p>
+<p>PPO 的核心创新在于其裁剪目标函数： <span class="math display">\[
+\mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_{t} \left[ \min \left(
+r_t(\theta) \hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)
+\hat{A}_t \right) \right]
+\]</span> 其中 <span class="math inline">\(\epsilon\)</span>
+是一个超参数（通常设为 0.2）。</p>
+<p>这个公式有三个部分：</p>
+<ol type="1">
+<li><strong>第一项</strong>：<span class="math inline">\(r_t(\theta)
+\hat{A}_t\)</span> 是正常的替代目标（与 TRPO 相同）。</li>
+<li><strong>第二项</strong>：<span
+class="math inline">\(\text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)
+\hat{A}_t\)</span> 将重要性比率强行截断在 <span
+class="math inline">\([0.8, 1.2]\)</span> 之间。</li>
+<li><strong>取最小值 (min)</strong>：构建悲观的下界（Pessimistic
+Bound）。</li>
+</ol>
+<p><strong>分情况讨论</strong>（结合面试的例子）：</p>
+<ul>
+<li><strong>当 <span class="math inline">\(\hat{A}_t &gt; 0\)</span>
+时</strong>（如"讲项目经历"，<span class="math inline">\(\hat{A} =
++3\)</span>）：好动作，我们想增加其概率。
+<ul>
+<li>如果 <span class="math inline">\(r_t(\theta)\)</span> 增大到超过
+<span
+class="math inline">\(1+\epsilon\)</span>（概率涨太多了），裁剪项生效，梯度变为
+0。<strong>见好就收，不许一次涨太多。</strong></li>
+</ul></li>
+<li><strong>当 <span class="math inline">\(\hat{A}_t &lt; 0\)</span>
+时</strong>（如"讲兴趣爱好"，<span class="math inline">\(\hat{A} =
+-3\)</span>）：坏动作，我们想降低其概率。
+<ul>
+<li>如果 <span class="math inline">\(r_t(\theta)\)</span> 减小到低于
+<span
+class="math inline">\(1-\epsilon\)</span>（概率降太多了），裁剪项生效，梯度变为
+0。<strong>防止矫枉过正，不许一次降太多。</strong></li>
+</ul></li>
+</ul>
+<p>通过这种简单的裁剪机制，PPO
+成功地将新策略限制在旧策略的"信任区域"内，无需复杂的二阶优化计算，直接使用
+Adam 等一阶优化器即可高效训练。从重要性采样的角度看，裁剪 <span
+class="math inline">\(r \in [1-\epsilon, 1+\epsilon]\)</span>
+同时将重要性权重限制在了安全范围内，防止了 IS 估计的方差爆炸。这使得 PPO
+可以对同一批采样数据安全地进行多个 epoch 的小批量更新（通常 3~10 个
+epoch），相比 REINFORCE
+每批数据只用一次就丢弃，样本效率提升了数倍——这正是 PPO
+能够高效训练大规模模型的关键之一。</p>
+<h2 id="ppo-的完整损失函数与代码实现">PPO 的完整损失函数与代码实现</h2>
+<p>在大模型微调中，PPO 是 <strong>RLHF</strong> 流程的核心算法。RLHF
+的基本思路是：先用人类标注的偏好数据（"回答 A 比回答 B
+好"）训练一个<strong>奖励模型（Reward
+Model）</strong>，然后将该奖励模型作为环境的"评委"，用 PPO
+训练语言模型生成更符合人类偏好的回答。在这一流程中，PPO
+的总损失函数通常包含三部分： <span class="math display">\[
+\mathcal{L}^{\text{PPO}}(\theta) = \mathcal{L}^{\text{CLIP}}(\theta) -
+c_1 \mathcal{L}^{\text{VF}}(\theta) + c_2 S[\pi_\theta](s_t)
+\]</span></p>
+<ol type="1">
+<li><p><strong>策略损失 <span
+class="math inline">\(\mathcal{L}^{\text{CLIP}}\)</span></strong>：即上文推导的裁剪目标函数：</p>
+<p><span class="math display">\[\mathcal{L}^{\text{CLIP}}(\theta) =
+\mathbb{E}_t
+\left[\min\!\left(r_t(\theta)\,\hat{A}_t,\;\text{clip}\!\left(r_t(\theta),\,1-\epsilon,\,1+\epsilon\right)\hat{A}_t\right)\right]\]</span></p>
+<p>其中 <span
+class="math inline">\(r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}\)</span>
+是新旧策略的概率比率，<span class="math inline">\(\hat{A}_t\)</span> 是
+GAE 计算的优势估计。<span class="math inline">\(\min\)</span>
+加上裁剪构成了"悲观下界"——当优势为正（好动作）时阻止概率涨过 <span
+class="math inline">\(1+\epsilon\)</span>，当优势为负（坏动作）时阻止概率降过
+<span
+class="math inline">\(1-\epsilon\)</span>。这确保了每次更新不会偏离旧策略太远。</p></li>
+<li><p><strong>价值损失 <span
+class="math inline">\(\mathcal{L}^{\text{VF}}\)</span></strong>：Critic
+网络的回归目标，用均方误差衡量 Critic 预测值与实际回报之间的差距：</p>
+<p><span class="math display">\[\mathcal{L}^{\text{VF}}(\theta) =
+\mathbb{E}_t \left[\left(V_\theta(s_t) -
+V_t^{\text{target}}\right)^2\right]\]</span></p>
+<p>其中 <span class="math inline">\(V_\theta(s_t)\)</span> 是 Critic
+对状态 <span class="math inline">\(s_t\)</span> 的价值预测，<span
+class="math inline">\(V_t^{\text{target}}\)</span> 是实际折扣回报（或
+GAE 目标值 <span class="math inline">\(\hat{A}_t +
+V_{\theta_{\text{old}}}(s_t)\)</span>）。通过最小化该项，Critic
+学会准确预估每个状态的长期收益，从而为 Actor 提供更低方差的优势估计
+<span class="math inline">\(\hat{A}_t\)</span>。系数 <span
+class="math inline">\(c_1\)</span>（通常
+0.5）控制价值损失在总损失中的权重。</p></li>
+<li><p><strong>熵奖励（Entropy Bonus）<span
+class="math inline">\(S[\pi_\theta]\)</span></strong>：策略熵的定义为：</p>
+<p><span class="math display">\[S[\pi_\theta](s_t) = -\sum_{a \in
+\mathcal{A}} \pi_\theta(a \mid s_t) \log \pi_\theta(a \mid
+s_t)\]</span></p>
+<p>其中 <span class="math inline">\(\mathcal{A}\)</span>
+是<strong>动作空间</strong>（所有可选动作的集合），<span
+class="math inline">\(a\)</span> 是其中的单个动作。在传统 RL 中，<span
+class="math inline">\(\mathcal{A}\)</span>
+是有限动作集（如游戏的上/下/左/右按键，<span
+class="math inline">\(|\mathcal{A}|=4\)</span>）；在 LLM-RL 中，<span
+class="math inline">\(\mathcal{A}\)</span>
+就是整个词表（vocabulary），<span
+class="math inline">\(|\mathcal{A}|\)</span> 为词表大小（3~13
+万），每个动作 <span class="math inline">\(a\)</span> 对应一个
+token，而状态 <span class="math inline">\(s_t\)</span>
+则是当前已生成的上下文。</p>
+<p>熵衡量的是<strong>策略在当前状态下对动作空间的概率分布的不确定性</strong>，其取值范围为
+<span class="math inline">\([0, \log|\mathcal{A}|]\)</span>：</p>
+<ul>
+<li><strong>上限 <span
+class="math inline">\(\log|\mathcal{A}|\)</span>（均匀分布）</strong>：当
+<span class="math inline">\(\pi_\theta(a|s_t) =
+\frac{1}{|\mathcal{A}|}\)</span> 对所有 <span
+class="math inline">\(a\)</span> 成立时，代入得 <span
+class="math inline">\(S = -\sum_{a=1}^{|\mathcal{A}|}
+\frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|} = -|\mathcal{A}|
+\cdot \frac{1}{|\mathcal{A}|} \cdot (-\log|\mathcal{A}|) =
+\log|\mathcal{A}|\)</span>。可以用拉格朗日乘数法证明，均匀分布是在 <span
+class="math inline">\(\sum_a \pi(a)=1\)</span>
+约束下的<strong>全局最大熵分布</strong>。</li>
+<li><strong>下限 <span
+class="math inline">\(0\)</span>（确定性策略）</strong>：当存在某个
+<span class="math inline">\(a_k\)</span> 使得 <span
+class="math inline">\(\pi_\theta(a_k|s_t)=1\)</span>，其余 <span
+class="math inline">\(\pi_\theta(a|s_t)=0\)</span> 时，代入得 <span
+class="math inline">\(S = -(1\cdot\log 1 + 0\cdot\log 0 + \cdots) =
+0\)</span>。这里约定 <span class="math inline">\(0\log 0 =
+0\)</span>，与极限 <span class="math inline">\(\lim_{x\to 0^+} x\log x =
+0\)</span> 一致。</li>
+</ul>
+<p>损失函数中以 <span class="math inline">\(+c_2 \cdot S\)</span>
+的形式出现（注意正号），因为最小化 loss
+时该项等价于<strong>最大化熵</strong>——鼓励策略保持随机性、避免过早坍缩到确定性行为，这正是<strong>探索与利用（exploration
+vs. exploitation）权衡</strong>的体现。系数 <span
+class="math inline">\(c_2\)</span>（通常
+0.01）较小，确保探索激励不会盖过策略优化信号。</p></li>
+</ol>
+<p>下面用 PyTorch 风格的伪代码展示 PPO 的完整训练流程。对比上面 TRPO
+的实现，可以清楚地看到 PPO 的核心简化：<strong>没有 Fisher
+矩阵、没有共轭梯度、没有线搜索</strong>——全部替换为简单的裁剪 + 标准
+Adam 优化器。</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 模型定义 (与 TRPO 相同: Actor + Critic)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ActorModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim, action_dim)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> CriticModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">3e-4</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">clip_range </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.2</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">      # ε：比率 r 允许偏离 1 的幅度，对应 clip 区间 [1-ε, 1+ε]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">vf_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.5</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">         # 价值损失权重 c₁</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">entropy_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.01</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">   # 熵奖励权重 c₂</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">K_epochs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 4</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">          # 同一批 rollout 数据做 K 轮 epoch，配合 clip 复用样本、提高样本效率</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 1: 数据采集 (同 TRPO)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">buffer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(T):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)       </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前策略下动作分布</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        action </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 采样时策略的 log π，用作 PPO 旧概率</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        value </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同时记下 V，用于 GAE</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_state, reward, done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    buffer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((state, action, reward, log_prob, value, done))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同时存 done</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_state </span><span style="color:#A626A4;--shiki-dark:#C678DD">if</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done </span><span style="color:#A626A4;--shiki-dark:#C678DD">else</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">states, actions, rewards, old_log_probs, old_values, dones </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> collate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(buffer)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 2: 优势估计 (同 TRPO)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_gae</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(rewards, old_values, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">gamma</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.99</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lam</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.95</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dones</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">dones)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># GAE 估计 Â，供裁剪目标使用</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">std</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1e-8</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 优势标准化，稳定训练</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_values  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic 的回归目标</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 3: 多 epoch 小批量更新 (PPO 核心 — 替代了 TRPO 的 Step 4~5)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同一批数据安全地复用 K 次, 每次用 clip 防止偏离过远</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># minibatch_indices 把全量数据随机拆成若干小批次，每次返回一组整数索引</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 例如: len(states)=1024, batch_size=64 → 每 epoch 产生 16 组 idx</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># idx 的 shape 是 [batch_size]，即 [64]，内容是随机打乱的样本下标</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> minibatch_indices</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">total</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> batch_size</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """将 [0, total) 随机打乱后按 batch_size 切分，yield 每个小批次的索引"""</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    perm </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randperm</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(total)                  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 随机排列所有样本下标</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> start </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, total, batch_size):     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 按 batch_size 步进切片</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        yield</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> perm[start : start </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> batch_size]    </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 返回一组索引，shape = [batch_size]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> epoch </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(K_epochs):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> idx </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#61AFEF"> minibatch_indices</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(states), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">batch_size</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">64</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        s, a </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> states[idx], actions[idx]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        old_lp, adv, ret </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_log_probs[idx], advantages[idx], returns[idx]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # --- 前向传播 ---</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(s)                           </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 新策略分布 π_θ(·|s)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(a)          </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π_θ(a|s)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(s).</span><span style="color:#383A42;--shiki-dark:#61AFEF">squeeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()              </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># V_φ(s)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 策略熵的 batch 均值：鼓励探索，避免过早确定性策略（乘以系数后从 loss 中减去即熵奖励）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        entropy </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">entropy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">().</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()           </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略熵 S[π_θ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # --- 策略损失 (裁剪) ---</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_lp) </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># r = π_θ / π_old，重要性采样权重</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr1 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> adv                        </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 未裁剪的替代项 r·Â</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 将 r 限制在 [1-ε,1+ε] 再乘 Â，过大偏离时梯度被截断，隐式信任区域</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr2 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clamp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ratio, </span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_range, </span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_range) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> adv</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 取 min 再取负：对优化器而言是最大化悲观下界，防止过度乐观的重要性加权</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">min</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(surr1, surr2).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # --- 价值损失 ---</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mse_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(values, ret)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # --- 总损失: L^CLIP - c₁·L^VF + c₂·S ---</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 策略项 + 价值回归 − 熵奖励（entropy 越大 loss 越小，等价鼓励高熵）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> vf_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> entropy_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> entropy</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # --- 反向传播 + 梯度裁剪 + 更新 (标准一阶优化!) ---</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 全局梯度范数裁剪：抑制异常大更新，与大模型/深层网络训练常见做法一致</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        torch.nn.utils.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clip_grad_norm_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#0184BC;--shiki-dark:#56B6C2">            list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">max_norm</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.5</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span></code></pre></div>
+<p><strong>开源代码参考：</strong> Vanilla PPO 在经典
+RL（游戏、机器人控制等）中的主流实现是
+<strong>Stable-Baselines3</strong>
+库（<code>stable_baselines3.PPO</code>），其核心逻辑与上述代码一致。</p>
+<p>上面的代码展示的是经典强化学习场景中的 PPO，只需要 Actor 和 Critic
+两个模型。但在大模型 RLHF 中，PPO
+实际上需要<strong>四个模型</strong>同时在线。</p>
+<h2 id="rlhf-中的-ppo四模型架构">RLHF 中的 PPO：四模型架构</h2>
+<p>在 RLHF 场景下，PPO
+的"环境"不再是游戏或物理模拟器，而是<strong>语言生成 +
+奖励模型打分</strong>。整个系统需要四个模型协同工作：</p>
+<ol type="1">
+<li><strong>Actor（策略模型）</strong> <span
+class="math inline">\(\pi_\theta\)</span>：正在训练的语言模型，负责根据
+prompt 生成回答。</li>
+<li><strong>Critic（价值模型）</strong> <span
+class="math inline">\(V_\phi\)</span>：估计当前生成状态的价值，通常与
+Actor 共享底座（backbone），只在顶部加一个标量输出头。</li>
+<li><strong>Reference 模型</strong> <span
+class="math inline">\(\pi_\text{ref}\)</span>：<strong>冻结的 SFT
+模型</strong>，即 Actor 训练前的初始状态。它的作用是防止 Actor 在 RL
+训练过程中"学偏"——如果没有约束，Actor
+可能学会生成一些得分很高但语无伦次的"奖励黑客"（Reward
+Hacking）输出。通过惩罚 Actor 偏离 Reference 的程度（KL
+散度），可以确保生成的回答保持合理的语言质量。</li>
+<li><strong>Reward 模型</strong> <span
+class="math inline">\(R_\psi\)</span>：<strong>冻结的奖励模型</strong>，用人类偏好数据预训练而成，负责为
+Actor 的回答打分。</li>
+</ol>
+<p><strong>为什么 RLHF 多了 KL 惩罚，而 vanilla PPO 没有？</strong>
+这是两者最本质的区别，源于奖励信号的可靠性差异：</p>
+<ul>
+<li><strong>Vanilla
+PPO（游戏/机器人）</strong>：奖励来自<strong>真实环境</strong>——CartPole
+真的平衡了 200
+步，机器人真的到达了目标。奖励信号是"地面真值"，策略再怎么优化也无法"欺骗"物理定律。PPO
+的 clip 机制控制<strong>每步更新步长</strong>就足够了。</li>
+<li><strong>RLHF-PPO（大模型微调）</strong>：奖励来自一个<strong>学出来的奖励模型</strong>
+<span
+class="math inline">\(R_\psi\)</span>，它是人类偏好的<strong>不完美近似</strong>。没有额外约束，策略会发现奖励模型的"盲区"——生成一些
+RM
+打高分但实际上语无伦次或重复套话的输出，这就是<strong>奖励黑客（Reward
+Hacking）</strong>。KL 惩罚 <span class="math inline">\(\beta \cdot
+\text{KL}[\pi_\theta \| \pi_\text{ref}]\)</span> 的作用是把策略"拴"在
+SFT 参考模型附近，防止因追逐不可靠的奖励而走偏。</li>
+</ul>
+<blockquote>
+<p><strong>PPO clip 与 KL 惩罚的分工</strong>：clip
+管的是"每步别迈太大"（步长控制），KL
+惩罚管的是"总体别跑太远"（分布正则化）。两者解决的是不同层面的问题。</p>
+</blockquote>
+<p><strong>RLHF-PPO 的奖励公式</strong>因此需要对原始 RM 分数做 KL
+修正： <span class="math display">\[
+r_t = R_\psi(\text{prompt}, \text{response}) - \beta \cdot
+\text{KL}[\pi_\theta \| \pi_\text{ref}]
+\]</span> 其中 <span class="math inline">\(\beta\)</span> 控制 KL
+惩罚的强度：<span class="math inline">\(\beta\)</span> 越大，Actor
+越不敢偏离 Reference。</p>
+<p>下面是 RLHF-PPO 的完整实现。对比上面的 vanilla 版本，核心差异在 Step
+1（数据采集方式）和 Step 2（KL 惩罚修正奖励）。</p>
+<p><strong>代码结构差异——为什么 RLHF 没有
+<code>dist.sample()</code>？</strong> Vanilla PPO
+是<strong>单步决策</strong>：<code>dist = actor(s)</code>
+返回一个分布对象，然后 <code>dist.sample()</code>
+采一个动作、<code>dist.log_prob()</code>
+算概率、<code>dist.entropy()</code> 算熵——一个 <code>dist</code>
+对象就搞定一切。但语言模型生成回答是<strong>逐 token
+自回归</strong>的：生成 <span class="math inline">\(T\)</span> 个 token
+需要循环 <span class="math inline">\(T\)</span>
+次，每一步的分布都依赖上一步的采样结果，不存在一个 <code>dist</code>
+能代表整个回答。因此 RLHF 将采样封装在 <code>actor.generate()</code>
+内部，训练时使用 <strong>teacher forcing</strong>
+一次前向传播同时得到所有位置的 log_prob 和 entropy。</p>
+<blockquote>
+<p><strong>什么是 Teacher Forcing？</strong>
+生成回答时，模型必须<strong>逐 token 循环</strong>——第 <span
+class="math inline">\(t\)</span> 步的输入依赖第 <span
+class="math inline">\(t-1\)</span> 步采样出的 token，无法并行，这就是
+<code>generate()</code> 很慢的原因。但在训练阶段计算
+<code>log_probs()</code> 和 <code>compute_entropy()</code>
+时，回答已经生成好了（<code>responses</code>
+是已知的固定序列）。此时可以把完整的 <code>[prompt, response]</code>
+<strong>一次性喂给模型</strong>，让模型在每个位置预测"下一个 token
+应该是什么"——因为正确答案（response 中的实际
+token）已经摆在那里当"老师"，所以叫 teacher
+forcing。这样只需<strong>一次前向传播</strong>就能并行算出所有 <span
+class="math inline">\(T\)</span> 个位置的 logits，再从中提取 log_prob 和
+entropy，比自回归循环快 <span class="math inline">\(T\)</span> 倍。</p>
+<p><strong>为什么"一次前向传播"就能得到所有位置的概率？</strong>
+这靠的是 Transformer 的<strong>因果遮罩（causal
+mask）</strong>。直觉上语言模型是"输入序列 → 预测下一个 token"，但实际上
+Transformer <strong>同时</strong>为序列中每个位置都预测了"下一个
+token"。以输入 <code>[你, 好, 吗, 我]</code> 为例：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">位置</th>
+<th style="text-align: left;">因果遮罩允许看到的内容</th>
+<th style="text-align: left;">该位置的输出</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">0 ("你")</td>
+<td style="text-align: left;">[你]</td>
+<td style="text-align: left;">预测"你"后面的 token</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">1 ("好")</td>
+<td style="text-align: left;">[你, 好]</td>
+<td style="text-align: left;">预测"好"后面的 token</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">2 ("吗")</td>
+<td style="text-align: left;">[你, 好, 吗]</td>
+<td style="text-align: left;">预测"吗"后面的 token</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">3 ("我")</td>
+<td style="text-align: left;">[你, 好, 吗, 我]</td>
+<td style="text-align: left;">预测"我"后面的 token</td>
+</tr>
+</tbody>
+</table>
+<p>每个位置只能 attend 到<strong>自己和之前的位置</strong>（通过
+attention 中的三角遮罩矩阵实现），所以位置 2 的输出和"只输入
+<code>[你, 好, 吗]</code>"时完全相同——不会因为后面还有 <code>我</code>
+而"偷看"未来信息。这 4
+个位置的预测是<strong>并行计算</strong>的。这就是为什么<strong>生成时必须逐步循环</strong>（因为下一个
+token 还不知道），但<strong>训练时可以一次性并行</strong>（所有 token
+都已知，因果遮罩保证不作弊）。</p>
+</blockquote>
+<p>代码中 <code>generate()</code>、<code>log_probs()</code> 和
+<code>compute_entropy()</code> 的实现都展示在下方：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># RLHF-PPO 的四模型架构</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> LanguageModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)                 </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 正在训练的策略 π_θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ValueHead</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.backbone)         </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 价值网络 V_φ, 通常共享 Actor 底座</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ref_model </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> LanguageModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)             </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 冻结的 SFT 模型 π_ref</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ref_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">requires_grad_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)            </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 不参与反传与更新，仅作 KL 锚点、防止偏离人类对齐初稿太远</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">reward_model </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> RewardModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)            </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 冻结的奖励模型 R_ψ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">reward_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">requires_grad_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">False</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)         </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 奖励固定，只 forward 打分</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-5</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">clip_range </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.2</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">kl_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.1</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">      # β, KL 惩罚系数</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 1: 数据采集 — "环境"是: prompt → 生成回答 → 奖励模型打分</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">prompts </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> sample_prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(dataset)          </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, L]  B 个 prompt，每个长度 L</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 自回归生成完整回答，并记录采样时策略的 log π_θ（供 PPO 比率与 KL 项）</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # generate() 内部逐 token 循环：logits → softmax → 采样 → 拼接，共 T 步</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    responses, old_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">generate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">return_log_probs</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # responses: [B, T]        T 个生成 token</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # old_log_probs: [B, T]    每个 token 位置的 log π_θ_old</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    old_values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts, responses)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T] 每个生成位置的价值估计</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 参考策略在相同 (prompt, response) 上的 log π_ref，用于逐 token KL</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    ref_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ref_model.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_probs</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts, responses)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T] π_ref 的对数概率</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    scores </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> reward_model</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts, responses)                 </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B]    RM 整句打分（序列级标量）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 2: 计算 KL 惩罚修正后的奖励 (vanilla PPO 没有这一步!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># r = R_ψ - β·(log π_θ - log π_ref)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># β·(log π_θ − log π_ref) 近似逐 token KL 惩罚，拉大与参考模型差异则扣分</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">kl_penalty </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> kl_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (old_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ref_log_probs)      </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T] 逐 token KL 惩罚</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 将序列级 RM 分数与逐 token 惩罚合成 token 级奖励</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">adjusted_rewards </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_token_rewards</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(scores, kl_penalty)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T] 逐 token 奖励</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ------ compute_token_rewards 的实现 ------</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># RM 给的是整句分数（一个标量），但 GAE 需要逐 token 的奖励。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 标准做法（InstructGPT）：中间 token 的奖励 = −KL 惩罚，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 最后一个 token 额外加上 RM 分数，相当于"句末结算"。</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_token_rewards</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">scores</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> kl_penalty</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    scores:     Tensor [B]       每个回答的 RM 序列级评分</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    kl_penalty: Tensor [B, T]    每个 token 位置的 KL 惩罚项</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    return:     Tensor [B, T]    逐 token 奖励</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    rewards </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">kl_penalty                       </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 大部分 token：奖励 = −KL（偏离越大扣分越多）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    rewards[:, </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">+=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> scores                    </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 最后一个 token：叠加 RM 整句分数（句末结算）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> rewards</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ------ actor.generate() 的内部实现 ------</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Vanilla PPO 是单步决策：dist = actor(s) → action = dist.sample()，一步完成。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 而语言模型生成回答是逐 token 自回归的——每个位置产生一个分布，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 后一个位置依赖前一个位置的采样结果，因此不存在一个 dist 对象能概括整个回答。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># generate() 将采样循环封装在内部：</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> generate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E5C07B;--shiki-dark-font-style:italic">self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> return_log_probs</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">True</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> max_new_tokens</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">256</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    prompts: [B, L]</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    return:  responses [B, T], log_probs [B, T]</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    tokens, log_probs_list </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> [], []</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    input_ids </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> prompts                                     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, L]</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(max_new_tokens):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        logits </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#E45649;--shiki-dark:#E5C07B"> self</span><span style="color:#383A42;--shiki-dark:#ABB2BF">.</span><span style="color:#383A42;--shiki-dark:#61AFEF">forward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(input_ids).logits[:, </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, :]   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 取最后位置 → [B, V]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">softmax</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(logits, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)               </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, V]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        token </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">multinomial</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(probs, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">num_samples</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 采样 → [B, 1]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        lp </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_softmax</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(logits, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)              </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, V]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        token_lp </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> lp.</span><span style="color:#383A42;--shiki-dark:#61AFEF">gather</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">index</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">token)           </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 取对应 token → [B, 1]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        tokens.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(token)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        log_probs_list.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(token_lp)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        input_ids </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([input_ids, token], </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 自回归拼接</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(tokens, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">), torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(log_probs_list, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ------ compute_entropy() 的实现 ------</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略熵 S[π_θ](s) = −Σ_a π_θ(a|s) log π_θ(a|s)，衡量策略在当前状态下的"不确定性"。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 熵越大 → 策略越随机（均匀分布时熵最大）；熵越小 → 策略越确定（概率集中在一个 token）。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 在 PPO 损失中以负号出现（- entropy_coef * entropy），等价于鼓励策略保持多样性。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Vanilla PPO 直接调用 dist.entropy()；RLHF 中因为动作空间是整个词表（3~13万 token），</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 需要从 logits 手动计算。</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_entropy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> prompts</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> responses</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    计算策略在 response 部分、所有生成位置上的平均熵</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    actor:     语言模型 π_θ</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    prompts:   [B, L]     prompt token ids —— 必须传入，因为 response 位置的概率分布</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">                          取决于 prompt 提供的上下文（prompt 就是 RL 中的"状态 s"）</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    responses: [B, T]     response token ids</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    return:    标量，response 区域所有 batch × token 位置的平均熵</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # prompt 和 response 拼接后一起输入：prompt 提供条件，response 提供预测目标</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    input_ids </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([prompts, responses], </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, L+T] 拼接完整序列</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    logits </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(input_ids).logits                     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, L+T, V]  V = 词表大小</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 只取 response 部分的 logits（teacher forcing：位置 L-1 到 L+T-2 的输出预测位置 L 到 L+T-1 的 token）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    resp_logits </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> logits[:, prompts.</span><span style="color:#383A42;--shiki-dark:#61AFEF">size</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, :]     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T, V]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">softmax</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(resp_logits, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)           </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T, V]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_softmax</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(resp_logits, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T, V]  数值稳定版 log</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    token_entropy </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> log_probs).</span><span style="color:#383A42;--shiki-dark:#61AFEF">sum</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)     </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [B, T]  逐位置: −Σ_v p(v) log p(v)</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> token_entropy.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()                          </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 标量</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 3: 优势估计 (同 vanilla PPO)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">with</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">no_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">():</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # γ=1：序列短、主要关心整句质量时通常不做时间折扣，与未来 token 权重一致</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 不传 dones：每个 prompt→response 就是一个完整回合，无中途终止</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_gae</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(adjusted_rewards, old_values, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">gamma</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lam</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.95</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (advantages.</span><span style="color:#383A42;--shiki-dark:#61AFEF">std</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1e-8</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_values</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 4: 多 epoch 小批量更新 (同 vanilla PPO)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> epoch </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(K_epochs):</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> idx </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#61AFEF"> minibatch_indices</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts), batch_size):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_probs</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts[idx], responses[idx])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 更新后策略对已生成 token 的 log π</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(prompts[idx], responses[idx])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前 Critic 对同一前缀的价值预测</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        entropy </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> compute_entropy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor, prompts[idx], responses[idx])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略熵，鼓励多样性</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(new_log_probs </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_log_probs[idx])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 与 vanilla PPO 相同的重要性权重 r</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr1 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages[idx]  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 未裁剪替代项</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surr2 </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clamp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ratio, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_range, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> +</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> clip_range) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages[idx]  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 裁剪后的悲观项</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">min</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(surr1, surr2).</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># PPO-Clip 策略损失</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mse_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(values, returns[idx])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic 回归 adjusted return</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> vf_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> entropy_coef </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> entropy  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 与 vanilla 相同的三项组合</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 防止 RLHF 长序列梯度爆炸，限制 Actor+Critic 总梯度范数</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        torch.nn.utils.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clip_grad_norm_</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#0184BC;--shiki-dark:#56B6C2">            list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> list</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">max_norm</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span></code></pre></div>
+<p><strong>开源代码参考：</strong> 上述伪代码的生产级实现可参考
+<strong><a
+target="_blank" rel="noopener" href="https://github.com/huggingface/trl">TRL</a></strong>（Hugging
+Face）和 <strong><a
+target="_blank" rel="noopener" href="https://github.com/OpenRLHF/OpenRLHF">OpenRLHF</a></strong>，两者都采用
+prompt+response 拼接后一起前向传播、再通过 mask 提取 response
+部分的方式计算 log_prob 和 entropy。</p>
+<h2 id="ppo-在大模型微调中的痛点">PPO 在大模型微调中的痛点</h2>
+<p>PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 RLHF
+的标准算法。</p>
+<p>然而，从上面的四模型架构可以看出，RLHF-PPO
+的<strong>显存开销巨大</strong>：需要同时加载
+Actor、Critic、Reference、Reward
+四个模型。当模型参数量飙升到百亿（10B）甚至千亿级别时，即便 Reference 和
+Reward 不需要梯度，仅它们的前向推理也会占据大量显存，加上 Actor 和
+Critic 的参数、梯度和优化器状态，这往往远超单张甚至多张 GPU
+的显存极限。</p>
+<p>为了解决这个问题，学术界演化出了两条不同的路线：</p>
+<ol type="1">
+<li><strong>绕过强化学习</strong>：直接使用偏好数据优化语言模型，即
+<strong>DPO (Direct Preference Optimization)</strong> 算法。</li>
+<li><strong>改进强化学习</strong>：丢弃 Critic
+网络，通过组内相对评分估计优势，即 <strong>GRPO (Group Relative Policy
+Optimization)</strong> 算法。</li>
+</ol>
+<p>接下来的两篇文章，我们将分别探讨这两条激动人心的前沿路线。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Schulman, J., Levine, S., Abbeel, P., Jordan, M., &amp; Moritz, P.
+(2015). <em>Trust Region Policy Optimization</em>. ICML 2015.</li>
+<li>Schulman, J., Wolski, F., Dhariwal, P., Radford, A., &amp; Klimov,
+O. (2017). <em>Proximal Policy Optimization Algorithms</em>.
+arXiv:1707.06347.</li>
+<li>Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin,
+P., ... &amp; Lowe, R. (2022). <em>Training language models to follow
+instructions with human feedback</em>. NeurIPS 2022.</li>
+<li><a
+target="_blank" rel="noopener" href="https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo">Trust
+Region Methods: From REINFORCE to TRPO to PPO</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://agustinus.kristia.de/blog/natural-gradient/">Natural
+Gradient Descent — Agustinus Kristiadi</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/53-dpo/">笔记｜强化学习（三）：大模型对齐的另一条路：DPO
+(Direct Preference Optimization)</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/52-trpo-ppo/">https://chengyi-xun.github.io/chengYi-xun/posts/52-trpo-ppo/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜强化学习（一）：强化学习基础与策略梯度</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E6%A6%82%E5%BF%B5%E5%9B%9E%E9%A1%BEq-%E5%87%BD%E6%95%B0%E4%B8%8E%E4%BC%98%E5%8A%BF%E5%87%BD%E6%95%B0"><span class="toc-number">1.</span> <span class="toc-text">关键概念回顾：Q
+函数与优势函数</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%E7%9A%84%E6%A0%B8%E5%BF%83%E5%9B%B0%E5%A2%83%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%88%E5%A4%A7%E6%AD%A5%E4%BC%9A%E8%AE%A9%E8%AE%AD%E7%BB%83%E5%B4%A9%E6%BA%83"><span class="toc-number">2.</span> <span class="toc-text">策略梯度的核心困境：为什么&quot;迈大步&quot;会让训练崩溃</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E5%B1%82%E4%BC%98%E5%8A%BF%E4%BC%B0%E8%AE%A1%E5%A4%B1%E6%95%88"><span class="toc-number">2.1.</span> <span class="toc-text">第一层：优势估计失效</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E5%B1%82%E5%8F%82%E6%95%B0%E7%A9%BA%E9%97%B4%E4%B8%8E%E7%AD%96%E7%95%A5%E7%A9%BA%E9%97%B4%E7%9A%84%E9%B8%BF%E6%B2%9F"><span class="toc-number">2.2.</span> <span class="toc-text">第二层：参数空间与策略空间的鸿沟</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E5%B1%82%E6%AD%A3%E5%8F%8D%E9%A6%88%E5%B4%A9%E6%BA%83%E5%BE%AA%E7%8E%AF%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0%E7%8B%AC%E6%9C%89%E7%9A%84%E8%87%B4%E5%91%BD%E9%97%AE%E9%A2%98"><span class="toc-number">2.3.</span> <span class="toc-text">第三层：正反馈崩溃循环——强化学习独有的致命问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%AA%8C%E8%AF%81%E6%8D%AEreinforce-%E6%9C%89%E5%A4%9A%E4%B8%8D%E7%A8%B3%E5%AE%9A"><span class="toc-number">2.4.</span> <span class="toc-text">实验证据：REINFORCE
+有多不稳定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E5%B0%8F%E7%BB%93"><span class="toc-number">2.5.</span> <span class="toc-text">问题小结</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#trpo%E7%94%BB%E4%B8%AA%E5%9C%88%E5%9C%88%E5%9C%A8%E5%9C%88%E9%87%8C%E6%89%BE%E6%9C%80%E4%BC%98%E8%A7%A3"><span class="toc-number">3.</span> <span class="toc-text">TRPO：画个圈圈，在圈里找最优解</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9B%BF%E4%BB%A3%E7%9B%AE%E6%A0%87%E5%87%BD%E6%95%B0-surrogate-objective"><span class="toc-number">3.1.</span> <span class="toc-text">替代目标函数 (Surrogate
+Objective)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#kl-%E6%95%A3%E5%BA%A6%E7%BA%A6%E6%9D%9F"><span class="toc-number">3.2.</span> <span class="toc-text">KL 散度约束</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%87%AA%E7%84%B6%E6%A2%AF%E5%BA%A6-f-1g-%E7%9A%84%E6%8E%A8%E5%AF%BC"><span class="toc-number">3.2.1.</span> <span class="toc-text">自然梯度 \(F^{-1}g\) 的推导</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B1%E8%BD%AD%E6%A2%AF%E5%BA%A6%E6%B3%95%E4%B8%8D%E5%AD%98-f%E4%B9%9F%E8%83%BD%E7%AE%97-f-1g"><span class="toc-number">3.2.2.</span> <span class="toc-text">共轭梯度法：不存 \(F\)，也能算 \(F^{-1}g\)</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#trpo-%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="toc-number">3.3.</span> <span class="toc-text">TRPO 的实现</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#ppo%E5%A4%A7%E9%81%93%E8%87%B3%E7%AE%80%E7%9A%84%E8%A3%81%E5%89%AA%E8%89%BA%E6%9C%AF"><span class="toc-number">4.</span> <span class="toc-text">PPO：大道至简的&quot;裁剪&quot;艺术</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A3%81%E5%89%AA%E7%9B%AE%E6%A0%87%E5%87%BD%E6%95%B0-clipped-surrogate-objective"><span class="toc-number">4.1.</span> <span class="toc-text">裁剪目标函数 (Clipped
+Surrogate Objective)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ppo-%E7%9A%84%E5%AE%8C%E6%95%B4%E6%8D%9F%E5%A4%B1%E5%87%BD%E6%95%B0%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="toc-number">4.2.</span> <span class="toc-text">PPO 的完整损失函数与代码实现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#rlhf-%E4%B8%AD%E7%9A%84-ppo%E5%9B%9B%E6%A8%A1%E5%9E%8B%E6%9E%B6%E6%9E%84"><span class="toc-number">4.3.</span> <span class="toc-text">RLHF 中的 PPO：四模型架构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ppo-%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%BE%AE%E8%B0%83%E4%B8%AD%E7%9A%84%E7%97%9B%E7%82%B9"><span class="toc-number">4.4.</span> <span class="toc-text">PPO 在大模型微调中的痛点</span></a></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/52-trpo-ppo/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/52-trpo-ppo/',
+      title: '笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

@@ -1,0 +1,1214 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜世界模型（三）：JEPA——在嵌入空间预测世界 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="核心论文：I-JEPA (arXiv:2301.08243, CVPR 2023)、V-JEPA (arXiv:2404.08471, 2024)、V-JEPA 2 (arXiv:2506.09985, 2025) 代码：facebookresearch&#x2F;ijepa · facebookresearch&#x2F;jepa | 前置知识：上一篇：Dreamer 系列 ⬅️ 上一篇：笔记｜世界模型（二）：D">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/103-jepa/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="核心论文：I-JEPA (arXiv:2301.08243, CVPR 2023)、V-JEPA (arXiv:2404.08471, 2024)、V-JEPA 2 (arXiv:2506.09985, 2025) 代码：facebookresearch&#x2F;ijepa · facebookresearch&#x2F;jepa | 前置知识：上一篇：Dreamer 系列 ⬅️ 上一篇：笔记｜世界模型（二）：D">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T16:40:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.486Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="World Model">
+<meta property="article:tag" content="JEPA">
+<meta property="article:tag" content="V-JEPA">
+<meta property="article:tag" content="Self-Supervised Learning">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/103-jepa/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜世界模型（三）：JEPA——在嵌入空间预测世界',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.486Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p><strong>核心论文</strong>：I-JEPA (arXiv:2301.08243, CVPR
+2023)、V-JEPA (arXiv:2404.08471, 2024)、V-JEPA 2 (arXiv:2506.09985,
+2025)</p>
+<p><strong>代码</strong>：<a
+target="_blank" rel="noopener" href="https://github.com/facebookresearch/ijepa">facebookresearch/ijepa</a>
+· <a
+target="_blank" rel="noopener" href="https://github.com/facebookresearch/jepa">facebookresearch/jepa</a>
+| <strong>前置知识</strong>：<a
+href="/chengYi-xun/posts/102-dreamer/">上一篇：Dreamer 系列</a></p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/102-dreamer/">笔记｜世界模型（二）：Dreamer
+系列——在想象中学习控制</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/104-video-world-model/">笔记｜世界模型（四）：视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos</a></p>
+</blockquote>
+<h2 id="预测每片树叶的飘动是愚蠢的">0. 预测每片树叶的飘动是愚蠢的</h2>
+<p>上一篇介绍了 Dreamer
+系列：在潜空间想象未来，用解码器重建像素来训练世界模型。DreamerV3 甚至在
+Minecraft 中从零采到了钻石。但 Yann LeCun
+提出了一个尖锐的质疑：<strong>为什么世界模型一定要能"画出"未来？</strong></p>
+<p>观察窗外的一棵树。树叶在风中随机飘动——每片叶子的具体轨迹本质上不可预测。但你能预测"树叶还会继续飘动"、"风变大了树会摇得更厉害"。你的大脑<strong>从不尝试重建每一片叶子的像素级位置</strong>，却对未来有清晰的"理解"。</p>
+<p>Dreamer
+的解码器被迫建模这些不可预测的细节——因为重建损失对每个像素一视同仁。这意味着模型容量的一大部分被浪费在树叶纹理、光影变化等<strong>对决策无关的随机性</strong>上。</p>
+<p>JEPA（Joint-Embedding Predictive
+Architecture，联合嵌入预测架构）走了一条完全不同的路：<strong>丢弃不可预测的细节，只在嵌入空间中预测。</strong>
+不需要解码器，不需要重建像素——一个好的预测只需要在语义层面捕捉未来。</p>
+<h2 id="lecun-的认知架构提案">1. LeCun 的认知架构提案</h2>
+<p><img src="/chengYi-xun/img/jepa_vs_generative.png"
+alt="生成式 vs 对比式 vs JEPA 三种学习架构对比（LeCun, 2022）" /></p>
+<h3 id="三种学习架构">1.1 三种学习架构</h3>
+<p>2022 年，Yann LeCun 在白皮书 <em>"A Path Towards Autonomous Machine
+Intelligence"</em> 中系统对比了三种自监督学习架构。为了理解 JEPA
+的设计动机，我们需要先搞清楚另外两种方案各自的"致命缺陷"。</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 37%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>架构</th>
+<th>预测对象</th>
+<th>核心缺陷</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>生成式（Generative）</strong></td>
+<td>重建原始输入 <span class="math inline">\(\hat{x} \approx
+x\)</span></td>
+<td>被迫建模不可预测的细节（像素噪声、纹理）</td>
+</tr>
+<tr class="even">
+<td><strong>对比式（Contrastive/JE）</strong></td>
+<td>拉近正样本嵌入、推远负样本</td>
+<td>依赖负样本构造，训练不稳定，可能丢失信息</td>
+</tr>
+<tr class="odd">
+<td><strong>JEPA（联合嵌入预测）</strong></td>
+<td>在嵌入空间预测目标表征</td>
+<td>无需重建、无需负样本，但需要防止崩塌</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么 LeCun 要从 JE（对比学习）出发讨论这个问题？</strong>
+2022 年的学术背景是：JE
+方法（SimCLR、MoCo、BYOL、DINO、CLIP）已经成为自监督学习的统治范式，在分类、检索、零样本迁移上全面超越监督学习。JE
+已经证明了两件关键的事：</p>
+<ol type="1">
+<li><strong>嵌入空间是正确方向</strong>——不需要在像素空间操作，在嵌入空间学表征更高效</li>
+<li><strong>不需要标签</strong>——自监督就能学到强大的特征</li>
+</ol>
+<p>但 LeCun 指出了 JE
+的根本局限：<strong>它只学会了"静态的同一性判断"，没有任何"如果...那么..."的预测能力。</strong>
+JE
+能判断"这两张照片是不是同一个人"，但无法回答"如果我推他一下，他会怎么反应"。</p>
+<p>这引出了从 JE 到世界模型的推理链：</p>
+<p><span class="math display">\[
+\text{JE（对比学习）} \xrightarrow{\text{加入预测器 } g_\phi}
+\text{JEPA} \xrightarrow{\text{加入动作条件 } a_t} \text{世界模型}
+\]</span></p>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>JE（对比式）</th>
+<th>JEPA</th>
+<th>世界模型</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>核心操作</strong></td>
+<td>判断两个输入"是否相似"</td>
+<td>从一个嵌入<strong>预测</strong>另一个嵌入</td>
+<td>给定状态+动作，<strong>预测</strong>未来状态</td>
+</tr>
+<tr class="even">
+<td><strong>时间建模</strong></td>
+<td>✗ 无（静态表征）</td>
+<td>✓ 有（预测目标可以是未来帧）</td>
+<td>✓ 有（<span class="math inline">\(s_{t+1} = f(s_t,
+a_t)\)</span>）</td>
+</tr>
+<tr class="odd">
+<td><strong>本质</strong></td>
+<td>学"什么是什么"（同一性）</td>
+<td>学"什么会变成什么"（动态）</td>
+<td>学"做了什么会发生什么"（因果）</td>
+</tr>
+</tbody>
+</table>
+<p>JEPA 的命名本身就揭示了这个设计——<strong>Joint-Embedding Predictive
+Architecture = JE + P</strong>。LeCun 的论证策略是"先肯定再超越"：肯定
+JE 在嵌入空间和丢弃无用细节上做对了，然后指出它缺少预测能力，最后说明
+JEPA 如何用<strong>最小的改动</strong>（加一个 predictor <span
+class="math inline">\(g_\phi\)</span>）弥补这个缺陷。</p>
+<p>回到三种架构各自的问题：</p>
+<p><strong>生成式</strong>（如 MAE、Dreamer
+的解码器、Sora）：损失函数对每个像素都"一视同仁"。模型被迫为树叶的随机飘动分配概率，这些计算对理解"树在摇"毫无帮助。</p>
+<p><strong>对比式 / JE</strong>（如
+SimCLR、CLIP）：需要精心设计"什么是正样本、什么是负样本"。这引入了大量工程选择（数据增强策略、负样本队列大小等），且对比损失只关心"样本对的相对距离"，可能丢弃绝对位置、时间顺序等有用信息。<strong>更根本的是：JE
+没有预测器，只做匹配，不做预测——它永远无法回答"接下来会发生什么"。</strong></p>
+<p><strong>JEPA</strong>
+取两者之长：像生成式一样做预测（不需要负样本），但预测发生在嵌入空间而非像素空间（不需要建模噪声）。同时，它继承了
+JE
+在嵌入空间操作的优势，只增加了一个预测器来赋予模型"预测未来"的能力。</p>
+<h3 id="jepa-的形式化定义">1.2 JEPA 的形式化定义</h3>
+<p>JEPA
+的核心思路可以用一句话概括：<strong>把输入映射到嵌入空间，然后在嵌入空间里做预测</strong>。</p>
+<p>给定上下文输入 <span
+class="math inline">\(x^{\text{ctx}}\)</span>（你能看到的部分）和目标输入
+<span
+class="math inline">\(x^{\text{tgt}}\)</span>（你需要预测的部分——被遮挡的图像块、未来的视频帧等）：</p>
+<p><span class="math display">\[
+\begin{aligned}
+s_x &amp;= f_\theta(x^{\text{ctx}}) \quad
+&amp;\text{（上下文编码器：把看到的东西变成嵌入）} \\
+s_y &amp;= f_{\bar{\theta}}(x^{\text{tgt}}) \quad
+&amp;\text{（目标编码器：把要预测的东西变成嵌入）} \\
+\hat{s}_y &amp;= g_\phi(s_x) \quad
+&amp;\text{（预测器：从看到的嵌入推测目标嵌入）}
+\end{aligned}
+\]</span></p>
+<p>训练目标极其简洁——让预测嵌入 <span
+class="math inline">\(\hat{s}_y\)</span> 逼近目标嵌入 <span
+class="math inline">\(s_y\)</span>：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{JEPA}} = \|\hat{s}_y - \text{sg}(s_y)\|_2^2
+\]</span></p>
+<p>其中 <span class="math inline">\(\text{sg}(\cdot)\)</span> 是
+stop-gradient（梯度不回传到目标编码器）。目标编码器 <span
+class="math inline">\(f_{\bar{\theta}}\)</span> 通过
+<strong>EMA（指数移动平均）</strong> 缓慢跟踪上下文编码器的权重：</p>
+<p><span class="math display">\[
+\bar{\theta} \leftarrow \tau \bar{\theta} + (1 - \tau) \theta, \quad
+\tau \in [0.996, 1)
+\]</span></p>
+<p><strong>什么是 EMA？</strong>
+用一个类比：假设你在追踪股票价格，每天有一个新价格 <span
+class="math inline">\(p_t\)</span>。直接看每日价格波动剧烈，你想要一条"平滑的趋势线"
+<span class="math inline">\(\bar{p}_t\)</span>：</p>
+<p><span class="math display">\[
+\bar{p}_t = \tau \cdot \bar{p}_{t-1} + (1 - \tau) \cdot p_t
+\]</span></p>
+<p><span class="math inline">\(\tau\)</span> 越接近
+1，趋势线越平滑、对新数据反应越迟钝。在 JEPA 中取 <span
+class="math inline">\(\tau = 0.996\)</span> 意味着目标编码器每步只接受
+<span class="math inline">\(0.4\%\)</span>
+的新权重——变化极其缓慢，相当于上下文编码器"过去几百步权重的平均版本"。</p>
+<p><strong>为什么需要两个编码器和 EMA？</strong>
+如果上下文编码器和目标编码器共享参数且同时更新，模型会找到一个"捷径"——让所有输入都映射到同一个常数向量，损失自动为零，但什么也没学到。这就是<strong>表征崩塌</strong>。EMA
+目标编码器的缓慢移动创造了一种"异步"：上下文编码器快速学习，目标编码器缓慢跟随——快的追慢的，始终有差距，始终有非平凡的预测目标。</p>
+<h3 id="为什么不在像素空间预测">1.3 为什么不在像素空间预测？</h3>
+<p>用一个具体例子理解这个问题。假设你在看一段视频：一个人在走路，背景有树叶飘动、路面有水洼反光。</p>
+<ul>
+<li><strong>像素重建模型</strong>（MAE、Dreamer
+解码器）必须预测："下一帧这片树叶在哪？水洼反光的形状是什么？"——这些细节本质上是随机的，对理解"人在走路"毫无帮助。</li>
+<li><strong>JEPA</strong>
+只需要在嵌入空间预测："这个人的姿态将如何变化？"——编码器可以自由选择丢弃树叶和反光的细节。</li>
+</ul>
+<p>从信息论角度，输入 <span class="math inline">\(x\)</span>
+的信息可以分解为：</p>
+<p><span class="math display">\[
+H(x) =
+\underbrace{H_{\text{semantic}}}_{\text{可预测的语义（人的姿态）}} +
+\underbrace{H_{\text{stochastic}}}_{\text{不可预测的噪声（树叶飘动）}}
+\]</span></p>
+<p>像素重建被迫建模全部 <span class="math inline">\(H(x)\)</span>，包括
+<span class="math inline">\(H_{\text{stochastic}}\)</span>。JEPA
+的编码器 <span class="math inline">\(f_\theta\)</span> 则可以学会丢弃
+<span
+class="math inline">\(H_{\text{stochastic}}\)</span>，只在嵌入空间保留
+<span class="math inline">\(H_{\text{semantic}}\)</span>。</p>
+<blockquote>
+<p><strong>命题（JEPA 的信息选择性）</strong>：设 <span
+class="math inline">\(s = f_\theta(x)\)</span> 为 JEPA
+编码器的输出，<span class="math inline">\(y\)</span>
+为预测目标。在理想情况下，JEPA 的最优编码器满足：</p>
+<p><span class="math display">\[I(s; y) \to \max, \quad I(s; x \mid y)
+\to 0\]</span></p>
+</blockquote>
+<p>这两个条件的含义：</p>
+<ul>
+<li><strong><span class="math inline">\(I(s; y) \to
+\max\)</span></strong>：互信息 <span class="math inline">\(I(s;
+y)\)</span> 衡量"知道 <span class="math inline">\(s\)</span> 后，对预测
+<span class="math inline">\(y\)</span> 有多大帮助"。最大化它要求 <span
+class="math inline">\(s\)</span>
+保留所有对预测目标有用的信息。例如：<span
+class="math inline">\(x\)</span> 是走路视频帧，<span
+class="math inline">\(y\)</span> 是下一帧——<span
+class="math inline">\(s\)</span>
+必须编码步频、方向、重心等与预测相关的语义信息。</li>
+<li><strong><span class="math inline">\(I(s; x \mid y) \to
+0\)</span></strong>：条件互信息 <span class="math inline">\(I(s; x \mid
+y)\)</span> 衡量"已经知道 <span class="math inline">\(y\)</span>
+后，<span class="math inline">\(s\)</span> 还额外携带了多少原始输入
+<span class="math inline">\(x\)</span> 的信息"。让它为零要求 <span
+class="math inline">\(s\)</span> 不包含与预测无关的信息。例如：<span
+class="math inline">\(x\)</span> 中有树叶飘动、水面反光——即使知道了
+<span class="math inline">\(y\)</span>，如果 <span
+class="math inline">\(s\)</span> 还编码了树叶位置，那就是"多余的"。</li>
+</ul>
+<p>两个条件合在一起定义了<strong>最小充分统计量</strong>（Minimal
+Sufficient
+Statistics）：<strong>保留所有有用信息，丢弃所有无用信息</strong>。这正是
+Information Bottleneck（Tishby et al.,
+2000）的核心思想：在"信息保留"和"噪声过滤"之间找到最优平衡。</p>
+<h3 id="防止崩塌从工程技巧到理论保证">1.4
+防止崩塌：从工程技巧到理论保证</h3>
+<p>JEPA 面临的最大风险是<strong>表征崩塌（Representation
+Collapse）</strong>——如果上下文编码器和目标编码器都学会输出同一个常数向量，MSE
+损失自动为零，但模型什么也没学到。</p>
+<p><strong>工程层面的防崩塌机制</strong>（I-JEPA、V-JEPA 采用）：</p>
+<ol type="1">
+<li><strong>EMA 目标编码器</strong>：目标侧参数缓慢更新（<span
+class="math inline">\(\tau \approx
+0.996\)</span>），防止两个编码器同步退化为常数映射。</li>
+<li><strong>大块掩码策略</strong>：遮挡的区域足够大且语义丰富，使预测任务非平凡——模型无法通过简单的空间插值完成任务。</li>
+</ol>
+<p>这些技巧在实践中效果良好，但缺乏严谨的理论解释："为什么 EMA
+能防止崩塌？<span class="math inline">\(\tau\)</span> 取多少才够？"</p>
+<p><strong>2026 年的理论进展：变分推断视角</strong></p>
+<p>最新的理论研究将 JEPA 重新表述为变分推断（Variational
+Inference）框架下的概率模型：</p>
+<ul>
+<li><strong>Var-JEPA</strong>（Gögl &amp; Yau, 2026,
+arXiv:2603.20111）证明了标准 JEPA
+实际上是变分推断在方差趋于零时的确定性特例。通过显式地优化
+ELBO，Var-JEPA 能够<strong>在不使用 EMA
+的情况下</strong>从原理上避免表征崩塌。</li>
+<li><strong>VJEPA</strong>（Huang et al., 2026,
+arXiv:2601.14354）进一步证明了 JEPA
+学到的表征可以是最优控制的<strong>充分信息状态（Sufficient Information
+States）</strong>——即它包含了做出最优决策所需的全部信息，同时自动过滤掉高方差的随机噪声。</li>
+</ul>
+<p>这个结果具有深远的意义：<strong>预测派（JEPA）和生成派（Dreamer 的
+ELBO）在底层数学结构上正在走向统一。</strong> JEPA 不是 ELBO
+的"替代品"，而是 ELBO 在特定条件下的另一种实现方式。</p>
+<h2 id="i-jepa在图像上的第一次实践">2. I-JEPA：在图像上的第一次实践</h2>
+<h3 id="核心思路">2.1 核心思路</h3>
+<p>I-JEPA（Assran et al., CVPR 2023）是 JEPA
+思想在图像领域的首次大规模实现。它的任务非常直观：<strong>遮挡图像的一部分，从可见部分预测被遮挡部分的嵌入表征</strong>——注意，不是预测像素，而是预测语义特征。</p>
+<p>具体流程：</p>
+<ol type="1">
+<li><strong>分块</strong>：图像被切成 <span
+class="math inline">\(N\)</span> 个 patch（ViT 的标准做法，如 14×14 =
+196 个 patch）</li>
+<li><strong>掩码</strong>：选定若干<strong>大块连续区域</strong>作为目标（被遮挡），剩余部分作为上下文（可见）</li>
+<li><strong>编码</strong>：上下文编码器处理可见 patch →
+得到上下文嵌入；目标编码器（EMA）处理目标 patch → 得到目标嵌入</li>
+<li><strong>预测</strong>：预测器（一个轻量 ViT）从上下文嵌入 +
+目标位置编码 → 预测目标嵌入</li>
+<li><strong>损失</strong>：预测嵌入与目标嵌入的 L2 距离</li>
+</ol>
+<h3 id="掩码策略为什么大块比随机好">2.2
+掩码策略：为什么大块比随机好？</h3>
+<p><img src="/chengYi-xun/img/ijepa_architecture_meta.png"
+alt="I-JEPA 架构：上下文编码器处理可见区域，预测器预测多个目标块的嵌入表征（Meta AI Blog, 2023）" /></p>
+<p>I-JEPA 的掩码策略是其成功的关键设计，与 MAE
+的随机掩码形成鲜明对比。论文中的具体参数：</p>
+<ul>
+<li><strong>4 个目标块</strong>（<span
+class="math inline">\(M=4\)</span>），每个面积占图像的
+<strong>15%–20%</strong>，长宽比在 <strong>(0.75, 1.5)</strong>
+内随机采样</li>
+<li><strong>1 个上下文块</strong>，面积占
+<strong>85%–100%</strong>，并<strong>移除与目标重叠的区域</strong></li>
+</ul>
+<p>为什么这样设计？关键在于<strong>让模型学习语义而非纹理</strong>：</p>
+<ul>
+<li>MAE 遮挡 75% 的<strong>随机散布 patch</strong>。由于每个被遮挡的
+patch 周围大概率有相邻的可见
+patch，模型可以通过局部纹理插值来重建——<strong>不需要理解语义，靠纹理接龙就够了</strong>。</li>
+<li>I-JEPA
+遮挡的是<strong>大块连续区域</strong>（可能覆盖一只狗的整个头部）。模型无法靠周围像素"接龙"——它必须理解"这是一只狗，狗头应该长什么样"才能预测该区域的嵌入。</li>
+</ul>
+<p>此外，I-JEPA
+的预测目标是嵌入而非像素，这进一步避免了对纹理细节的过度关注。</p>
+<h3 id="与-mae-的定量对比">2.3 与 MAE 的定量对比</h3>
+<table>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 26%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>维度</th>
+<th>MAE</th>
+<th>I-JEPA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>预测目标</td>
+<td>像素重建</td>
+<td>嵌入预测</td>
+</tr>
+<tr class="even">
+<td>解码器</td>
+<td>需要（像素解码器）</td>
+<td>不需要</td>
+</tr>
+<tr class="odd">
+<td>掩码策略</td>
+<td>75% 随机散布 patch</td>
+<td>15-20% 大块连续区域</td>
+</tr>
+<tr class="even">
+<td>数据增强</td>
+<td>必需（裁剪、翻转等）</td>
+<td><strong>不需要</strong></td>
+</tr>
+<tr class="odd">
+<td>ImageNet 线性评估</td>
+<td>77.2% (ViT-H/14, <strong>1600 epochs</strong>)</td>
+<td><strong>79.3%</strong> (ViT-H/14, <strong>300 epochs</strong>)</td>
+</tr>
+<tr class="even">
+<td>训练效率</td>
+<td>显著更慢（需要像素解码器）</td>
+<td>快 <strong>&gt;10×</strong></td>
+</tr>
+</tbody>
+</table>
+<p>I-JEPA 用不到 MAE 五分之一的预训练 epoch，在 ImageNet
+线性评估上取得了更高的准确率——而且不需要任何数据增强。这验证了 LeCun
+的核心论点：<strong>在嵌入空间预测比在像素空间重建更高效。</strong></p>
+<h3 id="代码核心">2.4 代码核心</h3>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ---- 初始化 ----</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ctx_enc </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ViT</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()                        </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 上下文编码器，只看可见 patch</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">tgt_enc </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> deepcopy</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ctx_enc)            </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 目标编码器，EMA 更新，看完整图像</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">predictor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> MLP</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()                      </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 预测器：从可见 token 预测被遮挡 token</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ---- 前向传播 ----</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ctx_tok </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ctx_enc</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(img, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">mask</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">visible)   </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 只编码可见 patch → 上下文 token</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">tgt_tok </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> tgt_enc</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(img)                 </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 编码完整图像 → 目标 token（不算梯度）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> predictor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ctx_tok, masked_pos)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 用上下文 token 预测被遮挡位置的嵌入</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> MSE</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(pred, tgt_tok[masked_pos])  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 在嵌入空间算 MSE，而非像素空间</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ---- EMA 更新 ----</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">tgt_enc </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> τ </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> tgt_enc </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF">τ) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ctx_enc  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># τ≈0.996，目标编码器缓慢跟踪上下文编码器</span></span></code></pre></div>
+<h2 id="v-jepa从图像到视频">3. V-JEPA：从图像到视频</h2>
+<h3 id="为什么视频比图像更需要-jepa">3.1 为什么视频比图像更需要
+JEPA？</h3>
+<p>I-JEPA 在图像上验证了嵌入预测的有效性。但 JEPA
+的真正优势在视频领域更加明显——因为<strong>视频中不可预测的随机性远多于图像</strong>。</p>
+<p>想象预测一段行走视频的下一帧：行人的姿态变化是可预测的（语义），但他外套的褶皱、地面的反光、远处树叶的飘动都是随机的。像素级视频预测模型（如
+Sora）必须为所有这些细节分配计算资源；V-JEPA
+则可以在嵌入空间中只保留"姿态变化"的信息。</p>
+<h3 id="时空掩码遮挡什么保留什么">3.2 时空掩码：遮挡什么、保留什么</h3>
+<p>V-JEPA（Bardes et al., 2024, arXiv:2404.08471）将 I-JEPA 的掩码思路从
+2D 图像扩展到 3D 视频。输入视频被切成 <span class="math inline">\((t, h,
+w)\)</span> 的 3D patch（时间 × 高度 ×
+宽度），然后在时空维度上同时做掩码。</p>
+<p>V-JEPA 使用<strong>多种掩码策略</strong>的组合：</p>
+<ul>
+<li><strong>短程掩码</strong>（空间为主）：在同一帧或相邻帧内遮挡空间区域——类似
+I-JEPA 的大块遮挡，测试模型的空间理解能力</li>
+<li><strong>长程掩码</strong>（时间为主）：遮挡未来若干帧的<strong>整个帧</strong>或大面积区域——测试模型的时间动力学预测能力</li>
+</ul>
+<p>数学上与 I-JEPA 完全一致，只是从 2D patch 变成了 3D
+patch。设视频被分为 <span class="math inline">\(N\)</span> 个时空
+patch，上下文集合 <span
+class="math inline">\(\mathcal{C}\)</span>，目标集合 <span
+class="math inline">\(\mathcal{T}\)</span>：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathbf{s}_{\mathcal{C}} &amp;= f_\theta(\{x_i\}_{i \in \mathcal{C}})
+\in \mathbb{R}^{|\mathcal{C}| \times d} \\
+\mathbf{s}_{\mathcal{T}} &amp;= f_{\bar{\theta}}(\{x_j\}_{j \in
+\mathcal{T}}) \in \mathbb{R}^{|\mathcal{T}| \times d} \\
+\hat{\mathbf{s}}_{\mathcal{T}} &amp;= g_\phi(\mathbf{s}_{\mathcal{C}},
+\text{pos}_{\mathcal{T}}) \in \mathbb{R}^{|\mathcal{T}| \times d}
+\end{aligned}
+\]</span></p>
+<p>预测器 <span class="math inline">\(g_\phi\)</span>
+接收上下文嵌入和<strong>目标位置编码</strong>（告诉它要预测"哪个时刻的哪个位置"），输出目标位置的嵌入预测。损失函数不变：</p>
+<p><span class="math display">\[
+\mathcal{L} = \frac{1}{|\mathcal{T}|} \sum_{j \in \mathcal{T}}
+\|\hat{s}_j - \text{sg}(s_j)\|_2^2
+\]</span></p>
+<h3 id="关键设计纯特征预测-冻结评估">3.3 关键设计：纯特征预测 +
+冻结评估</h3>
+<p>V-JEPA 有两个值得强调的设计哲学：</p>
+<p><strong>纯特征预测</strong>：整个训练过程不使用任何像素重建、对比学习、负样本、预训练图像编码器或文本标注。这使它成为"最纯粹"的
+JEPA 实现——训练信号完全来自嵌入空间的 MSE。</p>
+<p><strong>冻结评估（Frozen
+Evaluation）</strong>：下游任务（动作识别、图像分类等）只在冻结的
+backbone 上训练一个轻量探针（attentive probe），<strong>不微调
+backbone</strong>。这是对表征质量最严格的测试——如果冻结评估就能取得高精度，说明预训练得到的表征真正具有通用性。</p>
+<p>V-JEPA（ViT-H/16）在冻结评估下的结果：Kinetics-400 达
+81.9%，Something-Something-v2 达 72.2%，ImageNet-1K 达 77.9%。</p>
+<h3 id="v-jepa-vs-视频生成模型">3.4 V-JEPA vs 视频生成模型</h3>
+<table>
+<thead>
+<tr class="header">
+<th>维度</th>
+<th>V-JEPA</th>
+<th>视频生成模型（Sora 等）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>预测对象</td>
+<td>嵌入向量</td>
+<td>像素/视频帧</td>
+</tr>
+<tr class="even">
+<td>解码器</td>
+<td>无</td>
+<td>需要（扩散/自回归）</td>
+</tr>
+<tr class="odd">
+<td>训练信号</td>
+<td>嵌入 MSE</td>
+<td>扩散 ELBO / NLL</td>
+</tr>
+<tr class="even">
+<td>输出</td>
+<td>不可视化的表征</td>
+<td>可视化的视频</td>
+</tr>
+<tr class="odd">
+<td>对随机细节的处理</td>
+<td>可以丢弃</td>
+<td>必须建模</td>
+</tr>
+<tr class="even">
+<td>适用场景</td>
+<td>表征学习、理解、规划</td>
+<td>视频生成、仿真</td>
+</tr>
+</tbody>
+</table>
+<h2 id="v-jepa-2jepa-终于成为世界模型">4. V-JEPA 2：JEPA
+终于成为世界模型</h2>
+<h3 id="从表征学习到行动决策">4.1 从"表征学习"到"行动决策"</h3>
+<p>V-JEPA
+在视频理解上表现出色，但它有一个根本性的缺失：<strong>没有动作</strong>。V-JEPA
+只能"看视频并理解内容"，不能回答"如果我执行动作 <span
+class="math inline">\(a\)</span>，世界会怎么变？"——而这恰恰是世界模型最核心的能力。</p>
+<p>V-JEPA 2（Meta AI, 2025, arXiv:2506.09985）补上了这块关键拼图：它在
+V-JEPA 的基础上增加了<strong>动作条件预测</strong>，使 JEPA
+架构第一次具备了<strong>规划（Planning）</strong> 能力。</p>
+<h3 id="两阶段训练">4.2 两阶段训练</h3>
+<p>V-JEPA 2 采用两阶段训练范式：</p>
+<p><strong>阶段一：大规模视频预训练</strong>。在超过 <strong>100
+万小时</strong>的互联网视频上，用标准的 V-JEPA 目标（时空掩码 +
+嵌入预测）训练一个 1.2B 参数的 ViT
+编码器。这个阶段让模型学会了"世界长什么样、物体怎么运动"的通用物理直觉。</p>
+<p><strong>阶段二：动作条件后训练（V-JEPA 2-AC）</strong>。在冻结的
+V-JEPA 2 编码器之上，训练一个 300M 参数的 Transformer
+网络，使其能够根据动作预测未来嵌入。这个阶段仅需不到 <strong>62
+小时</strong>的无标注机器人交互数据（来自 Droid 数据集）。</p>
+<p>数学上：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\text{编码:} \quad &amp; s_t = f_\theta(o_t) \quad \text{（冻结的 V-JEPA
+2 编码器）} \\
+\text{动作条件预测:} \quad &amp; \hat{s}_{t+1} = g_\phi(s_t, a_t) \quad
+\text{（后训练的 Transformer）} \\
+\text{规划:} \quad &amp; a^* = \arg\min_a \|\hat{s}_{t+1} -
+s_{\text{goal}}\|_1
+\end{aligned}
+\]</span></p>
+<h3 id="嵌入空间中的规划mpc-cem">4.3 嵌入空间中的规划：MPC + CEM</h3>
+<p><img src="/chengYi-xun/img/vjepa2_planning_fig7.png"
+alt="V-JEPA 2-AC 的 MPC（模型预测控制）规划流程：当前观察经编码器 Eθ 编码，预测器 Pϕ 接收 CEM（Cross-Entropy Method，交叉熵方法）采样的动作序列（a₁, aₜ）逐步推演未来嵌入，与目标图像的嵌入计算 L₁ 距离作为能量函数（Assran et al., 2025, Figure 7）" /></p>
+<p>有了动作条件预测能力后，V-JEPA 2-AC 使用
+<strong>模型预测控制（MPC）</strong> 配合
+<strong>交叉熵方法（CEM）</strong>
+来做规划。用一个具体例子来理解：假设机器人面前有一个杯子，你拍了一张"杯子放到桌子右侧"的目标照片，让机器人执行这个任务。</p>
+<p><strong>第一步：定义"什么算成功"</strong></p>
+<p>把目标照片通过编码器变成嵌入向量 <span
+class="math inline">\(s_{\text{goal}} =
+f_\theta(o_{\text{goal}})\)</span>。现在"成功"有了数学定义：让当前状态的嵌入尽可能接近
+<span
+class="math inline">\(s_{\text{goal}}\)</span>。不需要人工写奖励函数——两个嵌入的距离就是奖励。</p>
+<p><strong>第二步：在脑中"试"很多种动作序列（CEM，Cross-Entropy
+Method，交叉熵方法）</strong></p>
+<p>机器人不可能真的尝试每种动作。CEM
+的做法是<strong>在想象中反复筛选</strong>：</p>
+<ol type="1">
+<li><strong>随机猜</strong>：从高斯分布中采样 <span
+class="math inline">\(N=512\)</span> 条候选动作序列，比如"先右移 3cm
+再下压 2cm 再夹紧"、"先前推 5cm 再左移 1cm"……</li>
+<li><strong>在脑中模拟</strong>：对每条动作序列，用世界模型 <span
+class="math inline">\(g_\phi\)</span>
+在<strong>嵌入空间</strong>中逐步推演未来状态：<span
+class="math inline">\(\hat{s}_1 = g_\phi(s_0, a_0)\)</span>，<span
+class="math inline">\(\hat{s}_2 = g_\phi(\hat{s}_1,
+a_1)\)</span>，……最终得到每条序列的"预测结局"</li>
+<li><strong>留下最好的</strong>：算每条序列的结局嵌入与 <span
+class="math inline">\(s_{\text{goal}}\)</span> 的距离，保留距离最小的
+top-<span class="math inline">\(K\)</span> 条</li>
+<li><strong>基于精英重新采样</strong>：用这 <span
+class="math inline">\(K\)</span>
+条精英序列的均值和方差作为新的采样分布，回到第 1 步</li>
+<li><strong>重复 3–5
+轮</strong>：分布越来越集中在"好动作"附近，最终收敛到一条高质量的动作序列</li>
+</ol>
+<p><span class="math display">\[
+\mu_{t+1}, \sigma_{t+1} = \text{fit}(\text{top-}K \text{ 精英序列})
+\quad \text{（用精英的统计量更新采样分布）}
+\]</span></p>
+<p><strong>第三步：只执行第一个动作，然后重新规划（MPC）</strong></p>
+<p>找到最优序列后，<strong>只执行第一个动作</strong> <span
+class="math inline">\(a_0^*\)</span>，然后观察真实世界的变化，重新从第一步开始规划。为什么不一口气执行完？因为真实世界和模型预测总有偏差——每执行一步就"睁眼看一下"，比蒙着眼执行一整套动作要靠谱得多。这就是
+MPC 的核心思想：<strong>滚动规划，走一步看一步。</strong></p>
+<p>整个过程完全在嵌入空间中进行，<strong>不需要渲染任何像素</strong>。相比之下，基于视频生成的规划方法（如
+Cosmos）需要先生成视频帧再评估——V-JEPA 2-AC 的规划速度是 Cosmos 的约
+<strong>15 倍</strong>（16 秒 vs 4 分钟）。</p>
+<p><strong>零样本机器人操作</strong>：V-JEPA 2-AC
+实现了在新环境、新物体上的零样本抓取和放置——不需要环境特定的数据收集或任务特定的奖励函数。只需一张目标照片，机器人就能自己规划出动作序列。</p>
+<h3 id="与-dreamer-的深度对比">4.4 与 Dreamer 的深度对比</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 32%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>维度</th>
+<th>Dreamer</th>
+<th>V-JEPA 2-AC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>预测空间</td>
+<td>潜变量 <span class="math inline">\(h_t, z_t\)</span> +
+解码器重建</td>
+<td>纯嵌入空间 <span class="math inline">\(s_t\)</span>（无解码器）</td>
+</tr>
+<tr class="even">
+<td>训练信号</td>
+<td>ELBO（重建 + KL）</td>
+<td>嵌入 MSE</td>
+</tr>
+<tr class="odd">
+<td>策略学习</td>
+<td>Actor-Critic（在想象中训练）</td>
+<td>MPC + CEM（在线规划）</td>
+</tr>
+<tr class="even">
+<td>奖励</td>
+<td>显式预测奖励头</td>
+<td>隐式（目标嵌入距离）</td>
+</tr>
+<tr class="odd">
+<td>预训练数据</td>
+<td>无（只用环境交互数据）</td>
+<td>100 万小时互联网视频</td>
+</tr>
+<tr class="even">
+<td>泛化能力</td>
+<td>同一域内泛化</td>
+<td><strong>跨域零样本</strong>（新物体、新环境）</td>
+</tr>
+</tbody>
+</table>
+<p>核心差异在于：Dreamer 从零开始在单一环境中学习一切（世界模型 +
+策略），而 V-JEPA 2
+先从海量视频中学习通用的物理世界表征，然后只需少量机器人数据就能适配到具体任务。这种"预训练
+→ 后训练"的范式正是 LLM 成功的关键——V-JEPA 2 将其引入了世界模型。</p>
+<h3 id="v-jepa-2.1让每个-token-都精确2026">4.5 V-JEPA 2.1：让每个 token
+都精确（2026）</h3>
+<p>V-JEPA 2
+的一个局限是：其表征更擅长<strong>全局语义理解</strong>（"这是一只杯子"），但在<strong>精细空间定位</strong>（"杯子的把手在哪里"）上不够准确。这对需要精确抓取的机器人操作是致命的。</p>
+<p>V-JEPA 2.1（2026, arXiv:2603.14482）通过三个创新解决了这个问题：</p>
+<p><strong>创新一：稠密预测损失——让每个 token
+都"知道自己在哪"</strong></p>
+<p>V-JEPA 2 的问题根源：只有被遮挡的 token 参与损失计算，可见的 token
+仅作为预测器的"输入"。这意味着可见 token
+没有任何压力去编码"我在图像的哪个位置"——它可以把自己变成一个全局摘要向量，丢失精确的空间信息。</p>
+<p>V-JEPA 2.1 的解决方案：<strong>对所有
+token（包括可见的）都施加预测损失</strong>。具体做法：</p>
+<ul>
+<li>被遮挡 token：标准 L1 损失（和之前一样）</li>
+<li>可见 token：加一个<strong>距离加权</strong>的 L1 损失。对于可见
+token <span class="math inline">\(i\)</span>，权重为：</li>
+</ul>
+<p><span class="math display">\[
+\lambda_i = \frac{1}{\sqrt{d_i}}
+\]</span></p>
+<p>其中 <span class="math inline">\(d_i\)</span> 是该 token 到最近被遮挡
+token 的时空距离（以 patch 为单位）。</p>
+<p>为什么要按距离加权？直觉很简单：<strong>靠近遮挡边界的 token
+必须编码精确的局部信息</strong>（因为旁边就是需要预测的位置），远处的
+token 可以更"全局"一些。<span class="math inline">\(1/\sqrt{d}\)</span>
+的衰减创造了从精细到粗糙的平滑过渡。</p>
+<p>这个损失如何让 token
+对应到时空位置？目标编码器独立处理完整输入，其位置 <span
+class="math inline">\((t, h, w)\)</span>
+的输出自然编码了该位置的内容。现在上下文编码器的<strong>每个</strong>输出都必须匹配目标编码器在同一位置的输出——这就迫使每个
+token 忠实地表征"自己所在位置的内容"，而非退化为全局摘要。</p>
+<p><strong>创新二：深层自监督</strong></p>
+<p>标准 JEPA 只在 Transformer
+最后一层施加损失。但空间细节（边缘、纹理位置）往往在浅层就已经存在，只是因为深层没有被约束去保留它们，这些信息在逐层传递中被丢弃了。V-JEPA
+2.1
+在<strong>多个中间层</strong>都施加预测目标——相当于在每一层都提醒模型"别忘了空间细节"。</p>
+<p><strong>创新三：多模态 tokenizer</strong></p>
+<p>对图像使用 2D patch embedding，对视频使用 3D patch
+embedding，替代统一的扁平化格式——让每种模态都能用最自然的方式被切分。</p>
+<p>结果：V-JEPA 2.1（ViT-G, 2B 参数）在机器人抓取任务上比 V-JEPA 2
+提升了 <strong>20%</strong>。</p>
+<h2 id="jepa-vs-生成式世界模型一个根本性的设计选择">5. JEPA vs
+生成式世界模型：一个根本性的设计选择</h2>
+<h3 id="损失函数决定了模型关注什么">5.1
+损失函数决定了模型"关注什么"</h3>
+<p>生成式和 JEPA
+的根本差异不在架构，而在<strong>损失函数对信息的处理方式</strong>。</p>
+<p><strong>生成式模型</strong>（Dreamer 解码器,
+Sora）优化的是负对数似然：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{gen}} = -\mathbb{E}_{p_{\text{data}}}[\log
+p_\theta(x)]
+\]</span></p>
+<p>这要求模型对输入 <span class="math inline">\(x\)</span>
+的<strong>每一个细节</strong>都分配合理的概率密度。一棵树有 10
+万片叶子，每片叶子在风中的位置都算在损失里——模型无法选择"忽略叶子的细节"。</p>
+<p><strong>JEPA</strong> 优化的是嵌入空间的 MSE：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\text{JEPA}} =
+\mathbb{E}[\|g_\phi(f_\theta(x^{\text{ctx}})) -
+\text{sg}(f_{\bar{\theta}}(x^{\text{tgt}}))\|^2]
+\]</span></p>
+<p>关键区别：编码器 <span class="math inline">\(f_\theta\)</span>
+可以自由选择丢弃哪些信息——只要目标编码器也丢弃了同样的信息，MSE
+就不会增大。如果"叶子的具体位置"被两个编码器同时丢弃了，这个信息对损失没有任何贡献。</p>
+<h3 id="信息瓶颈jepa-编码器自动学会丢弃噪声">5.2 信息瓶颈：JEPA
+编码器自动学会"丢弃噪声"</h3>
+<blockquote>
+<p><strong>命题（JEPA 编码器的信息瓶颈性质）</strong>：在 JEPA
+框架下，最优编码器 <span class="math inline">\(f^*\)</span> 是 <span
+class="math inline">\(x\)</span> 关于预测目标 <span
+class="math inline">\(y\)</span> 的<strong>最小充分统计量</strong>：</p>
+<p><span class="math display">\[f^* = \arg\min_{f: I(f(x); y) = I(x; y)}
+H(f(x))\]</span></p>
+<p>即在保持对预测目标的全部信息的同时，最小化自身的熵（丢弃一切冗余信息）。</p>
+</blockquote>
+<p>这与 Information Bottleneck（Tishby et al.,
+2000）的形式完全一致。直觉上：JEPA
+编码器会自动找到输入中"对预测有用"的最小信息子集。树叶的随机位置对预测"人在走路"没有帮助，所以会被自动丢弃。</p>
+<h3 id="什么时候该用哪种">5.3 什么时候该用哪种？</h3>
+<table>
+<thead>
+<tr class="header">
+<th>任务</th>
+<th>生成式更好</th>
+<th>JEPA 更好</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>视频/图像生成</td>
+<td>✓</td>
+<td>✗</td>
+<td>JEPA 无法生成可视化输出</td>
+</tr>
+<tr class="even">
+<td>仿真数据合成</td>
+<td>✓</td>
+<td>✗</td>
+<td>需要像素级输出</td>
+</tr>
+<tr class="odd">
+<td>图像分类</td>
+<td>-</td>
+<td>✓</td>
+<td>嵌入表征更紧凑</td>
+</tr>
+<tr class="even">
+<td>视频理解</td>
+<td>-</td>
+<td>✓</td>
+<td>自动过滤无关视觉细节</td>
+</tr>
+<tr class="odd">
+<td>机器人规划</td>
+<td>可行但慢</td>
+<td><strong>✓（快 15×）</strong></td>
+<td>不需要渲染像素</td>
+</tr>
+<tr class="even">
+<td>跨域泛化</td>
+<td>困难</td>
+<td><strong>✓</strong></td>
+<td>大规模视频预训练 + 少量适配</td>
+</tr>
+</tbody>
+</table>
+<h2 id="总结理解未来而非画出未来">6. 总结：理解未来，而非画出未来</h2>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>模型</th>
+<th>年份</th>
+<th>模态</th>
+<th>核心创新</th>
+<th>关键能力</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>I-JEPA</td>
+<td>2023</td>
+<td>图像</td>
+<td>大块掩码 + 嵌入预测</td>
+<td>高效自监督表征学习</td>
+</tr>
+<tr class="even">
+<td>V-JEPA</td>
+<td>2024</td>
+<td>视频</td>
+<td>时空掩码 + 纯特征预测</td>
+<td>冻结评估下的视频理解</td>
+</tr>
+<tr class="odd">
+<td>V-JEPA 2</td>
+<td>2025</td>
+<td>视频+动作</td>
+<td>动作条件后训练 + MPC 规划</td>
+<td>零样本机器人操作</td>
+</tr>
+<tr class="even">
+<td>V-JEPA 2.1</td>
+<td>2026</td>
+<td>图像+视频</td>
+<td>稠密预测 + 深层自监督</td>
+<td>精细空间定位</td>
+</tr>
+</tbody>
+</table>
+<p>JEPA 系列的演进脉络清晰：从<strong>图像理解</strong>（I-JEPA）→
+<strong>视频理解</strong>（V-JEPA）→ <strong>世界模型</strong>（V-JEPA
+2）→ <strong>精细定位</strong>（V-JEPA
+2.1）。每一步都在保持核心优势（嵌入空间预测、无需像素重建）的同时，扩展能力边界。</p>
+<p>JEPA
+代表了一种优雅的世界模型哲学：<strong>不需要能"画出"未来，只需要能"理解"未来。</strong>
+但它有一个明显的限制——无法生成可视化的预测。如果你的目标不是理解，而是<strong>生成逼真的虚拟世界</strong>呢？下一篇将介绍走向另一个极端的方案：<strong>视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos</strong>。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>LeCun, Y. (2022). <em>A Path Towards Autonomous Machine
+Intelligence</em>. OpenReview.</li>
+<li>Assran, M., ... &amp; Rabbat, M. (2023). <em>Self-Supervised
+Learning from Images with a Joint-Embedding Predictive
+Architecture</em>. CVPR 2023.</li>
+<li>Bardes, A., ... &amp; Rabbat, M. (2024). <em>Revisiting Feature
+Prediction for Learning Visual Representations from Video</em>.
+arXiv:2404.08471.</li>
+<li>Tishby, N., Pereira, F., &amp; Bialek, W. (2000). <em>The
+Information Bottleneck Method</em>. arXiv:physics/0004057.</li>
+<li>Gögl, S., &amp; Yau, C. (2026). <em>Var-JEPA: A Variational
+Formulation of the Joint-Embedding Predictive Architecture</em>.
+arXiv:2603.20111.</li>
+<li>Huang, B., et al. (2026). <em>Variational Joint-Embedding Predictive
+Architecture</em>. arXiv:2601.14354.</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/104-video-world-model/">笔记｜世界模型（四）：视频生成即世界模拟——从
+Sora 到 Genie 与 Cosmos</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/103-jepa/">https://chengyi-xun.github.io/chengYi-xun/posts/103-jepa/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/World-Model/">World Model</a><a class="post-meta__tags" href="/chengYi-xun/tags/JEPA/">JEPA</a><a class="post-meta__tags" href="/chengYi-xun/tags/V-JEPA/">V-JEPA</a><a class="post-meta__tags" href="/chengYi-xun/tags/Self-Supervised-Learning/">Self-Supervised Learning</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</div></div></a></div><div><a href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</div></div></a></div><div><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div><div><a href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</div></div></a></div><div><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div><div><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A2%84%E6%B5%8B%E6%AF%8F%E7%89%87%E6%A0%91%E5%8F%B6%E7%9A%84%E9%A3%98%E5%8A%A8%E6%98%AF%E6%84%9A%E8%A0%A2%E7%9A%84"><span class="toc-number">1.</span> <span class="toc-text">0. 预测每片树叶的飘动是愚蠢的</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#lecun-%E7%9A%84%E8%AE%A4%E7%9F%A5%E6%9E%B6%E6%9E%84%E6%8F%90%E6%A1%88"><span class="toc-number">2.</span> <span class="toc-text">1. LeCun 的认知架构提案</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%89%E7%A7%8D%E5%AD%A6%E4%B9%A0%E6%9E%B6%E6%9E%84"><span class="toc-number">2.1.</span> <span class="toc-text">1.1 三种学习架构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#jepa-%E7%9A%84%E5%BD%A2%E5%BC%8F%E5%8C%96%E5%AE%9A%E4%B9%89"><span class="toc-number">2.2.</span> <span class="toc-text">1.2 JEPA 的形式化定义</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%9C%A8%E5%83%8F%E7%B4%A0%E7%A9%BA%E9%97%B4%E9%A2%84%E6%B5%8B"><span class="toc-number">2.3.</span> <span class="toc-text">1.3 为什么不在像素空间预测？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%98%B2%E6%AD%A2%E5%B4%A9%E5%A1%8C%E4%BB%8E%E5%B7%A5%E7%A8%8B%E6%8A%80%E5%B7%A7%E5%88%B0%E7%90%86%E8%AE%BA%E4%BF%9D%E8%AF%81"><span class="toc-number">2.4.</span> <span class="toc-text">1.4
+防止崩塌：从工程技巧到理论保证</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#i-jepa%E5%9C%A8%E5%9B%BE%E5%83%8F%E4%B8%8A%E7%9A%84%E7%AC%AC%E4%B8%80%E6%AC%A1%E5%AE%9E%E8%B7%B5"><span class="toc-number">3.</span> <span class="toc-text">2. I-JEPA：在图像上的第一次实践</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E8%B7%AF"><span class="toc-number">3.1.</span> <span class="toc-text">2.1 核心思路</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8E%A9%E7%A0%81%E7%AD%96%E7%95%A5%E4%B8%BA%E4%BB%80%E4%B9%88%E5%A4%A7%E5%9D%97%E6%AF%94%E9%9A%8F%E6%9C%BA%E5%A5%BD"><span class="toc-number">3.2.</span> <span class="toc-text">2.2
+掩码策略：为什么大块比随机好？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%8E-mae-%E7%9A%84%E5%AE%9A%E9%87%8F%E5%AF%B9%E6%AF%94"><span class="toc-number">3.3.</span> <span class="toc-text">2.3 与 MAE 的定量对比</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E6%A0%B8%E5%BF%83"><span class="toc-number">3.4.</span> <span class="toc-text">2.4 代码核心</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#v-jepa%E4%BB%8E%E5%9B%BE%E5%83%8F%E5%88%B0%E8%A7%86%E9%A2%91"><span class="toc-number">4.</span> <span class="toc-text">3. V-JEPA：从图像到视频</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A7%86%E9%A2%91%E6%AF%94%E5%9B%BE%E5%83%8F%E6%9B%B4%E9%9C%80%E8%A6%81-jepa"><span class="toc-number">4.1.</span> <span class="toc-text">3.1 为什么视频比图像更需要
+JEPA？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%97%B6%E7%A9%BA%E6%8E%A9%E7%A0%81%E9%81%AE%E6%8C%A1%E4%BB%80%E4%B9%88%E4%BF%9D%E7%95%99%E4%BB%80%E4%B9%88"><span class="toc-number">4.2.</span> <span class="toc-text">3.2 时空掩码：遮挡什么、保留什么</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E8%AE%BE%E8%AE%A1%E7%BA%AF%E7%89%B9%E5%BE%81%E9%A2%84%E6%B5%8B-%E5%86%BB%E7%BB%93%E8%AF%84%E4%BC%B0"><span class="toc-number">4.3.</span> <span class="toc-text">3.3 关键设计：纯特征预测 +
+冻结评估</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#v-jepa-vs-%E8%A7%86%E9%A2%91%E7%94%9F%E6%88%90%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.4.</span> <span class="toc-text">3.4 V-JEPA vs 视频生成模型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#v-jepa-2jepa-%E7%BB%88%E4%BA%8E%E6%88%90%E4%B8%BA%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B"><span class="toc-number">5.</span> <span class="toc-text">4. V-JEPA 2：JEPA
+终于成为世界模型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%8E%E8%A1%A8%E5%BE%81%E5%AD%A6%E4%B9%A0%E5%88%B0%E8%A1%8C%E5%8A%A8%E5%86%B3%E7%AD%96"><span class="toc-number">5.1.</span> <span class="toc-text">4.1 从&quot;表征学习&quot;到&quot;行动决策&quot;</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E9%98%B6%E6%AE%B5%E8%AE%AD%E7%BB%83"><span class="toc-number">5.2.</span> <span class="toc-text">4.2 两阶段训练</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B5%8C%E5%85%A5%E7%A9%BA%E9%97%B4%E4%B8%AD%E7%9A%84%E8%A7%84%E5%88%92mpc-cem"><span class="toc-number">5.3.</span> <span class="toc-text">4.3 嵌入空间中的规划：MPC + CEM</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%8E-dreamer-%E7%9A%84%E6%B7%B1%E5%BA%A6%E5%AF%B9%E6%AF%94"><span class="toc-number">5.4.</span> <span class="toc-text">4.4 与 Dreamer 的深度对比</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#v-jepa-2.1%E8%AE%A9%E6%AF%8F%E4%B8%AA-token-%E9%83%BD%E7%B2%BE%E7%A1%AE2026"><span class="toc-number">5.5.</span> <span class="toc-text">4.5 V-JEPA 2.1：让每个 token
+都精确（2026）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#jepa-vs-%E7%94%9F%E6%88%90%E5%BC%8F%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E4%B8%80%E4%B8%AA%E6%A0%B9%E6%9C%AC%E6%80%A7%E7%9A%84%E8%AE%BE%E8%AE%A1%E9%80%89%E6%8B%A9"><span class="toc-number">6.</span> <span class="toc-text">5. JEPA vs
+生成式世界模型：一个根本性的设计选择</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8D%9F%E5%A4%B1%E5%87%BD%E6%95%B0%E5%86%B3%E5%AE%9A%E4%BA%86%E6%A8%A1%E5%9E%8B%E5%85%B3%E6%B3%A8%E4%BB%80%E4%B9%88"><span class="toc-number">6.1.</span> <span class="toc-text">5.1
+损失函数决定了模型&quot;关注什么&quot;</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BF%A1%E6%81%AF%E7%93%B6%E9%A2%88jepa-%E7%BC%96%E7%A0%81%E5%99%A8%E8%87%AA%E5%8A%A8%E5%AD%A6%E4%BC%9A%E4%B8%A2%E5%BC%83%E5%99%AA%E5%A3%B0"><span class="toc-number">6.2.</span> <span class="toc-text">5.2 信息瓶颈：JEPA
+编码器自动学会&quot;丢弃噪声&quot;</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E8%AF%A5%E7%94%A8%E5%93%AA%E7%A7%8D"><span class="toc-number">6.3.</span> <span class="toc-text">5.3 什么时候该用哪种？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93%E7%90%86%E8%A7%A3%E6%9C%AA%E6%9D%A5%E8%80%8C%E9%9D%9E%E7%94%BB%E5%87%BA%E6%9C%AA%E6%9D%A5"><span class="toc-number">7.</span> <span class="toc-text">6. 总结：理解未来，而非画出未来</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</a><time datetime="2026-04-05T16:35:00.000Z" title="发表于 2026-04-06 00:35:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</a><time datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/103-jepa/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/103-jepa/',
+      title: '笔记｜世界模型（三）：JEPA——在嵌入空间预测世界',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

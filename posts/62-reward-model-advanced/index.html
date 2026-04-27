@@ -1,0 +1,882 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本篇是 上一篇（奖励模型基础） 的续篇。上一篇完成了代理裁判 \(\hat{r}_\theta\) 的构建，本篇追问三个递进的问题：(1) 拼命优化一个不完美的裁判会怎样？(2) 如何让裁判更健壮？(3) 能否绕过裁判？ ⬅️ 上一篇：笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成  1 Reward Hacking：当优化器攻击裁判 1.1 问题定义与优化动力学  阶">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/62-reward-model-advanced/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本篇是 上一篇（奖励模型基础） 的续篇。上一篇完成了代理裁判 \(\hat{r}_\theta\) 的构建，本篇追问三个递进的问题：(1) 拼命优化一个不完美的裁判会怎样？(2) 如何让裁判更健壮？(3) 能否绕过裁判？ ⬅️ 上一篇：笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成  1 Reward Hacking：当优化器攻击裁判 1.1 问题定义与优化动力学  阶">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T11:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.491Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/62-reward-model-advanced/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.491Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本篇是 <a
+href="/chengYi-xun/posts/61-reward-model/">上一篇（奖励模型基础）</a>
+的续篇。上一篇完成了代理裁判 <span
+class="math inline">\(\hat{r}_\theta\)</span>
+的构建，本篇追问三个递进的问题：<strong>(1)</strong>
+拼命优化一个不完美的裁判会怎样？<strong>(2)</strong>
+如何让裁判更健壮？<strong>(3)</strong> 能否绕过裁判？</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/61-reward-model/">笔记｜强化学习（十一）：奖励模型基础——从传统
+RL 到大模型与视觉生成</a></p>
+</blockquote>
+<h2 id="reward-hacking当优化器攻击裁判">1 Reward
+Hacking：当优化器攻击裁判</h2>
+<h3 id="问题定义与优化动力学">1.1 问题定义与优化动力学</h3>
+<blockquote>
+<p><strong>阶段澄清</strong>：RLHF 分两步——阶段一用 BT 损失训练奖励模型
+<span
+class="math inline">\(\hat{r}_\theta\)</span>（训裁判），阶段二冻结
+<span class="math inline">\(\hat{r}_\theta\)</span> 用 PPO
+等算法训练策略 <span
+class="math inline">\(\pi\)</span>（考选手）。<strong>Reward Hacking
+发生在阶段二</strong>。</p>
+</blockquote>
+<p>上一篇完成了阶段一。现在进入阶段二：我们冻结 <span
+class="math inline">\(\hat{r}_\theta\)</span>，让策略 <span
+class="math inline">\(\pi\)</span> 最大化期望得分。由于 <span
+class="math inline">\(\hat{r}_\theta\)</span> 只是真实偏好 <span
+class="math inline">\(r^*\)</span> 的近似，将其输出分解为</p>
+<p><span class="math display">\[
+\hat{r}_\theta(x,y) = r^*(x,y) + \epsilon(x,y)
+\]</span></p>
+<p>其中 <span class="math inline">\(r^*\)</span>
+是不可观测的真实人类偏好，<span class="math inline">\(\epsilon\)</span>
+为 RM 的系统性拟合误差。代入策略优化目标：</p>
+<p><span class="math display">\[
+\max_\pi \; \mathbb{E}_{y \sim \pi}[\hat{r}_\theta(x,y)] \;=\;
+\underbrace{\mathbb{E}[\,r^*(x,y)\,]}_{\text{目标 1：提升真实质量}}
+\;+\; \underbrace{\mathbb{E}[\,\epsilon(x,y)\,]}_{\text{目标 2：利用 RM
+误差}}
+\]</span></p>
+<p>优化器<strong>无法区分</strong>这两项，它只看到一个总分。RL
+是一个极强的主动探索器，会像水流一样寻找提升总分最容易的路径。这导致了三阶段的动力学：</p>
+<ol type="1">
+<li><strong>初期（分布内优化）</strong>：策略生成的内容仍在 RM
+的训练数据分布内，<span class="math inline">\(\epsilon \approx
+0\)</span>。此时提升总分最有效的路径就是提升 <span
+class="math inline">\(r^*\)</span>——模型在真实地变好。</li>
+<li><strong>瓶颈期</strong>：<span class="math inline">\(r^*\)</span>
+越来越高，继续提升的边际成本急剧上升（例如从 90 分到 95
+分需要更强的推理能力）。</li>
+<li><strong>Hacking 期（分布外漂移）</strong>：策略被推至 RM
+训练分布之外（OOD）。RM
+作为神经网络，在未见过的输入区域必然存在外推失控的"假山峰"——这些点上
+<span class="math inline">\(r^*\)</span> 很低但 <span
+class="math inline">\(\epsilon\)</span> 极大。优化器发现：<strong>提升
+<span class="math inline">\(\epsilon\)</span> 的收益远大于提升 <span
+class="math inline">\(r^*\)</span>，且难度极低</strong>。于是概率质量被集中到这些假山峰上，RM
+给出的分数（即 Proxy 分数，因为 RM
+只是真实偏好的"代理"）飙升，而真实质量崩塌。</li>
+</ol>
+<p>这就是 <strong>Reward Hacking</strong>（奖励过度优化）。其理论根源是
+<strong>古德哈特定律</strong>（Goodhart's
+Law）：当代理指标本身变成优化目标时，它不再是好的度量指标（Goodhart,
+1975; Manheim &amp; Garrabrant, 2019）。</p>
+<p><strong>实践中常见的三类 Hacking 形态</strong>（Weng, 2024）：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">类型</th>
+<th style="text-align: left;">机制</th>
+<th style="text-align: left;">典型表现</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>冗长（Verbosity）</strong></td>
+<td style="text-align: left;">RM 隐含"长 = 详尽 = 好"的偏见</td>
+<td style="text-align: left;">一句话能说清楚的事写成五段废话</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>谄媚（Sycophancy）</strong></td>
+<td style="text-align: left;">RM 对"同意用户"给高分</td>
+<td style="text-align: left;">即使用户说"1+1=3"也附和</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>格式套路</strong></td>
+<td style="text-align: left;">RM 对特定格式特征过拟合</td>
+<td style="text-align: left;">堆砌粗体、列表、"作为 AI
+语言模型"等安全声明</td>
+</tr>
+</tbody>
+</table>
+<p>它们的共同特征是 <span class="math inline">\(\hat{r}_\theta\)</span>
+高分而 <span class="math inline">\(r^*\)</span>
+低分——在代理裁判眼里满分，在人类眼里毫无价值。</p>
+<h3 id="过度优化的缩放定律">1.2 过度优化的缩放定律</h3>
+<p>上面的三阶段分析是定性的。Gao et al.（<em>Scaling Laws for Reward
+Model Overoptimization</em>, ICML
+2023）用一个精心设计的实验将其<strong>定量化</strong>了。</p>
+<p><strong>实验设计</strong>：由于真实人类偏好 <span
+class="math inline">\(r^*\)</span>
+不可观测，他们构造了一个合成代理框架来模拟整个过程——</p>
+<ul>
+<li><strong>Gold
+RM</strong>（黄金裁判）：一个参数量很大、拟合能力很强的奖励模型，<strong>充当实验中的"真实人类"</strong>。我们把它的评分视为真实偏好
+<span class="math inline">\(r^*\)</span> 的最佳近似。</li>
+<li><strong>Proxy RM</strong>（代理裁判）：用 Gold RM
+的少量标注数据训练出的<strong>较小模型</strong>。这就是实际 RLHF
+中那个不完美的裁判 <span
+class="math inline">\(\hat{r}_\theta\)</span>。</li>
+</ul>
+<p>然后让策略模型拼命优化 Proxy 的分数，同时用 Gold
+的分数来衡量策略是否真的在变好。如果两条曲线同步上升，说明 Proxy
+可靠；如果 Proxy 一路飙升而 Gold 掉头向下，就证明 Reward Hacking
+正在发生。</p>
+<p><strong>核心发现——倒 U 型曲线</strong>：</p>
+<p><img src="/chengYi-xun/img/scaling-law-flowchart.png"
+alt="Proxy 与 Gold 分数在优化过程中的变化趋势（示意图，基于 Gao et al. 2023 的实验规律）" /></p>
+<p>如图所示，用策略与初始策略的 KL 散度度量"策略跑了多远"（横轴），Gold
+分数（真实质量，蓝色实线）呈现一条<strong>先升后降的倒 U
+型曲线</strong>——而 Proxy
+分数（红色虚线）始终单调上升。峰值点（Peak）就是优化的"甜蜜点"；越过它之后，继续优化只是在钻
+Proxy 的漏洞，真实质量不断崩塌。</p>
+<p>这一规律在 Best-of-<span
+class="math inline">\(N\)</span>（拒绝采样）和
+RL（PPO）下都被观察到，且曲线的关键参数随 Proxy RM
+参数量<strong>平滑缩放</strong>（近似对数趋势），因此可以用小规模实验预测大规模训练的行为。</p>
+<p><strong>工程启示——如何找到最优停止点？</strong></p>
+<p>Gao et al. 的缩放律之所以重要，是因为曲线参数随 Proxy RM
+的参数量呈<strong>对数平滑变化</strong>。这意味着你可以在小规模上（小
+Proxy RM + 短训练）拟合出 <span class="math inline">\(\alpha,
+\beta\)</span>
+的趋势线，然后<strong>外推</strong>到大规模训练的预期行为——包括峰值出现在哪个
+KL 值（Gao et al., 2023, Fig. 12）。</p>
+<p>实际工程中，常用的做法包括：</p>
+<ol type="1">
+<li><strong>KL 预算法</strong>：在 PPO 训练前预设一个 KL 上限（KL
+budget），策略偏离超过阈值就强制停止。这等价于在倒 U
+型曲线上"提前下车"。</li>
+<li><strong>Hold-out 监控法</strong>：保留一组 Gold
+标注数据（或用更强的模型评分），定期评估。当 Proxy 分数仍在涨但 Hold-out
+分数开始掉时，说明已进入 Hacking 阶段，应立即停止。</li>
+<li><strong>迭代 RLHF（Iterated
+RLHF）</strong>：不跑一次到底。每训练一段时间后暂停
+PPO，让当前策略模型生成一批新回答，请人类标注员对这些新回答做偏好排序，然后用这些新标注数据重新训练
+RM。这样 RM
+见过的数据就不再局限于初始阶段的回答，而是覆盖了策略模型"现在正在说的话"，策略更难跑到
+RM 的盲区去钻空子（Gao et al., §4.3）。</li>
+<li><strong>RM 集成</strong>：同时训练多个不同初始化 / 不同数据分割的
+RM，取平均分。单个 RM 的漏洞不太可能被所有 RM 共享，集成可以有效压缩
+<span class="math inline">\(\epsilon\)</span>（Lambert, <em>RLHF
+Book</em>, Ch. 14）。</li>
+</ol>
+<h3 id="kl-正则化为何不是万能药">1.3 KL 正则化为何不是万能药</h3>
+<p>既然过度优化会导致崩溃，一个自然的想法是：<strong>限制策略不要跑太远</strong>。标准
+PPO 正是这么做的——在奖励目标上加一个 KL 惩罚项，强迫策略 <span
+class="math inline">\(\pi\)</span> 不要偏离参考策略 <span
+class="math inline">\(\pi_{\mathrm{ref}}\)</span>
+太多。直觉上，如果策略被拴在参考策略附近，它就没法跑到 RM
+的分布外去钻空子了。</p>
+<p>但 Kwa et al.（<em>Catastrophic Goodhart</em>（灾难性古德哈特）,
+NeurIPS 2024）从理论上证明了这种保护并不可靠。他们的核心发现取决于 RM
+误差 <span class="math inline">\(\epsilon\)</span>
+的<strong>尾部性质</strong>：</p>
+<p><img src="/chengYi-xun/img/kl-tail-comparison.png"
+alt="轻尾 vs 重尾误差下 KL 惩罚的有效性对比（示意图，基于 Kwa et al., NeurIPS 2024）" /></p>
+<p><strong>轻尾误差（如高斯分布，左图）</strong>：参考策略的输出分布（蓝色）在远离中心后概率急剧衰减为零，尾部几乎没有概率质量。优化后的策略（橙色虚线）即使想搬运质量到高
+<span class="math inline">\(\epsilon\)</span>
+区域，也找不到多少"原料"可搬——因为参考分布在那里本来就接近零。要到达那些区域，策略需要做大幅度的分布变动，KL
+代价会急剧上升，远超收益。所以 KL 惩罚有效。</p>
+<p><strong>重尾误差（如帕累托分布、柯西分布，右图）</strong>：参考策略的输出分布（蓝色）在极端区域仍有缓慢衰减的概率尾巴——这就是重尾的特征。如图所示，优化后的策略（红色虚线）只需将极端尾部的概率<strong>稍微放大</strong>（红色阴影区），就完成了
+Hacking。由于参考分布在那里本来就有概率质量（虽然小），这个放大操作的 KL
+代价极低；但那些位置上的 <span class="math inline">\(\epsilon\)</span>
+值却异常巨大，收益远超代价。</p>
+<p><strong>关键机制</strong>：你可能会问——如果误差很大，策略岂不是要"跑很远"才能碰到那些极端漏洞？那
+KL 不也会很大吗？</p>
+<p>答案是：<strong>不需要跑很远</strong>。重尾分布的特性是，在参考策略
+<span class="math inline">\(\pi_{\mathrm{ref}}\)</span>
+的输出空间里，就已经存在一些<strong>极其罕见但 <span
+class="math inline">\(\epsilon\)</span> 巨大</strong>的输出 <span
+class="math inline">\((x,
+y)\)</span>。优化器不需要创造新的输出模式，它只需要把这些本来就存在的罕见输出的概率<strong>稍微调高一点点</strong>——比如从
+0.001% 调到 0.01%。</p>
+<p>这个微小的概率调整在 KL
+散度看来几乎无关紧要（绝大多数输出的概率没变，KL
+几乎为零）。但由于那些点上的 <span
+class="math inline">\(\epsilon\)</span>
+异常巨大（重尾极值），这一点点概率质量的转移就能带来巨大的代理奖励收益。<strong>KL
+惩罚感受到的是"概率搬了多少"（对数级），而奖励收益取决于"搬到的地方
+<span class="math inline">\(\epsilon\)</span>
+有多大"（可以任意大）——两者增长速度不匹配。</strong></p>
+<p>Kwa et al.
+将这种现象命名为<strong>灾难性古德哈特</strong>（Catastrophic
+Goodhart）：存在某些策略，RM 给它的分数（代理奖励）无限高、KL
+散度却趋近于零，但真实效用不比初始策略好——KL 惩罚形同虚设。</p>
+<blockquote>
+<p><strong>实证补充</strong>：Kwa et al. 用 Pythia-1.4B 和 Starling-7B
+等开源 RM
+做了实验，发现当前模型的误差分布主要呈<strong>轻尾</strong>特征，所以现阶段
+KL 正则仍然管用。但作者警告：随着 RM
+覆盖的任务更广、评估维度更复杂，重尾误差出现的可能性会增加。灾难性古德哈特不是当下的问题，而是一个<strong>理论红线</strong>——它告诉我们
+KL 惩罚的保护不是无条件的。</p>
+</blockquote>
+<p><strong>阶段性结论</strong>：</p>
+<ol type="1">
+<li><strong>缩放定律</strong>（Gao et al.）表明：给定一个
+RM，真实的优化收益存在<strong>天花板</strong>——倒 U
+型曲线的峰值就是极限，超过它就是在毁灭真实质量。</li>
+<li><strong>灾难性古德哈特</strong>（Kwa et al.）表明：光靠调大 KL
+惩罚系数 <span class="math inline">\(\beta\)</span>
+是不够的——在重尾误差下，KL 惩罚的对数增长永远追不上极端漏洞的收益。</li>
+</ol>
+<p>因此，必须从 RM
+架构本身入手——要么<strong>造更好的裁判</strong>（GenRM、ArmoRM），要么在适用场景下<strong>绕过裁判</strong>（DeepSeek-R1
+的可验证奖励）。</p>
+<h2 id="造更好的裁判从-ai-评委到生成式奖励模型">2 造更好的裁判：从 AI
+评委到生成式奖励模型</h2>
+<h3 id="ai-反馈的三条路线">2.1 AI 反馈的三条路线</h3>
+<p>传统 RM 的瓶颈在于人类标注成本。为此，学术界发展出三条技术路线（Lee
+et al., 2023; Bai et al., 2022）：</p>
+<ol type="1">
+<li><p><strong>大模型直接当评委（LLM-as-a-Judge）</strong>：写一段
+Prompt 让 GPT-4 直接输出"A 更好"或"B 更好"。最简单灵活，但依赖闭源
+API，且存在系统性偏差（Zheng et al., 2023）。</p></li>
+<li><p><strong>AI 反馈强化学习（RLAIF）</strong>：让 AI
+批量生成偏好标注数据，再用这些数据蒸馏出一个轻量的 BT-RM。Anthropic 的
+Constitutional AI（Bai et al.,
+2022）是先驱。局限在于蒸馏过程中信息有损。</p></li>
+<li><p><strong>生成式奖励模型（GenRM）</strong>：把评委能力直接微调进开源
+LLM，让它像人类审稿人一样先推理再判决（Mahan et al.,
+2024）。效果好但推理成本较高（需要生成 CoT，即 Chain-of-Thought
+思维链——让模型在给出判决前先写出一段推理过程）。</p></li>
+</ol>
+<p>三者并非互斥：RLAIF 可用大模型评委的输出做标注源，GenRM 可在 RLAIF
+数据上训练。</p>
+<h3 id="genrm让评委先推理再判决">2.2 GenRM：让评委先推理再判决</h3>
+<p>Mahan et al.（<em>Generative Reward Models</em>, 2024）提出将 RM
+从标量黑盒转变为<strong>先推理、后判决</strong>的生成式模型。</p>
+<p><strong>基础 GenRM</strong> 把 LLM 视为分类器，给定 prompt <span
+class="math inline">\(x\)</span> 和候选对 <span
+class="math inline">\((y_1, y_2)\)</span>，预测胜出标记 <span
+class="math inline">\(I\)</span>：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\mathrm{GenRM}} = \mathbb{E}_{(x, y_1, y_2, I)} \bigl[-\log
+\pi_\phi(I \mid x, y_1, y_2)\bigr]
+\]</span></p>
+<p><strong>CoT-GenRM</strong> 要求模型在判决前先生成推理链 <span
+class="math inline">\(c\)</span>，训练目标变为联合似然：</p>
+<p><span class="math display">\[
+\mathcal{L}_{\mathrm{CoT}} = \mathbb{E} \bigl[-\log \pi_\phi(c \mid x,
+y_1, y_2) - \log \pi_\phi(I \mid x, y_1, y_2, c)\bigr]
+\]</span></p>
+<p>CoT 的关键价值在于：<span class="math inline">\(\log \pi_\phi(c \mid
+\cdot)\)</span> 项将中间推理结构暴露为可训练的监督信号，直接惩罚了黑盒
+RM 容易学到的捷径（如"长回答=好回答"）。实验显示 CoT-GenRM 在 OOD
+泛化上较 BT-RM 提升 10%–45%（Mahan et al., 2024, Fig. 3）。</p>
+<p><strong>奖励信号如何传递给策略模型？</strong> GenRM 的推理链 <span
+class="math inline">\(c\)</span>
+是评委内部的"思考过程"，<strong>策略模型看不到它</strong>。在 RL
+训练循环中，流程是：策略模型生成回答 <span
+class="math inline">\(y\)</span> → GenRM 内部先生成推理链 <span
+class="math inline">\(c\)</span>，再输出判决 <span
+class="math inline">\(I\)</span>（或从 <span
+class="math inline">\(\pi_\phi(I \mid x, y_1, y_2, c)\)</span>
+中提取一个标量概率作为分数）→
+策略模型只收到这个<strong>最终的标量奖励信号</strong>，用于更新梯度。CoT
+的作用不是展示给策略模型看，而是提升评委自身的判断质量——就像论文审稿人写详细审稿意见是为了让自己的判断更准确，但作者拿到的只是"接受/拒绝"的最终决定。</p>
+<p>后续工作进一步发展了 GenRM 范式：<strong>Think-RM</strong>（NeurIPS
+2025）引入长程推理链训练；<strong>Rationale Consistency</strong>
+指标（2026）用于检测推理链是否为事后合理化（post-hoc
+rationalization），而非因果性推理。</p>
+<h3 id="ai-评委的系统性偏差">2.3 AI 评委的系统性偏差</h3>
+<p>无论采用何种 AI 评委，以下三类偏差均需关注（Zheng et al., 2023; Weng,
+2024）：</p>
+<ul>
+<li><strong>位置偏差（Position
+Bias）</strong>：倾向偏好先出现的回答。缓解：交换 A/B
+顺序做两次评判，不一致则判平。</li>
+<li><strong>冗长偏差（Verbosity
+Bias）</strong>：将冗长误判为详尽。缓解：Prompt
+约束或在训练数据中加入"短精 &gt; 长空"样本。</li>
+<li><strong>自我偏好（Self-preference
+Bias）</strong>：对同家族模型的输出给出更高评分（低困惑度效应）。缓解：跨家族交叉评判。</li>
+</ul>
+<h2 id="绕过单一标量多目标-rm-与可验证奖励">3 绕过单一标量：多目标 RM
+与可验证奖励</h2>
+<h3 id="armorm把黑盒标量拆成多个可解释维度">3.1
+ArmoRM：把黑盒标量拆成多个可解释维度</h3>
+<p>传统 BT-RM 把所有偏好压进一个标量——当策略 Hacking
+时，你只知道"分数降了"，但分不清是"太啰嗦"还是"太冒险"。</p>
+<p>Wang et al.（EMNLP Findings 2024）提出
+<strong>ArmoRM</strong>，核心思路很简单：<strong>先让模型像各科老师一样分别给"诚实"、"安全"、"简洁"等维度打出独立分数，然后根据当前问题的类型，动态决定各维度的权重。</strong>
+具体地，第一阶段训练一个多目标回归头，输出 <span
+class="math inline">\(k\)</span> 维评分向量；第二阶段用一个门控网络（MoE
+结构）读取 prompt 特征来决定权重，加权求和得到最终标量奖励。</p>
+<p>这样做的好处是：当模型出问题时，你可以直接看是哪个维度崩了（比如"安全分很高但简洁分暴跌"），而不是对着一个黑盒数字猜原因。ArmoRM-Llama3-8B-v0.1
+在 RewardBench 上取得了同规模 SOTA（Wang et al., 2024）。</p>
+<h3 id="可验证奖励deepseek-r1-的双轨范式">3.2 可验证奖励：DeepSeek-R1
+的双轨范式</h3>
+<p>DeepSeek-AI（<em>DeepSeek-R1</em>, Nature 2025;
+arXiv:2501.12948）提出了更激进的方案：在<strong>对错可判定</strong>的任务上，直接用规则替代神经网络裁判。</p>
+<p>DeepSeek-R1-Zero 在数学 / 代码 / 逻辑任务上采用纯规则奖励：</p>
+<p><span class="math display">\[
+R_{\mathrm{rule}} = R_{\mathrm{acc}} + R_{\mathrm{format}}
+\]</span></p>
+<p>其中 <span class="math inline">\(R_{\mathrm{acc}}\)</span>
+由编译器或正则匹配判定答案正确性，<span
+class="math inline">\(R_{\mathrm{format}}\)</span> 检查
+<code>&lt;think&gt;...&lt;/think&gt;</code>
+等格式约束。团队显式避免使用神经 RM，理由是大规模 RL 下其 Hacking
+风险过高（DeepSeek-AI, 2025, §2.3）。</p>
+<p>配合 <strong>GRPO</strong>（Group Relative Policy
+Optimization）算法——以组内采样的均值/标准差归一化优势函数 <span
+class="math inline">\(A_i = (r_i - \mu_G) / \sigma_G\)</span>，免去显式
+Critic 模型——R1-Zero 仅凭纯 RL
+便涌现出了自我反思、回溯验证等推理策略（所谓"aha moment"）。</p>
+<p>但 R1 <strong>并非全局抛弃学习式
+RM</strong>。在通用对齐阶段（helpfulness、safety），论文仍使用学习式 RM
+配合多源奖励 <span
+class="math inline">\(R_{\mathrm{General}}\)</span>。准确画像是<strong>双轨范式</strong>：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">任务类型</th>
+<th style="text-align: left;">奖励来源</th>
+<th style="text-align: left;">优势</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">可验证（数学、代码、格式）</td>
+<td style="text-align: left;">规则硬奖励</td>
+<td style="text-align: left;">零 Hacking 空间，零训练成本</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">开放对话与价值判断</td>
+<td style="text-align: left;">BT-RM / GenRM</td>
+<td style="text-align: left;">覆盖主观偏好</td>
+</tr>
+</tbody>
+</table>
+<p>这构成了 2024–2026
+年最具代表性的路线之一：<strong>推理用可验证，通用用 RM</strong>（亦见
+Promptfoo, 2025; Mitra, 2026 对 RLVR 范式的讨论）。</p>
+<h2 id="视觉生成中的奖励模型">4 视觉生成中的奖励模型</h2>
+<p>文本生成的输出是一串离散的
+token，有些任务甚至有客观对错（数学题、代码题）。但图像和视频的输出是<strong>高维的连续像素信号</strong>——"好不好看"、"是否忠实于描述"往往高度主观，也没有类似数学题那样的
+0/1 正确答案。因此，视觉生成侧的奖励模型面临独特的挑战。</p>
+<h3 id="imagereward训一个同时懂文和图的裁判">4.1
+ImageReward：训一个同时懂"文"和"图"的裁判</h3>
+<p>早期的文生图评估主要依赖 <strong>CLIP
+Score</strong>（衡量图文匹配度）和<strong>美学分数</strong>（衡量画面好看程度），但这两个指标各管一头，经常冲突——比如
+CLIP Score 极高但画面构图一塌糊涂，或者美学分极高但完全跑题。</p>
+<p>Xu et al.（<em>ImageReward</em>, NeurIPS
+2023）的思路是：<strong>不再拆成两个独立分数，而是用大规模人类偏好数据（约
+13.7
+万对专家标注）训练一个跨模态模型，让它像人类一样综合考虑"图片是否符合描述"、"是否好看"、"是否有缺陷"。</strong>
+架构上基于 BLIP 跨模态编码器 + MLP 打分头，训练同样使用 BT
+配对损失。实验表明，它比单独的 CLIP Score
+或美学模型更贴近人类的真实排序。</p>
+<h3 id="flow-grpo让文生图模型也能做强化学习">4.2
+Flow-GRPO：让文生图模型也能做强化学习</h3>
+<p>有了 ImageReward 这样的裁判之后，下一步自然是：能不能像文本的 RLHF
+一样，用 RL 来优化图像生成模型？</p>
+<p>问题在于，当前主流的文生图模型（如基于 Flow Matching
+的模型）的生成过程是<strong>确定性的</strong>——给定一个初始噪声，生成的图片就注定了。而强化学习依赖"试错"：模型需要能探索不同的生成可能性，才能发现哪些方向能拿高分。</p>
+<p><strong>Flow-GRPO</strong>（2025）解决了这个问题：它在数学上将确定性的生成过程改写为一个等价的<strong>随机过程</strong>，在不改变最终生成效果的前提下注入了随机性，让模型有了"探索空间"。同时用
+Denoising Reduction 技术压缩计算量，使在线 RL 的开销变得可接受。</p>
+<p>与文本 RLHF 相比，视觉 RL 有三个关键差异：</p>
+<ol type="1">
+<li><strong>动作空间不同</strong>：文本模型每步选一个
+token（离散的），图像模型每步更新的是连续的像素向量。</li>
+<li><strong>奖励几乎全是多目标的</strong>：需要同时兼顾对齐、美感、构图、时序一致性等多个维度，很少有单一的绝对对错。</li>
+<li><strong>Hacking 形态不同</strong>：比如"CLIP
+分极高但画面崩坏"、"美学分极高但语义跑题"，缓解方式通常需要多奖励帕累托优化。</li>
+</ol>
+<h2 id="评测与选型">5 评测与选型</h2>
+<h3 id="rewardbench给奖励模型做统考">5.1
+RewardBench：给奖励模型做"统考"</h3>
+<p>在 2024 年之前，各家论文都用自己的私有数据评测
+RM，没有统一标准。Lambert et al.（2024）构建了第一个公开的 RM 评测基准
+<strong>RewardBench</strong>。</p>
+<p>它的测试方式很直观：给 RM
+一道题（prompt）、一个好回答和一个坏回答，看 RM
+能否正确识别出哪个更好。覆盖四个场景：日常对话、困难对话、安全拒绝、逻辑推理。核心指标是<strong>胜率</strong>——RM
+判断正确的比例。</p>
+<p><strong>RewardBench 2</strong>（Malik et al.,
+2025）进一步提升了难度（各家模型的平均分下降约 20 分），并且与实际 RLHF
+训练效果的相关性更高——在 RewardBench 2 上得分高的
+RM，用它训练出来的模型也确实更好。</p>
+<h3 id="选型指南">5.2 选型指南</h3>
+<p>面对这么多 RM 方案，实际工程中怎么选？以下是一个简单的决策流程：</p>
+<ol type="1">
+<li><strong>任务有客观对错吗？</strong>（数学题、代码题、格式检查）→
+优先用<strong>规则奖励</strong>（DeepSeek-R1 路线），零 Hacking
+风险，零训练成本。</li>
+<li><strong>任务是开放式的？</strong>（对话、创意写作）→ 用<strong>传统
+BT-RM、GenRM 或大模型评委</strong>。</li>
+<li><strong>需要知道"坏在哪里"？</strong>（比如区分"太啰嗦"和"不安全"）→
+用<strong>多目标 RM</strong>（ArmoRM），可以看到各维度分数。</li>
+<li><strong>训练数据少、部署场景多变？</strong> → 用带 CoT 推理的
+<strong>GenRM</strong>，分布外泛化能力更强；或建立持续标注刷新机制。</li>
+<li><strong>推理成本敏感？</strong> → 成本从低到高：标量
+BT-RM（一次前向传播）&lt; GenRM（需要生成推理链）&lt; GPT-4
+评委（每次都要调 API）。</li>
+</ol>
+<h2 id="结语">6 结语</h2>
+<p>本文沿"<strong>发现问题 → 量化问题 →
+解决问题</strong>"的主线展开：</p>
+<ol type="1">
+<li><strong>问题</strong>：Reward Hacking 是 RLHF
+的核心风险——策略模型会钻奖励模型的漏洞，代理分数飙升但真实质量崩塌。</li>
+<li><strong>量化</strong>：Gao et al. 的缩放定律给出了那条标志性的倒 U
+型曲线；Kwa et al. 证明了 KL
+惩罚在重尾误差下理论上会失效（灾难性古德哈特）。</li>
+<li><strong>造更好的裁判</strong>：GenRM
+让评委先推理再打分，大幅提升了面对新场景时的判断准确率；ArmoRM
+把黑盒标量拆成多个可解释维度，让问题诊断成为可能。</li>
+<li><strong>绕过裁判</strong>：DeepSeek-R1 在数学 /
+代码等有客观答案的任务上，直接用规则奖励替代神经网络裁判，从根源消除了
+Hacking 空间。</li>
+<li><strong>视觉侧</strong>：ImageReward 和 Flow-GRPO 把"训裁判 +
+考选手"的范式搬到了图像和视频生成领域。</li>
+</ol>
+<p>奖励模型是 RLHF
+的隐藏引擎。理解它的脆弱性与演进方向，才算真正看懂大模型对齐的底层逻辑。</p>
+<blockquote>
+<p>参考文献：</p>
+<ol type="1">
+<li>Gao, L., Schulman, J. &amp; Hilton, J. (2023). <em>Scaling Laws for
+Reward Model Overoptimization</em>. ICML. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2210.10760">arXiv:2210.10760</a>.</li>
+<li>Kwa, T., Thomas, D. &amp; Garriga-Alonso, A. (2024).
+<em>Catastrophic Goodhart: Regularizing RLHF with KL Divergence Does Not
+Mitigate Heavy-Tailed Reward Misspecification</em>. NeurIPS. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2407.14503">arXiv:2407.14503</a>.</li>
+<li>Mahan, D., et al. (2024). <em>Generative Reward Models</em>. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2410.12832">arXiv:2410.12832</a>.</li>
+<li>Wang, H., et al. (2024). <em>Interpretable Preferences via
+Multi-Objective Reward Modeling and Mixture-of-Experts</em>. EMNLP
+Findings. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2406.12845">arXiv:2406.12845</a>.</li>
+<li>DeepSeek-AI (2025). <em>DeepSeek-R1: Incentivizing Reasoning
+Capability in LLMs via Reinforcement Learning</em>. Nature. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2501.12948">arXiv:2501.12948</a>.</li>
+<li>Xu, J., et al. (2023). <em>ImageReward: Learning and Evaluating
+Human Preferences for Text-to-Image Generation</em>. NeurIPS. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2304.05977">arXiv:2304.05977</a>.</li>
+<li><em>Flow-GRPO: Training Flow Matching Models via Online RL</em>
+(2025). <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2505.05470">arXiv:2505.05470</a>.</li>
+<li>Lambert, N., et al. (2024). <em>RewardBench: Evaluating Reward
+Models for Language Modeling</em>. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2403.13787">arXiv:2403.13787</a>.</li>
+<li>Malik, S., et al. (2025). <em>RewardBench 2: Advancing Reward Model
+Evaluation</em>. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2506.01937">arXiv:2506.01937</a>.</li>
+<li>Weng, L. (2024). <em>Reward Hacking in Reinforcement Learning</em>.
+<a
+target="_blank" rel="noopener" href="https://lilianweng.github.io/posts/2024-11-28-reward-hacking/">Blog</a>.</li>
+<li>Bai, Y., et al. (2022). <em>Constitutional AI: Harmlessness from AI
+Feedback</em>. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2212.08073">arXiv:2212.08073</a>.</li>
+<li>Zheng, L., et al. (2023). <em>Judging LLM-as-a-Judge with MT-Bench
+and Chatbot Arena</em>. NeurIPS. <a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/2306.05685">arXiv:2306.05685</a>.</li>
+</ol>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/62-reward-model-advanced/">https://chengyi-xun.github.io/chengYi-xun/posts/62-reward-model-advanced/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div><div><a href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#reward-hacking%E5%BD%93%E4%BC%98%E5%8C%96%E5%99%A8%E6%94%BB%E5%87%BB%E8%A3%81%E5%88%A4"><span class="toc-number">1.</span> <span class="toc-text">1 Reward
+Hacking：当优化器攻击裁判</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E5%AE%9A%E4%B9%89%E4%B8%8E%E4%BC%98%E5%8C%96%E5%8A%A8%E5%8A%9B%E5%AD%A6"><span class="toc-number">1.1.</span> <span class="toc-text">1.1 问题定义与优化动力学</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%BF%87%E5%BA%A6%E4%BC%98%E5%8C%96%E7%9A%84%E7%BC%A9%E6%94%BE%E5%AE%9A%E5%BE%8B"><span class="toc-number">1.2.</span> <span class="toc-text">1.2 过度优化的缩放定律</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#kl-%E6%AD%A3%E5%88%99%E5%8C%96%E4%B8%BA%E4%BD%95%E4%B8%8D%E6%98%AF%E4%B8%87%E8%83%BD%E8%8D%AF"><span class="toc-number">1.3.</span> <span class="toc-text">1.3 KL 正则化为何不是万能药</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%80%A0%E6%9B%B4%E5%A5%BD%E7%9A%84%E8%A3%81%E5%88%A4%E4%BB%8E-ai-%E8%AF%84%E5%A7%94%E5%88%B0%E7%94%9F%E6%88%90%E5%BC%8F%E5%A5%96%E5%8A%B1%E6%A8%A1%E5%9E%8B"><span class="toc-number">2.</span> <span class="toc-text">2 造更好的裁判：从 AI
+评委到生成式奖励模型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#ai-%E5%8F%8D%E9%A6%88%E7%9A%84%E4%B8%89%E6%9D%A1%E8%B7%AF%E7%BA%BF"><span class="toc-number">2.1.</span> <span class="toc-text">2.1 AI 反馈的三条路线</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#genrm%E8%AE%A9%E8%AF%84%E5%A7%94%E5%85%88%E6%8E%A8%E7%90%86%E5%86%8D%E5%88%A4%E5%86%B3"><span class="toc-number">2.2.</span> <span class="toc-text">2.2 GenRM：让评委先推理再判决</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ai-%E8%AF%84%E5%A7%94%E7%9A%84%E7%B3%BB%E7%BB%9F%E6%80%A7%E5%81%8F%E5%B7%AE"><span class="toc-number">2.3.</span> <span class="toc-text">2.3 AI 评委的系统性偏差</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%95%E8%BF%87%E5%8D%95%E4%B8%80%E6%A0%87%E9%87%8F%E5%A4%9A%E7%9B%AE%E6%A0%87-rm-%E4%B8%8E%E5%8F%AF%E9%AA%8C%E8%AF%81%E5%A5%96%E5%8A%B1"><span class="toc-number">3.</span> <span class="toc-text">3 绕过单一标量：多目标 RM
+与可验证奖励</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#armorm%E6%8A%8A%E9%BB%91%E7%9B%92%E6%A0%87%E9%87%8F%E6%8B%86%E6%88%90%E5%A4%9A%E4%B8%AA%E5%8F%AF%E8%A7%A3%E9%87%8A%E7%BB%B4%E5%BA%A6"><span class="toc-number">3.1.</span> <span class="toc-text">3.1
+ArmoRM：把黑盒标量拆成多个可解释维度</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AF%E9%AA%8C%E8%AF%81%E5%A5%96%E5%8A%B1deepseek-r1-%E7%9A%84%E5%8F%8C%E8%BD%A8%E8%8C%83%E5%BC%8F"><span class="toc-number">3.2.</span> <span class="toc-text">3.2 可验证奖励：DeepSeek-R1
+的双轨范式</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%86%E8%A7%89%E7%94%9F%E6%88%90%E4%B8%AD%E7%9A%84%E5%A5%96%E5%8A%B1%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.</span> <span class="toc-text">4 视觉生成中的奖励模型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#imagereward%E8%AE%AD%E4%B8%80%E4%B8%AA%E5%90%8C%E6%97%B6%E6%87%82%E6%96%87%E5%92%8C%E5%9B%BE%E7%9A%84%E8%A3%81%E5%88%A4"><span class="toc-number">4.1.</span> <span class="toc-text">4.1
+ImageReward：训一个同时懂&quot;文&quot;和&quot;图&quot;的裁判</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#flow-grpo%E8%AE%A9%E6%96%87%E7%94%9F%E5%9B%BE%E6%A8%A1%E5%9E%8B%E4%B9%9F%E8%83%BD%E5%81%9A%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0"><span class="toc-number">4.2.</span> <span class="toc-text">4.2
+Flow-GRPO：让文生图模型也能做强化学习</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%84%E6%B5%8B%E4%B8%8E%E9%80%89%E5%9E%8B"><span class="toc-number">5.</span> <span class="toc-text">5 评测与选型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#rewardbench%E7%BB%99%E5%A5%96%E5%8A%B1%E6%A8%A1%E5%9E%8B%E5%81%9A%E7%BB%9F%E8%80%83"><span class="toc-number">5.1.</span> <span class="toc-text">5.1
+RewardBench：给奖励模型做&quot;统考&quot;</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E5%9E%8B%E6%8C%87%E5%8D%97"><span class="toc-number">5.2.</span> <span class="toc-text">5.2 选型指南</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AF%AD"><span class="toc-number">6.</span> <span class="toc-text">6 结语</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/62-reward-model-advanced/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/62-reward-model-advanced/',
+      title: '笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

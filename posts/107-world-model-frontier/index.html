@@ -1,0 +1,916 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="前置知识：本文是世界模型系列的终篇。建议先阅读前六篇。 - （一）世界模型基础 - （二）Dreamer 系列 - （三）JEPA - （四）视频生成世界模型 - （五）物理化世界模型 - （六）自动驾驶世界模型 ⬅️ 上一篇：笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测  0. 2026 年的世界模型：百花齐放还是趋于收敛？ 回顾前六篇，我们沿着五条路线走了一遍世界模型的版图">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/107-world-model-frontier/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="前置知识：本文是世界模型系列的终篇。建议先阅读前六篇。 - （一）世界模型基础 - （二）Dreamer 系列 - （三）JEPA - （四）视频生成世界模型 - （五）物理化世界模型 - （六）自动驾驶世界模型 ⬅️ 上一篇：笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测  0. 2026 年的世界模型：百花齐放还是趋于收敛？ 回顾前六篇，我们沿着五条路线走了一遍世界模型的版图">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T17:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.487Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="World Model">
+<meta property="article:tag" content="4D Generation">
+<meta property="article:tag" content="WorldScore">
+<meta property="article:tag" content="Embodied AI">
+<meta property="article:tag" content="Frontier">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/107-world-model-frontier/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.487Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p><strong>前置知识</strong>：本文是世界模型系列的终篇。建议先阅读前六篇。
+- <a
+href="/chengYi-xun/posts/101-world-model-basics/">（一）世界模型基础</a>
+- <a href="/chengYi-xun/posts/102-dreamer/">（二）Dreamer 系列</a> - <a
+href="/chengYi-xun/posts/103-jepa/">（三）JEPA</a> - <a
+href="/chengYi-xun/posts/104-video-world-model/">（四）视频生成世界模型</a>
+- <a
+href="/chengYi-xun/posts/105-physics-world-model/">（五）物理化世界模型</a>
+- <a
+href="/chengYi-xun/posts/106-driving-world-model/">（六）自动驾驶世界模型</a></p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/106-driving-world-model/">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a></p>
+</blockquote>
+<h2 id="年的世界模型百花齐放还是趋于收敛">0. 2026
+年的世界模型：百花齐放还是趋于收敛？</h2>
+<p>回顾前六篇，我们沿着五条路线走了一遍世界模型的版图：</p>
+<ol type="1">
+<li><strong>Model-based RL</strong>（Dreamer
+系列）：在潜空间做想象训练</li>
+<li><strong>JEPA</strong>（I/V-JEPA）：在嵌入空间做预测，丢弃不可预测细节</li>
+<li><strong>视频生成</strong>（Sora、Genie、Cosmos）：用大规模视频模型涌现物理理解</li>
+<li><strong>物理化生成</strong>（PhysDreamer、NewtonGen）：显式嵌入牛顿定律</li>
+<li><strong>自动驾驶</strong>（GAIA-1、Vista、OccWorld）：像素/占用/结构化三种预测范式</li>
+</ol>
+<p>截至 2026
+年，我们看到一个明确的趋势：<strong>路线开始交叉融合。</strong>
+本篇讨论四个前沿方向，然后从统一视角分析这种收敛。</p>
+<h2 id="d-生成时空一体的世界构建">1. 4D 生成：时空一体的世界构建</h2>
+<h3 id="什么是-4d-生成">1.1 什么是 4D 生成？</h3>
+<p>4D = 3D 空间 + 时间。4D
+生成的目标是<strong>从文本/图像/视频生成随时间变化的 3D
+场景</strong>。</p>
+<p>这与视频生成（2D+T）的本质区别：4D
+生成的输出是一个可以从任意角度、任意时刻渲染的 3D 场景。</p>
+<h3 id="d-gaussian-splatting">1.2 4D Gaussian Splatting</h3>
+<p>主流的 4D 表示基于 <strong>4D Gaussian Splatting</strong>：</p>
+<p>每个高斯核的参数是时间的函数：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mu_i(t) &amp;= \mu_i^0 + \Delta\mu_i(t) \quad
+&amp;\text{（位置随时间变化）} \\
+\Sigma_i(t) &amp;= R_i(t) S_i(t) S_i(t)^\top R_i(t)^\top \quad
+&amp;\text{（形状随时间变化）} \\
+\alpha_i(t) &amp;= \sigma(\hat{\alpha}_i + \Delta\alpha_i(t)) \quad
+&amp;\text{（透明度随时间变化）}
+\end{aligned}
+\]</span></p>
+<p>时间函数 <span class="math inline">\(\Delta\mu_i(t)\)</span>、<span
+class="math inline">\(\Delta\alpha_i(t)\)</span> 等通常用小型 MLP
+或多项式参数化：</p>
+<p><span class="math display">\[
+\Delta\mu_i(t) = \text{MLP}_\theta(t, \mathbf{f}_i) \quad \text{或}
+\quad \Delta\mu_i(t) = \sum_{k=0}^{K} c_k^i t^k
+\]</span></p>
+<h3 id="代表工作">1.3 代表工作</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方法</th>
+<th>表示</th>
+<th>时间建模</th>
+<th>文本控制</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>4D-GS (2024)</td>
+<td>4D Gaussian</td>
+<td>多项式</td>
+<td>✗</td>
+</tr>
+<tr class="even">
+<td>DreamGaussian4D (2024)</td>
+<td>4D Gaussian</td>
+<td>MLP</td>
+<td>✓</td>
+</tr>
+<tr class="odd">
+<td>Align Your Gaussians (Google, 2024)</td>
+<td>4D Gaussian</td>
+<td>Score Distillation</td>
+<td>✓</td>
+</tr>
+<tr class="even">
+<td>TC4D (2024)</td>
+<td>4D Gaussian + 轨迹控制</td>
+<td>条件 MLP</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<h3 id="d-生成与世界模型的关系">1.4 4D 生成与世界模型的关系</h3>
+<p>4D 生成可以视为世界模型的一种<strong>显式几何表示</strong>：</p>
+<p><span class="math display">\[
+\text{世界模型}: s_{t+1} = f(s_t, a_t) \quad \leftrightarrow \quad
+\text{4D 生成}: \text{Scene}(t+1) = \text{Render}(\mathcal{G}(t+1))
+\]</span></p>
+<p>区别在于：传统世界模型（如 Dreamer）预测<strong>潜变量</strong>，4D
+生成直接构建<strong>可从任意视角渲染的 3D 场景</strong>。这意味着 4D
+世界模型天然具备多视角一致性，但在处理复杂动态（流体、柔性物体）时仍有局限。</p>
+<h2 id="评估框架worldscore-与-worldmodelbench">2. 评估框架：WorldScore
+与 WorldModelBench</h2>
+<h3 id="如何评估世界模型">2.1 如何评估世界模型？</h3>
+<p>一个根本问题：<strong>FID 和 FVD
+只衡量"生成的视频好不好看"，但世界模型的核心价值不是好看，而是物理正确、可控、可用于决策。</strong>
+用 FID
+评估世界模型，就像用"字写得好不好看"来评估一篇论文的学术水平。</p>
+<p>2025 年，学术界推出了专门评估世界模型的统一基准体系，代表作是
+<strong>WorldScore</strong>（ICCV 2025）和
+<strong>WorldModelBench</strong>（arXiv:2502.20694, NeurIPS 2025）。</p>
+<h3 id="worldscore统一-3d4d-与视频生成">2.2 WorldScore：统一 3D/4D
+与视频生成</h3>
+<p>WorldScore
+是首个统一评估世界生成的基准。它的核心创新在于：将"世界生成"分解为一系列<strong>带有显式相机轨迹布局说明的下一场景生成任务</strong>。这使得它能够用同一套标准评估
+3D 场景生成、4D 场景生成和纯视频生成模型。</p>
+<p>WorldScore 包含 3000
+个精心策划的测试用例（涵盖室内/室外、静态/动态、写实/风格化），主要评估三个维度：
+1.
+<strong>可控性（Controllability）</strong>：模型严格遵循控制输入（如相机轨迹矩阵、文本布局描述）的能力。
+2. <strong>质量（Quality）</strong>：生成场景的保真度和多视角一致性。 3.
+<strong>动力学（Dynamics）</strong>：生成世界中运动的准确性和稳定性。</p>
+<h3 id="worldmodelbench聚焦物理幻觉与常识">2.3
+WorldModelBench：聚焦物理幻觉与常识</h3>
+<p>WorldModelBench（arXiv:2502.20694, NeurIPS
+2025）更侧重于评估视频生成模型的"世界建模"能力，包含 350
+个精心策划的图像-文本条件对，覆盖 7
+个应用驱动领域（机器人、自动驾驶、工业、人类活动、游戏、动画、自然场景）和
+56 个子领域。衡量三个核心能力：</p>
+<ol type="1">
+<li><strong>指令遵循（Instruction
+Following）</strong>：物体和运动是否符合指令</li>
+<li><strong>常识（Common Sense）</strong>：时序一致性和视觉质量</li>
+<li><strong>物理遵循（Physical
+Adherence）</strong>：专门调查常见的物理幻觉（违反牛顿第一定律、物体穿模、物体大小突变等）</li>
+</ol>
+<p>关键创新：为了克服传统自动化指标的缺陷，WorldModelBench 收集了
+<strong>6.7 万个人类标签</strong>，评估了 14
+个前沿模型，并微调了一个视觉语言裁判模型用于自动评估（在预测物理违规方面比
+GPT-4o 更准确）。</p>
+<h3 id="评估结果的启示">2.4 评估结果的启示</h3>
+<p>根据这些最新基准的测试结果： -
+<strong>物理推理依然是短板</strong>：即使是最先进的闭源视频模型，在
+WorldModelBench 的"物理遵循"测试中也经常出现违背牛顿定律的幻觉。 -
+<strong>4D 生成在一致性上占优，但在动态性上落后</strong>：基于 4D
+Gaussian 的方法在 WorldScore
+的"质量"（多视角一致性）上表现优异，但在处理复杂、非刚性的"动力学"时，往往不如大规模视频扩散模型自然。</p>
+<h2 id="具身智能中的世界模型">3. 具身智能中的世界模型</h2>
+<h3 id="thinker-talker-架构">3.1 Thinker-Talker 架构</h3>
+<p>2025-2026 年的具身智能研究中，一种流行的架构是
+<strong>Thinker-Talker</strong>：</p>
+<ul>
+<li><strong>Thinker</strong>（世界模型）：在潜空间中"想象"未来，生成预测和计划</li>
+<li><strong>Talker</strong>（策略网络/LLM）：基于 Thinker
+的预测做出决策</li>
+</ul>
+<p><span class="math display">\[
+\begin{aligned}
+\text{Thinker:} \quad &amp; z_{t+1:t+H} = \text{WorldModel}(z_t,
+a_{t:t+H-1}) \\
+\text{Talker:} \quad &amp; a^* = \text{Policy}(z_t, z_{t+1:t+H})
+\end{aligned}
+\]</span></p>
+<h3 id="leworldmodel从像素直接学习-jepa-世界模型">3.2
+LeWorldModel：从像素直接学习 JEPA 世界模型</h3>
+<p>LeWorldModel（arXiv:2603.19312, 2026）是第一个<strong>稳定的端到端
+JEPA 世界模型</strong>——直接从原始像素学习，无需复杂的训练技巧。</p>
+<p>核心创新：用 <strong>SIGReg</strong>（Sketched-Isotropic-Gaussian
+Regularizer）替代传统 JEPA 中防止坍缩的复杂机制（如
+EMA、stop-gradient）。训练目标只有两项：</p>
+<p><span class="math display">\[
+\mathcal{L} = \underbrace{\|\hat{z}_{t+1} -
+z_{t+1}\|^2}_{\text{下一嵌入预测}} + \lambda \cdot
+\underbrace{\text{SIGReg}(z)}_{\text{高斯正则化}}
+\]</span></p>
+<table>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>参数量</td>
+<td>~15M（极轻量）</td>
+</tr>
+<tr class="even">
+<td>训练成本</td>
+<td>单 GPU 数小时</td>
+</tr>
+<tr class="odd">
+<td>规划速度</td>
+<td>比基础模型类世界模型快 48 倍</td>
+</tr>
+<tr class="even">
+<td>物理理解</td>
+<td>对物理不合理事件（如瞬移）给出更高的"惊讶值"</td>
+</tr>
+</tbody>
+</table>
+<p>LeWorldModel 的意义在于证明了：<strong>JEPA
+世界模型不需要庞大的参数和复杂的训练流程</strong>，一个简洁的正则化就能让嵌入空间稳定地编码物理结构。</p>
+<h3 id="机器人操作中的世界模型">3.3 机器人操作中的世界模型</h3>
+<p><strong>UniPi</strong>（2023）用视频生成模型做机器人规划：</p>
+<ol type="1">
+<li>给定当前场景图像和目标描述（"把红色方块放到蓝色碗里"）</li>
+<li>用视频生成模型"想象"完成任务的视频</li>
+<li>用逆动力学模型从视频中提取动作序列</li>
+<li>执行提取的动作</li>
+</ol>
+<p><span class="math display">\[
+\text{Image}_0 + \text{Goal} \overset{\text{Video Gen}}{\longrightarrow}
+\hat{V}_{0:T} \overset{\text{Inverse Dynamics}}{\longrightarrow}
+a_{0:T-1} \overset{\text{Execute}}{\longrightarrow} \text{Robot}
+\]</span></p>
+<h2 id="五条路线的收敛">4. 五条路线的收敛</h2>
+<h3 id="收敛趋势分析">4.1 收敛趋势分析</h3>
+<div class="shiki-container"><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span>2023:                    2026:</span></span>
+<span class="line"><span>  </span></span>
+<span class="line"><span>  MBRL ──────┐           </span></span>
+<span class="line"><span>             │ 潜空间预测 ────→ 统一的</span></span>
+<span class="line"><span>  JEPA ──────┘                 嵌入空间</span></span>
+<span class="line"><span>                               世界模型</span></span>
+<span class="line"><span>  Video Gen ─┐                    ↑</span></span>
+<span class="line"><span>             │ 像素/token ──→ 可渲染+</span></span>
+<span class="line"><span>  Physics ───┘  生成          可控+物理</span></span>
+<span class="line"><span>                                 ↑</span></span>
+<span class="line"><span>  AD WM ─────────────────→ 领域特化</span></span></code></pre></div>
+<h3 id="三个融合点">4.2 三个融合点</h3>
+<p><strong>融合点 1：潜空间统一——RSSM 与 JEPA 的汇合</strong></p>
+<p>Dreamer 的 RSSM 和 JEPA
+看似截然不同，但本质上都在做同一件事：在潜空间中预测未来状态。</p>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Dreamer (RSSM)</th>
+<th>JEPA</th>
+<th>融合趋势</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>潜空间</td>
+<td>确定性 <span class="math inline">\(h_t\)</span> + 随机性 <span
+class="math inline">\(z_t\)</span></td>
+<td>嵌入 <span class="math inline">\(z_t\)</span></td>
+<td>统一的潜在世界表征</td>
+</tr>
+<tr class="even">
+<td>解码器</td>
+<td>有（重建观测）</td>
+<td>无（只预测嵌入）</td>
+<td>LeWorldModel 证明无解码器也可行</td>
+</tr>
+<tr class="odd">
+<td>动作条件</td>
+<td>✓</td>
+<td>V-JEPA 2 加入</td>
+<td>都支持</td>
+</tr>
+</tbody>
+</table>
+<p>TD-MPC2 已经证明：无解码器的潜空间世界模型在 <strong>104
+个任务</strong>上表现优异，不需要重建任何像素。</p>
+<p><strong>融合点 2：生成 + 物理——让视频既好看又正确</strong></p>
+<ul>
+<li>视频生成提供视觉逼真度</li>
+<li>物理约束提供因果正确性</li>
+<li>两种融合方式：NewtonGen（训练时嵌入物理方程）vs
+NewtonRewards（训练后用物理奖励对齐）</li>
+</ul>
+<p><strong>融合点 3：通用 + 领域——Foundation Model 范式</strong></p>
+<ul>
+<li>通用世界模型（Cosmos, Sora）提供基础能力</li>
+<li>领域微调（驾驶、机器人、游戏）提供专业精度</li>
+<li>类似 LLM 的 "Foundation Model + Fine-tuning"
+范式——先在海量视频上预训练，再在特定领域微调</li>
+</ul>
+<h3 id="路线对比总结">4.3 路线对比总结</h3>
+<table>
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+<col style="width: 29%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>路线</th>
+<th>核心优势</th>
+<th>核心局限</th>
+<th>2026 状态</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Model-based RL</strong></td>
+<td>样本效率最高</td>
+<td>仅潜空间，无视觉</td>
+<td>DreamerV3 固定超参横扫</td>
+</tr>
+<tr class="even">
+<td><strong>JEPA</strong></td>
+<td>信息选择性，无需重建</td>
+<td>不能生成，不能可视化</td>
+<td>V-JEPA 2 加入动作条件</td>
+</tr>
+<tr class="odd">
+<td><strong>视频生成</strong></td>
+<td>视觉逼真，涌现能力</td>
+<td>物理不准确，计算昂贵</td>
+<td>Cosmos 开源，Genie 3 交互</td>
+</tr>
+<tr class="even">
+<td><strong>物理化生成</strong></td>
+<td>物理正确性</td>
+<td>场景受限，方法碎片化</td>
+<td>NewtonRewards 后训练范式</td>
+</tr>
+<tr class="odd">
+<td><strong>自动驾驶</strong></td>
+<td>领域优化，实用性强</td>
+<td>泛化性差</td>
+<td>Vista/OccWorld 走向实用</td>
+</tr>
+</tbody>
+</table>
+<h2 id="开放问题">5. 开放问题</h2>
+<h3 id="世界模型需要多大的规模">5.1 世界模型需要多大的规模？</h3>
+<p>Sora 和 Cosmos
+表明，<strong>规模</strong>是涌现物理理解的关键因素。但多大才"够"？</p>
+<p><span class="math display">\[
+\text{能力} \overset{?}{=} f(\text{参数量}, \text{数据量},
+\text{计算量})
+\]</span></p>
+<p>是否存在类似 LLM 的 <strong>Scaling Law</strong> for World
+Models？目前没有定论。</p>
+<h3 id="统计相关性-vs-因果理解">5.2 统计相关性 vs 因果理解</h3>
+<p>这是世界模型领域<strong>最根本的哲学问题</strong>，也是上一篇自动驾驶部分提到的因果性反思的延续。</p>
+<table>
+<thead>
+<tr class="header">
+<th>问题</th>
+<th>统计模型能做到</th>
+<th>需要因果模型</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>"球掉下来会怎样？"</td>
+<td>✓（训练数据中见过）</td>
+<td>✓</td>
+</tr>
+<tr class="even">
+<td>"月球上球掉下来会怎样？"</td>
+<td>✗（需要外推）</td>
+<td>✓</td>
+</tr>
+<tr class="odd">
+<td>"如果重力加倍呢？"</td>
+<td>✗（反事实推理）</td>
+<td>✓</td>
+</tr>
+<tr class="even">
+<td>"为什么球会掉？"</td>
+<td>✗（无解释能力）</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<p>Pearl 的因果层级（Ladder of Causation, Pearl 2009）：</p>
+<p><span class="math display">\[
+\underbrace{\text{关联}}_{\text{Level 1: } p(y|x)} \subset
+\underbrace{\text{干预}}_{\text{Level 2: } p(y|do(x))} \subset
+\underbrace{\text{反事实}}_{\text{Level 3: } p(y_x|x&#39;, y&#39;)}
+\]</span></p>
+<p>当前所有数据驱动的世界模型最多处于 Level 1（统计关联），偶尔涌现
+Level 2 的能力（如 GAIA-1
+改变车速时场景正确响应）。真正的"世界模型"需要达到 Level
+3——而这可能需要架构层面的根本变革，而不仅仅是更多数据和更大模型。</p>
+<h3 id="评估难题">5.3 评估难题</h3>
+<p>目前没有统一的世界模型评估标准：</p>
+<ul>
+<li>Dreamer 用 RL 任务的回报评估</li>
+<li>Sora 用 FVD 和人类评估</li>
+<li>OccWorld 用 mIoU 评估</li>
+<li>PhysDreamer 用物理准确性评估</li>
+</ul>
+<p>WorldScore 是第一次尝试统一评估，但仍然不完善。</p>
+<p><img src="/chengYi-xun/img/wm_timeline.png"
+alt="世界模型技术演进全景图：从 Ha &amp; Schmidhuber (2018) 到多模态大模型" /></p>
+<h2 id="技术演进全景图">6. 技术演进全景图</h2>
+<div class="shiki-container"><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span>1943: Craik, "心智模型"</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>1989: Sutton, Dyna 架构（Model-based RL 开端）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>2015: Schmidhuber, RNN 世界模型</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>2018: Ha &#x26; Schmidhuber, "World Models"（VAE + MDN-RNN + Controller）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>  ├── 2019: Dreamer v1（RSSM + 想象训练）</span></span>
+<span class="line"><span>  │     ├── 2021: DreamerV2（离散潜变量）</span></span>
+<span class="line"><span>  │     └── 2023: DreamerV3（固定超参，Minecraft 钻石）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>  ├── 2022: LeCun, JEPA 白皮书</span></span>
+<span class="line"><span>  │     ├── 2023: I-JEPA（图像嵌入预测）</span></span>
+<span class="line"><span>  │     ├── 2024: V-JEPA（视频嵌入预测）</span></span>
+<span class="line"><span>  │     ├── 2025: V-JEPA 2（动作条件 + 规划）</span></span>
+<span class="line"><span>  │     └── 2026: LeWorldModel（端到端 JEPA + SIGReg）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>  ├── 2023: GAIA-1（9B 驾驶世界模型）</span></span>
+<span class="line"><span>  │     ├── 2023: DriveDreamer（结构化控制）</span></span>
+<span class="line"><span>  │     ├── 2024: Vista（通用驾驶世界模型）</span></span>
+<span class="line"><span>  │     └── 2024: OccWorld（3D 占用预测）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>  ├── 2024: Sora（视频生成即世界模拟）</span></span>
+<span class="line"><span>  │     ├── 2024: Genie（可交互世界模型）</span></span>
+<span class="line"><span>  │     └── 2025: Cosmos（世界基础模型平台）</span></span>
+<span class="line"><span>  │</span></span>
+<span class="line"><span>  └── 2024: PhysDreamer / PhysGen（物理化世界模型）</span></span>
+<span class="line"><span>        ├── 2025: NewtonGen（潜空间牛顿方程）</span></span>
+<span class="line"><span>        └── 2025: NewtonRewards（后训练物理奖励）</span></span></code></pre></div>
+<h2 id="系列总结">7. 系列总结</h2>
+<table>
+<thead>
+<tr class="header">
+<th>篇目</th>
+<th>主题</th>
+<th>核心信息</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>第一篇</td>
+<td>基础概念</td>
+<td>世界模型 = 前向动力学 + 观测模型 + 奖励模型</td>
+</tr>
+<tr class="even">
+<td>第二篇</td>
+<td>Dreamer</td>
+<td>RSSM 在潜空间想象训练策略</td>
+</tr>
+<tr class="odd">
+<td>第三篇</td>
+<td>JEPA</td>
+<td>嵌入空间预测，丢弃不可预测细节</td>
+</tr>
+<tr class="even">
+<td>第四篇</td>
+<td>视频生成</td>
+<td>大规模视频模型展现涌现物理理解</td>
+</tr>
+<tr class="odd">
+<td>第五篇</td>
+<td>物理化</td>
+<td>显式嵌入物理定律到生成过程</td>
+</tr>
+<tr class="even">
+<td>第六篇</td>
+<td>自动驾驶</td>
+<td>像素预测 / 占用预测 / 结构化预测</td>
+</tr>
+<tr class="odd">
+<td>第七篇</td>
+<td>前沿</td>
+<td>4D 生成 / 评估框架 / 路线融合</td>
+</tr>
+</tbody>
+</table>
+<p>世界模型是通向通用人工智能的核心模块之一。无论是 LeCun 的 JEPA
+路线还是 OpenAI
+的视频生成路线，最终目标一致：<strong>构建一个能够预测、推理、规划的世界内部表征。</strong></p>
+<p>用一句话总结这个系列的核心洞见：<strong>世界模型的本质不是"预测像素"，而是"理解因果"。</strong>
+从 Dreamer 的潜空间想象，到 JEPA 的信息选择，到 Sora 的涌现物理，到
+NewtonGen
+的显式物理嵌入——每一步都是在逼近这个目标。真正的突破可能不会来自更大的模型或更多的数据，而是来自将因果推理能力融入世界模型的架构设计。</p>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Pearl, J. (2009). <em>Causality: Models, Reasoning, and
+Inference</em>. Cambridge University Press.</li>
+<li>Ha, D. &amp; Schmidhuber, J. (2018). <em>World Models</em>.
+arXiv:1803.10122.</li>
+<li>LeCun, Y. (2022). <em>A Path Towards Autonomous Machine
+Intelligence</em>. OpenReview.</li>
+<li>Du, Y., Yang, M., Dai, B., Dai, H., Nachum, O., Tenenbaum, J. B.,
+Schuurmans, D. &amp; Abbeel, P. (2023). <em>Learning Universal Policies
+via Text-Guided Video Generation</em>. NeurIPS 2023.</li>
+<li>NVIDIA (2025). <em>Cosmos World Foundation Model Platform for
+Physical AI</em>. arXiv:2501.03575.</li>
+<li>Duan, H., et al. (2025). <em>WorldScore: A Unified Evaluation
+Benchmark for World Generation</em>. ICCV 2025.</li>
+<li>WorldModelBench Team (2025). <em>WorldModelBench: Judging Video
+Generation Models As World Models</em>. arXiv:2502.20694, NeurIPS
+2025.</li>
+<li>LeWorldModel Team (2026). <em>LeWorldModel: Stable End-to-End
+Joint-Embedding Predictive Architecture from Pixels</em>.
+arXiv:2603.19312.</li>
+</ol>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/107-world-model-frontier/">https://chengyi-xun.github.io/chengYi-xun/posts/107-world-model-frontier/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/World-Model/">World Model</a><a class="post-meta__tags" href="/chengYi-xun/tags/4D-Generation/">4D Generation</a><a class="post-meta__tags" href="/chengYi-xun/tags/WorldScore/">WorldScore</a><a class="post-meta__tags" href="/chengYi-xun/tags/Embodied-AI/">Embodied AI</a><a class="post-meta__tags" href="/chengYi-xun/tags/Frontier/">Frontier</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-full"><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div><div><a href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</div></div></a></div><div><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div><div><a href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</div></div></a></div><div><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div><div><a href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B9%B4%E7%9A%84%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E7%99%BE%E8%8A%B1%E9%BD%90%E6%94%BE%E8%BF%98%E6%98%AF%E8%B6%8B%E4%BA%8E%E6%94%B6%E6%95%9B"><span class="toc-number">1.</span> <span class="toc-text">0. 2026
+年的世界模型：百花齐放还是趋于收敛？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#d-%E7%94%9F%E6%88%90%E6%97%B6%E7%A9%BA%E4%B8%80%E4%BD%93%E7%9A%84%E4%B8%96%E7%95%8C%E6%9E%84%E5%BB%BA"><span class="toc-number">2.</span> <span class="toc-text">1. 4D 生成：时空一体的世界构建</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF-4d-%E7%94%9F%E6%88%90"><span class="toc-number">2.1.</span> <span class="toc-text">1.1 什么是 4D 生成？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#d-gaussian-splatting"><span class="toc-number">2.2.</span> <span class="toc-text">1.2 4D Gaussian Splatting</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E8%A1%A8%E5%B7%A5%E4%BD%9C"><span class="toc-number">2.3.</span> <span class="toc-text">1.3 代表工作</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#d-%E7%94%9F%E6%88%90%E4%B8%8E%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="toc-number">2.4.</span> <span class="toc-text">1.4 4D 生成与世界模型的关系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%84%E4%BC%B0%E6%A1%86%E6%9E%B6worldscore-%E4%B8%8E-worldmodelbench"><span class="toc-number">3.</span> <span class="toc-text">2. 评估框架：WorldScore
+与 WorldModelBench</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%A6%82%E4%BD%95%E8%AF%84%E4%BC%B0%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B"><span class="toc-number">3.1.</span> <span class="toc-text">2.1 如何评估世界模型？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#worldscore%E7%BB%9F%E4%B8%80-3d4d-%E4%B8%8E%E8%A7%86%E9%A2%91%E7%94%9F%E6%88%90"><span class="toc-number">3.2.</span> <span class="toc-text">2.2 WorldScore：统一 3D&#x2F;4D
+与视频生成</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#worldmodelbench%E8%81%9A%E7%84%A6%E7%89%A9%E7%90%86%E5%B9%BB%E8%A7%89%E4%B8%8E%E5%B8%B8%E8%AF%86"><span class="toc-number">3.3.</span> <span class="toc-text">2.3
+WorldModelBench：聚焦物理幻觉与常识</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AF%84%E4%BC%B0%E7%BB%93%E6%9E%9C%E7%9A%84%E5%90%AF%E7%A4%BA"><span class="toc-number">3.4.</span> <span class="toc-text">2.4 评估结果的启示</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B7%E8%BA%AB%E6%99%BA%E8%83%BD%E4%B8%AD%E7%9A%84%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.</span> <span class="toc-text">3. 具身智能中的世界模型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#thinker-talker-%E6%9E%B6%E6%9E%84"><span class="toc-number">4.1.</span> <span class="toc-text">3.1 Thinker-Talker 架构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#leworldmodel%E4%BB%8E%E5%83%8F%E7%B4%A0%E7%9B%B4%E6%8E%A5%E5%AD%A6%E4%B9%A0-jepa-%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.2.</span> <span class="toc-text">3.2
+LeWorldModel：从像素直接学习 JEPA 世界模型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9C%BA%E5%99%A8%E4%BA%BA%E6%93%8D%E4%BD%9C%E4%B8%AD%E7%9A%84%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.3.</span> <span class="toc-text">3.3 机器人操作中的世界模型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E6%9D%A1%E8%B7%AF%E7%BA%BF%E7%9A%84%E6%94%B6%E6%95%9B"><span class="toc-number">5.</span> <span class="toc-text">4. 五条路线的收敛</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%94%B6%E6%95%9B%E8%B6%8B%E5%8A%BF%E5%88%86%E6%9E%90"><span class="toc-number">5.1.</span> <span class="toc-text">4.1 收敛趋势分析</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%89%E4%B8%AA%E8%9E%8D%E5%90%88%E7%82%B9"><span class="toc-number">5.2.</span> <span class="toc-text">4.2 三个融合点</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%B7%AF%E7%BA%BF%E5%AF%B9%E6%AF%94%E6%80%BB%E7%BB%93"><span class="toc-number">5.3.</span> <span class="toc-text">4.3 路线对比总结</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%80%E6%94%BE%E9%97%AE%E9%A2%98"><span class="toc-number">6.</span> <span class="toc-text">5. 开放问题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%9A%E5%A4%A7%E7%9A%84%E8%A7%84%E6%A8%A1"><span class="toc-number">6.1.</span> <span class="toc-text">5.1 世界模型需要多大的规模？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%9F%E8%AE%A1%E7%9B%B8%E5%85%B3%E6%80%A7-vs-%E5%9B%A0%E6%9E%9C%E7%90%86%E8%A7%A3"><span class="toc-number">6.2.</span> <span class="toc-text">5.2 统计相关性 vs 因果理解</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AF%84%E4%BC%B0%E9%9A%BE%E9%A2%98"><span class="toc-number">6.3.</span> <span class="toc-text">5.3 评估难题</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8A%80%E6%9C%AF%E6%BC%94%E8%BF%9B%E5%85%A8%E6%99%AF%E5%9B%BE"><span class="toc-number">7.</span> <span class="toc-text">6. 技术演进全景图</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B3%BB%E5%88%97%E6%80%BB%E7%BB%93"><span class="toc-number">8.</span> <span class="toc-text">7. 系列总结</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</a><time datetime="2026-04-05T16:35:00.000Z" title="发表于 2026-04-06 00:35:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</a><time datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/107-world-model-frontier/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/107-world-model-frontier/',
+      title: '笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

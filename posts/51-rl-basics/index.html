@@ -1,0 +1,2092 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（一）：强化学习基础与策略梯度 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，从最基础的 REINFORCE 算法讲起，逐步引入 Actor-Critic 架构，为后续深入理解 PPO 和 GRPO 打下坚实的理论基础。 ⬅️ 上一篇：笔记｜生成模型（十五）：Flux 架构解析 ➡️ 下一篇：笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)  强化">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（一）：强化学习基础与策略梯度">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，从最基础的 REINFORCE 算法讲起，逐步引入 Actor-Critic 架构，为后续深入理解 PPO 和 GRPO 打下坚实的理论基础。 ⬅️ 上一篇：笔记｜生成模型（十五）：Flux 架构解析 ➡️ 下一篇：笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)  强化">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-16T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-27T17:05:29.488Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（一）：强化学习基础与策略梯度',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-28 01:05:29'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（一）：强化学习基础与策略梯度</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-27T17:05:29.488Z" title="更新于 2026-04-28 01:05:29">2026-04-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（一）：强化学习基础与策略梯度"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，从最基础的
+REINFORCE 算法讲起，逐步引入 Actor-Critic 架构，为后续深入理解 PPO 和
+GRPO 打下坚实的理论基础。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/15-flux/">笔记｜生成模型（十五）：Flux
+架构解析</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/52-trpo-ppo/">笔记｜强化学习（二）：信任区域与近端策略优化
+(从 TRPO 到 PPO)</a></p>
+</blockquote>
+<h1 id="强化学习基础概念从训狗说起">强化学习基础概念：从"训狗"说起</h1>
+<p>对于纯小白读者来说，理解强化学习（Reinforcement Learning,
+RL）最直观的例子就是<strong>"训狗"</strong>。</p>
+<ul>
+<li><strong>智能体（Agent）</strong>：就是那只狗（在 AI
+中就是我们的模型）。</li>
+<li><strong>环境（Environment）</strong>：狗所处的现实世界。</li>
+<li><strong>状态（State）</strong>：狗当前看到的画面、听到的口令（比如你喊"坐下"）。</li>
+<li><strong>动作（Action）</strong>：狗做出的反应（比如坐下、趴下、或者跑开）。</li>
+<li><strong>奖励（Reward）</strong>：如果狗做对了，你给它一块肉（正奖励）；做错了，你呵斥它（负奖励或零奖励）。</li>
+</ul>
+<p>强化学习的核心目标，就是让这只狗（模型）在不断的"尝试-犯错-获得奖励"的过程中，自己摸索出一条规律：<strong>在什么情况下，做什么动作，能吃到最多的肉</strong>。这条规律，在数学上就叫做<strong>策略（Policy）</strong>。</p>
+<p><img src="/chengYi-xun/img/rl_loop.png"
+alt="强化学习智能体与环境交互循环" /></p>
+<h2 id="马尔可夫决策过程-mdp">马尔可夫决策过程 (MDP)</h2>
+<p>强化学习问题通常被建模为<strong>马尔可夫决策过程（Markov Decision
+Process, MDP）</strong>（参考 <a
+target="_blank" rel="noopener" href="https://www.cs.cmu.edu/~15281-s25/coursenotes/mdps/index.html">CMU
+15-281 Lecture Notes: MDPs</a>）。一个 MDP 可以用一个元组 <span
+class="math inline">\(\langle \mathcal{S}, \mathcal{A}, \mathcal{P},
+\mathcal{R}, \gamma \rangle\)</span> 来表示：</p>
+<ul>
+<li><span class="math inline">\(\mathcal{S}\)</span>：状态空间（State
+Space），包含所有可能的状态 <span
+class="math inline">\(s\)</span>。</li>
+<li><span class="math inline">\(\mathcal{A}\)</span>：动作空间（Action
+Space），包含所有可能的动作 <span
+class="math inline">\(a\)</span>。</li>
+<li><span
+class="math inline">\(\mathcal{P}\)</span>：状态转移概率（Transition
+Probability），<span class="math inline">\(\mathcal{P}(s&#39;|s,
+a)\)</span> 表示在状态 <span class="math inline">\(s\)</span> 执行动作
+<span class="math inline">\(a\)</span> 后转移到状态 <span
+class="math inline">\(s&#39;\)</span> 的概率。</li>
+<li><span class="math inline">\(\mathcal{R}\)</span>：奖励函数（Reward
+Function），<span class="math inline">\(\mathcal{R}(s, a)\)</span>
+表示在状态 <span class="math inline">\(s\)</span> 执行动作 <span
+class="math inline">\(a\)</span> 后获得的即时奖励。</li>
+<li><span class="math inline">\(\gamma\)</span>：折扣因子（Discount
+Factor），<span class="math inline">\(\gamma \in [0,
+1]\)</span>，用于权衡即时奖励与未来奖励的重要性。</li>
+</ul>
+<p>智能体的目标是学习一个策略 <span
+class="math inline">\(\pi(a|s)\)</span>，即在状态 <span
+class="math inline">\(s\)</span> 下选择动作 <span
+class="math inline">\(a\)</span>
+的概率分布，使得期望的累积折扣奖励（Return）最大化： <span
+class="math display">\[
+J(\pi) = \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{\infty} \gamma^t
+r_t \right]
+\]</span> 其中，<strong><span class="math inline">\(\tau = (s_0, a_0,
+r_0, s_1, a_1, r_1, \dots)\)</span>
+表示一条完整的交互轨迹（Trajectory）</strong>。</p>
+<h2
+id="价值函数与优势函数怎么判断一个动作是好是坏">价值函数与优势函数：怎么判断一个动作是好是坏？</h2>
+<p>在训狗的过程中，狗不仅要看眼前的肉，还要考虑长远的利益（比如现在乖乖坐下，等会儿可能有大骨头）。为了评估策略的好坏，我们引入两个重要的价值函数：</p>
+<ol type="1">
+<li><strong>状态价值函数（State-Value Function）</strong> <span
+class="math inline">\(V^\pi(s)\)</span>：表示在状态 <span
+class="math inline">\(s\)</span> 下，遵循策略 <span
+class="math inline">\(\pi\)</span>
+所能获得的期望累积奖励。它实际上是该状态下所有可能动作的动作价值 <span
+class="math inline">\(Q^\pi(s, a)\)</span> 按照策略概率 <span
+class="math inline">\(\pi(a|s)\)</span> 的加权平均： <span
+class="math display">\[
+V^\pi(s) = \mathbb{E}_{\pi} \left[ \sum_{k=0}^{\infty} \gamma^k r_{t+k}
+\Big| s_t = s \right] = \sum_{a} \pi(a|s) Q^\pi(s, a)
+\]</span></li>
+<li><strong>动作价值函数（Action-Value Function）</strong> <span
+class="math inline">\(Q^\pi(s, a)\)</span>：表示在状态 <span
+class="math inline">\(s\)</span> 下执行动作 <span
+class="math inline">\(a\)</span>，随后遵循策略 <span
+class="math inline">\(\pi\)</span> 所能获得的期望累积奖励。 <span
+class="math display">\[
+Q^\pi(s, a) = \mathbb{E}_{\pi} \left[ \sum_{k=0}^{\infty} \gamma^k
+r_{t+k} \Big| s_t = s, a_t = a \right]
+\]</span></li>
+</ol>
+<p><strong>优势函数（Advantage Function）</strong> <span
+class="math inline">\(A^\pi(s, a)\)</span>
+定义为动作价值与状态价值之差，用于衡量在状态 <span
+class="math inline">\(s\)</span> 下执行特定动作 <span
+class="math inline">\(a\)</span>
+相比于"让策略自己盲选动作的平均表现"（即 <span
+class="math inline">\(V^\pi(s)\)</span>）的"优势"程度： <span
+class="math display">\[
+A^\pi(s, a) = Q^\pi(s, a) - V^\pi(s)
+\]</span> 如果 <span class="math inline">\(A^\pi(s, a) &gt;
+0\)</span>，说明动作 <span class="math inline">\(a\)</span> 比策略 <span
+class="math inline">\(\pi\)</span>
+随机选出来的平均动作表现更好；反之则说明动作 <span
+class="math inline">\(a\)</span>
+不如策略的平均水平。这里并不是指"执行动作"与"不执行动作"的对比，而是"执行特定动作
+<span
+class="math inline">\(a\)</span>"与"按策略概率分布执行动作"的对比。</p>
+<hr />
+<h1
+id="策略梯度定理如何让模型变聪明">策略梯度定理：如何让模型"变聪明"？</h1>
+<p><strong>核心思考出发点</strong>：既然我们知道了什么是"好动作"（优势函数
+<span class="math inline">\(A &gt;
+0\)</span>），什么是"坏动作"（优势函数 <span class="math inline">\(A
+&lt;
+0\)</span>），那我们该如何修改模型（神经网络）的参数，让它以后多做"好动作"，少做"坏动作"呢？</p>
+<p>这就是<strong>策略梯度（Policy
+Gradient）</strong>的意义所在。它提供了一种数学上的指导，告诉模型参数应该往哪个方向调整。</p>
+<p>在深度强化学习中，我们通常使用神经网络来参数化策略，记为 <span
+class="math inline">\(\pi_\theta(a|s)\)</span>，其中 <span
+class="math inline">\(\theta\)</span>
+是网络参数。我们的目标是找到最优参数 <span
+class="math inline">\(\theta^*\)</span>，使得目标函数 <span
+class="math inline">\(J(\theta)\)</span> 最大化。这里的目标函数 <span
+class="math inline">\(J(\theta)\)</span> 通常定义为策略 <span
+class="math inline">\(\pi_\theta\)</span>
+下的<strong>期望累积奖励（即初始状态的价值）</strong>： <span
+class="math display">\[
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{\infty}
+\gamma^t r_t \right] = V^{\pi_\theta}(s_0)
+\]</span></p>
+<h3 id="深入理解目标函数-jtheta">深入理解目标函数 <span
+class="math inline">\(J(\theta)\)</span></h3>
+<p>很多人可能会有疑问：既然 <span class="math inline">\(J(\theta) =
+V^{\pi_\theta}(s_0)\)</span>，那训练的目标难道是"让所有动作的价值都变大"吗？为了理清这个问题，我们需要深入理解以下三点：</p>
+<ol type="1">
+<li><p><strong>"初始状态的价值" <span
+class="math inline">\(V^{\pi_\theta}(s_0)\)</span> 的真正含义</strong>：
+在强化学习中，一个状态的"价值"就是指<strong>从这个状态出发，按照策略一直执行下去，所能获得的"期望累积奖励"</strong>。所以，目标函数
+<span class="math inline">\(J(\theta)\)</span> 正是从初始状态 <span
+class="math inline">\(s_0\)</span> 开始，遵循策略 <span
+class="math inline">\(\pi_\theta\)</span>
+所能获得的期望总奖励。</p></li>
+<li><p><strong>做一系列动作的价值之和的期望</strong>： 当你从 <span
+class="math inline">\(s_0\)</span> 出发，策略 <span
+class="math inline">\(\pi_\theta\)</span>
+会决定你采取哪些动作，每个动作会带来一个即时奖励并导致状态转移。随着你不断执行动作、获得奖励、转移状态，这些奖励累积起来就形成了"累积奖励"或"回报"（Return）。因为策略和环境具有随机性，每一次从
+<span class="math inline">\(s_0\)</span>
+出发可能都会得到不同的累积奖励。所以，<span
+class="math inline">\(V^{\pi_\theta}(s_0)\)</span>
+取的是所有这些可能的回报的<strong>期望值</strong>。</p></li>
+<li><p><strong>策略概率作为"加权平均"的权重</strong>：
+在计算这个期望值时，这里的均值是一个<strong>加权平均（Weighted
+Average）</strong>，而"权重"正是策略选择动作的<strong>概率</strong>
+<span class="math inline">\(\pi_\theta(a|s)\)</span>。对于初始状态 <span
+class="math inline">\(s_0\)</span>，其价值可以展开为： <span
+class="math display">\[
+J(\theta) = V^{\pi_\theta}(s_0) = \sum_{a} \pi_\theta(a|s_0)
+Q^{\pi_\theta}(s_0, a)
+\]</span>
+通过这种加权平均，我们将所有可能动作及其后续发展都考虑进去，最终得到该状态的期望累积奖励。</p></li>
+</ol>
+<p><strong>举个直观的例子：</strong> 假设在某个状态下只有两个动作：</p>
+<ul>
+<li>动作 A 是"吃金币"，环境给的真实价值 <span class="math inline">\(Q(s,
+A) = 10\)</span>。</li>
+<li>动作 B 是"跳悬崖"，环境给的真实价值 <span class="math inline">\(Q(s,
+B) = -10\)</span>。</li>
+</ul>
+<p>动作本身的价值是由环境规则决定的，<strong>我们无法改变 <span
+class="math inline">\(Q\)</span> 值本身</strong>。
+但我们可以改变神经网络的参数 <span
+class="math inline">\(\theta\)</span>，从而改变策略输出的<strong>概率（权重）</strong>：</p>
+<ul>
+<li><strong>训练前（瞎猜）</strong>：策略可能各给 50% 的概率，此时 <span
+class="math inline">\(J = 0.5 \times 10 + 0.5 \times (-10) =
+0\)</span>。</li>
+<li><strong>训练后（变聪明）</strong>：策略学会了 99% 选 A，1% 选
+B，此时 <span class="math inline">\(J = 0.99 \times 10 + 0.01 \times
+(-10) = 9.8\)</span>。</li>
+</ul>
+<p><strong>结论：</strong>
+强化学习的训练目标，<strong>不是去放大动作本身的价值，而是通过调整网络参数
+<span
+class="math inline">\(\theta\)</span>，把高价值动作的"选择概率"调大，把低价值动作的"选择概率"调小</strong>，从而让这个加权平均值
+<span class="math inline">\(J(\theta)\)</span> 达到最大。</p>
+<p>为了使用梯度上升法更新参数：<span class="math inline">\(\theta
+\leftarrow \theta + \alpha \nabla_\theta
+J(\theta)\)</span>，我们需要计算目标函数的梯度 <span
+class="math inline">\(\nabla_\theta J(\theta)\)</span>。</p>
+<p>根据<strong>策略梯度定理</strong>，梯度的解析表达式为： <span
+class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot Q^{\pi_\theta}(s_t, a_t) \right]
+\]</span></p>
+<p><strong>推导的核心：对数导数技巧 (Log-Derivative Trick)</strong>
+为什么梯度中会出现 <span
+class="math inline">\(\log\)</span>？（<em>注：本文及后续强化学习相关文章中，<span
+class="math inline">\(\log\)</span> 均指代以 <span
+class="math inline">\(e\)</span> 为底的自然对数 <span
+class="math inline">\(\ln\)</span></em>）我们可以直接从目标函数 <span
+class="math inline">\(J(\theta)\)</span>
+的期望定义出发进行严格推导。</p>
+<p>根据前面的定义，目标函数是整条轨迹累积奖励的期望： <span
+class="math display">\[
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{\infty}
+\gamma^t r_t \right]
+\]</span> 为了书写简洁，我们记轨迹 <span class="math inline">\(\tau =
+(s_0, a_0, s_1, a_1, \dots)\)</span> 的总累积奖励为 <span
+class="math inline">\(R(\tau) = \sum_{t=0}^{\infty} \gamma^t
+r_t\)</span>。
+由于期望的本质是对所有可能轨迹的概率加权求和（积分），且参数 <span
+class="math inline">\(\theta\)</span> 决定了轨迹出现的概率分布 <span
+class="math inline">\(P(\tau|\theta)\)</span>，所以我们必须将期望展开为积分形式才能对
+<span class="math inline">\(\theta\)</span> 求导：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\nabla_\theta J(\theta) &amp;= \nabla_\theta \mathbb{E}_{\tau \sim
+\pi_\theta} [R(\tau)] \\
+&amp;= \nabla_\theta \int P(\tau|\theta) R(\tau) d\tau \\
+&amp;= \int \nabla_\theta P(\tau|\theta) R(\tau) d\tau
+\end{aligned}
+\]</span></p>
+<p>此时，我们引入微积分中的链式法则 <span class="math inline">\(\nabla
+f(x) = f(x) \nabla \log
+f(x)\)</span>（即<strong>对数导数技巧</strong>），将其应用于概率 <span
+class="math inline">\(P(\tau|\theta)\)</span>： <span
+class="math display">\[
+\begin{aligned}
+\nabla_\theta J(\theta) &amp;= \int P(\tau|\theta) \nabla_\theta \log
+P(\tau|\theta) R(\tau) d\tau \\
+&amp;= \mathbb{E}_{\tau \sim \pi_\theta} \left[ \nabla_\theta \log
+P(\tau|\theta) R(\tau) \right]
+\end{aligned}
+\]</span></p>
+<p>接下来，我们需要计算 <span class="math inline">\(\nabla_\theta \log
+P(\tau|\theta)\)</span>。根据马尔可夫决策过程，一条轨迹发生的概率可以分解为初始状态概率、策略选择概率和环境转移概率的乘积：
+<span class="math display">\[
+P(\tau|\theta) = P(s_0) \prod_{t=0}^{\infty} \pi_\theta(a_t|s_t)
+P(s_{t+1}|s_t, a_t)
+\]</span> 对其两边取对数（<span class="math inline">\(\log\)</span>
+将乘积变为求和）： <span class="math display">\[
+\log P(\tau|\theta) = \log P(s_0) + \sum_{t=0}^{\infty} \log
+\pi_\theta(a_t|s_t) + \sum_{t=0}^{\infty} \log P(s_{t+1}|s_t, a_t)
+\]</span> 对参数 <span class="math inline">\(\theta\)</span>
+求梯度时，由于环境的初始状态分布 <span
+class="math inline">\(P(s_0)\)</span> 和状态转移概率 <span
+class="math inline">\(P(s_{t+1}|s_t, a_t)\)</span>
+都与我们的策略网络参数 <span class="math inline">\(\theta\)</span>
+无关，它们的梯度为 0，直接消失： <span class="math display">\[
+\nabla_\theta \log P(\tau|\theta) = \sum_{t=0}^{\infty} \nabla_\theta
+\log \pi_\theta(a_t|s_t)
+\]</span></p>
+<p>将展开后的梯度代回期望公式，我们得到： <span class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\left( \sum_{t=0}^{\infty} \nabla_\theta \log \pi_\theta(a_t|s_t)
+\right) R(\tau) \right]
+\]</span></p>
+<p>最后一步，结合<strong>因果性（Causality）</strong>：未来的动作不能影响过去的奖励。即
+<span class="math inline">\(t\)</span> 时刻的动作 <span
+class="math inline">\(a_t\)</span> 只能影响 <span
+class="math inline">\(t\)</span>
+时刻及之后的累积奖励。因此，我们可以将总奖励 <span
+class="math inline">\(R(\tau)\)</span> 替换为从 <span
+class="math inline">\(t\)</span> 时刻开始的累积奖励（这正是动作价值
+<span class="math inline">\(Q^{\pi_\theta}(s_t, a_t)\)</span>
+的无偏估计），最终得到策略梯度定理的严谨表达式： <span
+class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot Q^{\pi_\theta}(s_t, a_t) \right]
+\]</span></p>
+<p><strong>逐项拆解这个公式：</strong></p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">组成部分</th>
+<th style="text-align: left;">写法</th>
+<th style="text-align: left;">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">外层期望</td>
+<td style="text-align: left;"><span
+class="math inline">\(\mathbb{E}_{\tau \sim
+\pi_\theta}[\cdots]\)</span></td>
+<td style="text-align: left;">用当前策略 <span
+class="math inline">\(\pi_\theta\)</span>
+跑很多条轨迹，对括号内的量取平均</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">时间求和</td>
+<td style="text-align: left;"><span
+class="math inline">\(\sum_{t=0}^{\infty}\)</span></td>
+<td style="text-align: left;">对轨迹上每个时间步 <span
+class="math inline">\(t\)</span> 的贡献求和</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">折扣因子</td>
+<td style="text-align: left;"><span
+class="math inline">\(\gamma^t\)</span>（<span
+class="math inline">\(\gamma \in [0,1)\)</span>）</td>
+<td style="text-align: left;">越远的未来贡献越小，<span
+class="math inline">\(\gamma=0.99\)</span> 表示 100 步后衰减到约 <span
+class="math inline">\(\frac{1}{3}\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">策略梯度方向</td>
+<td style="text-align: left;"><span class="math inline">\(\nabla_\theta
+\log \pi_\theta(a_t \mid s_t)\)</span></td>
+<td style="text-align: left;">"让动作 <span
+class="math inline">\(a_t\)</span> 在状态 <span
+class="math inline">\(s_t\)</span> 下更可能"的参数更新方向</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">信用分配权重</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q^{\pi_\theta}(s_t, a_t)\)</span></td>
+<td style="text-align: left;">在状态 <span
+class="math inline">\(s_t\)</span> 下执行动作 <span
+class="math inline">\(a_t\)</span>
+后，<strong>未来能获得的期望总回报</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>整体物理意义</strong>：对轨迹上的每个时刻 <span
+class="math inline">\(t\)</span>——</p>
+<p><span class="math display">\[
+\underbrace{\gamma^t}_{\text{时刻}\,t\,\text{的重要性}} \times
+\underbrace{\nabla_\theta \log
+\pi_\theta(a_t|s_t)}_{\text{增大}\,a_t\,\text{概率的方向}} \times
+\underbrace{Q^{\pi_\theta}(s_t, a_t)}_{\text{这个动作有多好}}
+\]</span></p>
+<ul>
+<li>如果 <span class="math inline">\(Q\)</span>
+值<strong>大</strong>（这个动作带来高回报）→ 沿梯度方向走大步 →
+<strong>强化</strong>这个动作</li>
+<li>如果 <span class="math inline">\(Q\)</span>
+值<strong>小</strong>（甚至为负） → 沿反方向走 →
+<strong>抑制</strong>这个动作</li>
+<li><span class="math inline">\(\gamma^t\)</span> 有两个作用：(1)
+越早的决策权重越大（因为早期决策影响整条轨迹）；(2) 让 <span
+class="math inline">\(\sum_{t=0}^{\infty}\)</span>
+这个理论上的无穷求和收敛——因为 <span class="math inline">\(\gamma &lt;
+1\)</span>，所以 <span class="math inline">\(\gamma^t\)</span>
+指数级衰减到零，总和有界。实际应用中回答长度有限（如最多 2048
+token），<span class="math inline">\(\sum\)</span>
+自然截断，不需要担心发散</li>
+</ul>
+<p><strong>因果性为什么重要？</strong>
+上一步的公式里，每个时刻的梯度都乘以<strong>整条轨迹的总奖励</strong>
+<span class="math inline">\(R(\tau)\)</span>。但 <span
+class="math inline">\(t=5\)</span> 时刻的动作根本不可能影响 <span
+class="math inline">\(t=0 \sim 4\)</span>
+时已经发生的奖励，把这些"过去的奖励"也算进去纯粹是噪声。因果性裁剪掉这些无关项，只保留
+<span class="math inline">\(t\)</span> 时刻及之后的累积回报 <span
+class="math inline">\(Q^{\pi_\theta}(s_t, a_t) =
+\mathbb{E}\left[\sum_{k=t}^{\infty} \gamma^{k-t} r_k \mid s_t,
+a_t\right]\)</span>——<strong>方差更小，学习更快</strong>。</p>
+<p>通过这个技巧，我们将原本难以计算的"概率梯度的积分"，转化为了可以通过<strong>蒙特卡洛采样（让智能体自己在环境里跑几圈收集数据）</strong>来近似计算的"期望值"。</p>
+<blockquote>
+<p><strong>延伸阅读：</strong>
+关于策略梯度定理的更详细推导和直觉理解，推荐以下两篇经典文章： - <a
+target="_blank" rel="noopener" href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html">Part
+3: Intro to Policy Optimization — OpenAI Spinning Up</a>：OpenAI
+官方教程，从最简形式出发逐步引入 baseline 和优势函数。 - <a
+target="_blank" rel="noopener" href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/">Policy
+Gradient Algorithms — Lil'Log</a>：Lilian Weng 的经典博客，覆盖从
+REINFORCE 到 PPO 的完整策略梯度算法族。</p>
+</blockquote>
+<h3 id="梯度的直观理解">梯度的直观理解</h3>
+<p>我们可以将上式中的 <span class="math inline">\(Q^{\pi_\theta}(s_t,
+a_t)\)</span> 替换为优势函数 <span
+class="math inline">\(A^{\pi_\theta}(s_t, a_t)\)</span>。
+为什么可以这样替换？因为 <span class="math inline">\(A(s, a) = Q(s, a) -
+V(s)\)</span>，相当于减去了一个只与状态 <span
+class="math inline">\(s\)</span> 有关的<strong>基线（Baseline）</strong>
+<span class="math inline">\(V(s)\)</span>。</p>
+<p><strong>物理直觉：为什么减去基线不影响期望？</strong>
+想象一下，你在某个状态 <span class="math inline">\(s\)</span>
+下，对所有可能的动作都加上了一个固定的奖励 <span
+class="math inline">\(b(s)\)</span>（比如每个动作都多给 10
+分）。因为所有动作的相对好坏没有改变，策略更新的方向也不应该改变。在数学上，由于策略是一个概率分布（所有动作的概率之和永远为
+1），如果你试图把所有动作的概率都往上推，这种"整体推力"的总和必然是
+0。</p>
+<p>我们可以通过下面的推导，严格证明减去任何基线 <span
+class="math inline">\(b(s)\)</span> 后的期望梯度为
+0。这里的推导关键在于：<strong>基线 <span
+class="math inline">\(b(s)\)</span> 只与状态有关，在对动作 <span
+class="math inline">\(a\)</span>
+求和时，它相当于一个常数，可以被直接提取到求和符号外面</strong>： <span
+class="math display">\[
+\begin{aligned}
+\mathbb{E}_{a \sim \pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a|s)
+\cdot b(s) \right]
+&amp;= \sum_a \pi_\theta(a|s) \left( \nabla_\theta \log \pi_\theta(a|s)
+\cdot b(s) \right) \\
+&amp;= b(s) \sum_a \pi_\theta(a|s) \left( \frac{\nabla_\theta
+\pi_\theta(a|s)}{\pi_\theta(a|s)} \right) \\
+&amp;= b(s) \sum_a \nabla_\theta \pi_\theta(a|s) \\
+&amp;= b(s) \nabla_\theta \left( \sum_a \pi_\theta(a|s) \right) \\
+&amp;= b(s) \nabla_\theta (1) \\
+&amp;= 0
+\end{aligned}
+\]</span> 既然减去 <span class="math inline">\(V(s)\)</span>
+后期望不变，为什么还要减呢？因为这能<strong>显著降低采样的方差</strong>，让训练更加稳定。</p>
+<p><strong>为什么减去基线能降低方差？</strong>
+想象一下，如果环境给的所有奖励都是非常大的正数（比如所有动作的 <span
+class="math inline">\(Q\)</span> 值都在 1000
+左右）。那么每次采样，无论动作好坏，梯度都会被乘以一个巨大的正数，导致网络参数剧烈震荡（方差极大）。
+当我们减去平均值 <span class="math inline">\(V(s)\)</span>（假设也是
+1000）后，原本的 <span class="math inline">\(Q(s, a)\)</span>
+就变成了优势 <span class="math inline">\(A(s, a)\)</span>，它的值会围绕
+0 波动（比如 +5 或
+-3）。这样一来，好动作会得到一个温和的正向推动，坏动作会得到一个温和的负向惩罚。梯度的绝对数值大大减小，更新过程自然就变得更加平稳了。</p>
+<p>替换后的公式如下： <span class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot A^{\pi_\theta}(s_t, a_t) \right]
+\]</span> 这个公式的物理意义非常直观：</p>
+<ul>
+<li><span class="math inline">\(\nabla_\theta \log
+\pi_\theta(a_t|s_t)\)</span> 指示了增加动作 <span
+class="math inline">\(a_t\)</span> 概率的参数更新方向。</li>
+<li><span class="math inline">\(A^{\pi_\theta}(s_t, a_t)\)</span>
+作为权重。如果优势为正，说明该动作好于平均，梯度会推动网络增加该动作的概率；如果优势为负，则降低该动作的概率。</li>
+</ul>
+<hr />
+<h1 id="从-reinforce-到-actor-critic算法的演进">从 REINFORCE 到
+Actor-Critic：算法的演进</h1>
+<p>虽然我们在理论上推导出了应该用优势函数 <span
+class="math inline">\(A(s_t, a_t)\)</span>
+来更新策略，但在实际写代码时，我们无法直接获得真实的 <span
+class="math inline">\(A\)</span> 值或 <span
+class="math inline">\(Q\)</span>
+值，只能通过<strong>采样（Sampling）</strong>来近似估计。根据估计方法的不同，策略梯度算法经历了以下几个阶段的演进。</p>
+<p>在进入具体算法之前，先理清本文中频繁出现的几个符号的层次关系——它们是不同算法的共同基础：</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">符号</th>
+<th style="text-align: left;">名称</th>
+<th style="text-align: left;">定义</th>
+<th style="text-align: left;">层次</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span
+class="math inline">\(r_t\)</span></td>
+<td style="text-align: left;">即时奖励</td>
+<td style="text-align: left;">第 <span class="math inline">\(t\)</span>
+步环境给的分数</td>
+<td style="text-align: left;"><strong>观测值</strong>（单步，已知）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(G_t =
+\sum_{k=0}^{T-t} \gamma^k r_{t+k}\)</span></td>
+<td style="text-align: left;">累积回报</td>
+<td style="text-align: left;">从 <span class="math inline">\(t\)</span>
+到结束的折扣奖励总和</td>
+<td
+style="text-align: left;"><strong>观测值</strong>（需跑完整局才知道）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(Q(s,a) =
+\mathbb{E}[G_t \mid s_t{=}s, a_t{=}a]\)</span></td>
+<td style="text-align: left;">动作价值</td>
+<td style="text-align: left;">在 <span class="math inline">\(s\)</span>
+执行 <span class="math inline">\(a\)</span> 后的期望总回报</td>
+<td
+style="text-align: left;"><strong>理论期望</strong>（跑无数局取平均）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(V(s) =
+\mathbb{E}_{a \sim \pi}[Q(s,a)]\)</span></td>
+<td style="text-align: left;">状态价值</td>
+<td style="text-align: left;">在 <span class="math inline">\(s\)</span>
+下按策略行动的期望总回报</td>
+<td style="text-align: left;"><strong>理论期望</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(A(s,a) =
+Q(s,a) - V(s)\)</span></td>
+<td style="text-align: left;">优势函数</td>
+<td style="text-align: left;">动作 <span
+class="math inline">\(a\)</span> 比平均水平好多少</td>
+<td style="text-align: left;"><strong>理论期望</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(\delta_t = r_t
++ \gamma V(s_{t+1}) - V(s_t)\)</span></td>
+<td style="text-align: left;">TD 误差</td>
+<td style="text-align: left;">一步实际表现与 Critic 预期之差</td>
+<td style="text-align: left;"><span class="math inline">\(A\)</span>
+的<strong>有偏近似</strong>（方差低）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心关系</strong>：理论公式用的是 <span
+class="math inline">\(A\)</span>（真实优势），但 <span
+class="math inline">\(A\)</span>
+算不出来。实际算法用不同的<strong>近似</strong>替代它：</p>
+<p><span class="math display">\[
+A(s_t, a_t) \approx \begin{cases} G_t - V(s_t) &amp;
+\text{（蒙特卡洛，无偏但方差大）} \\ \delta_t &amp; \text{（TD
+误差，方差小但有偏）} \\ \sum_l (\gamma\lambda)^l \delta_{t+l} &amp;
+\text{（GAE，可调的折中）} \end{cases}
+\]</span></p>
+<p>下面三种算法分别对应这三种近似方式。</p>
+<p>为了让讲解更直观，我们先设定一个贯穿本章的具体例子，然后用它来串起三种算法。</p>
+<p><strong>例子：训练 AI 面试助手</strong></p>
+<p>假设你在训练一个 AI 面试助手（智能体），面试共三轮。AI
+在每轮做出一个决策，并获得面试官打分。我们让 AI
+完成了一局面试（为简化，令 <span class="math inline">\(\gamma =
+1\)</span>）：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">轮次</th>
+<th style="text-align: center;">状态</th>
+<th style="text-align: center;">AI 的决策</th>
+<th style="text-align: center;">该轮得分（<span
+class="math inline">\(r_t\)</span>）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">第 1 轮（自我介绍）</td>
+<td style="text-align: center;"><span
+class="math inline">\(s_1\)</span></td>
+<td style="text-align: center;">"讲项目经历"</td>
+<td style="text-align: center;"><span class="math inline">\(r_1 =
++6\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">第 2 轮（技术面）</td>
+<td style="text-align: center;"><span
+class="math inline">\(s_2\)</span></td>
+<td style="text-align: center;">"用动态规划解题"</td>
+<td style="text-align: center;"><span class="math inline">\(r_2 =
++2\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">第 3 轮（HR 面）</td>
+<td style="text-align: center;"><span
+class="math inline">\(s_3\)</span></td>
+<td style="text-align: center;">"聊职业规划"</td>
+<td style="text-align: center;"><span class="math inline">\(r_3 =
++4\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>同时，假设我们有一个经验丰富的面试顾问（Critic 网络 <span
+class="math inline">\(V_\phi\)</span>），他对各状态的预估为：</p>
+<ul>
+<li><span class="math inline">\(V_\phi(s_1) = 9\)</span>（"从第 1
+轮开始，历史面试者的平均总分大约是 9 分"）</li>
+<li><span class="math inline">\(V_\phi(s_2) = 5\)</span>（"从第 2
+轮开始，平均还能拿 5 分"）</li>
+</ul>
+<p><strong>核心问题：第 1
+轮选择"讲项目经历"这个决策到底好不好？策略参数应该怎么调？</strong>
+接下来，我们看三种算法如何回答这个问题。</p>
+<h2 id="最朴素的实现reinforce-算法">1. 最朴素的实现：REINFORCE 算法</h2>
+<p><strong>先看例子：</strong> REINFORCE
+的做法最简单——等三轮面试<strong>全部结束</strong>，算出总分，直接用总分评价第
+1 轮的决策：</p>
+<p><span class="math display">\[G_1 = r_1 + r_2 + r_3 = 6 + 2 + 4 =
+\mathbf{12}\]</span></p>
+<p>然后用 <span class="math inline">\(G_1 = 12\)</span> 乘以梯度方向
+<span class="math inline">\(\nabla_\theta \log
+\pi_\theta(a_1|s_1)\)</span>
+来更新策略参数：让"讲项目经历"的概率变大。</p>
+<p><strong>问题马上就来了：</strong> 假设 AI 再跑一局，第 1
+轮仍然选"讲项目经历"（<span class="math inline">\(r_1 =
++6\)</span>），但第 2、3 轮运气不同（<span class="math inline">\(r_2 =
+0, r_3 = +1\)</span>），总分变成了 <span class="math inline">\(G_1 =
+7\)</span>。两次信号（<span class="math inline">\(12\)</span> vs <span
+class="math inline">\(7\)</span>）的差异，并非第 1
+轮决策好坏所致，而是后面轮次的随机性造成的。而且信号都是较大的正数，被乘入梯度后，参数每次更新的幅度都很大且波动剧烈。</p>
+<p><strong>一般化的算法原理：</strong></p>
+<p>上面例子中 <span class="math inline">\(G_1 = r_1 + r_2 + r_3\)</span>
+是 <span class="math inline">\(\gamma = 1\)</span>
+时的特例。一般地，智能体在 <span class="math inline">\(t\)</span>
+时刻执行动作 <span class="math inline">\(a_t\)</span>
+后，实际获得的<strong>累积折扣回报</strong>记为： <span
+class="math display">\[
+G_t = \sum_{k=0}^{T-t} \gamma^k r_{t+k}
+\]</span></p>
+<p>REINFORCE 算法直接用 <span class="math inline">\(G_t\)</span>
+替换策略梯度公式中的 <span class="math inline">\(Q(s_t,
+a_t)\)</span>。之所以可以这样替换，是因为 <span
+class="math inline">\(Q\)</span> 的定义就是 <span
+class="math inline">\(G_t\)</span> 的期望（<span
+class="math inline">\(Q(s_t, a_t) = \mathbb{E}[G_t]\)</span>），所以
+<span class="math inline">\(G_t\)</span> 是 <span
+class="math inline">\(Q\)</span> 的一个<strong>无偏估计（Unbiased
+Estimate）</strong>——虽然每局的 <span class="math inline">\(G_t\)</span>
+时高时低，但打足够多局取平均，就会精确收敛到理论上的 <span
+class="math inline">\(Q\)</span> 值。</p>
+<p><strong>参数更新公式：</strong> <span class="math display">\[
+\theta \leftarrow \theta + \alpha \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot G_t
+\]</span></p>
+<p>关于 REINFORCE 算法的深入探讨可参考 <a
+target="_blank" rel="noopener" href="https://rl-book.com/learn/policy_gradients/reinforce/">REINFORCE:
+Monte Carlo Policy Gradient
+Methods</a>（含方差分析和代码示例）。回到面试的例子，REINFORCE
+的<strong>两个致命缺点</strong>就非常清楚了：</p>
+<ol type="1">
+<li><strong>方差极大</strong>：两局面试中 <span
+class="math inline">\(G_1\)</span> 分别是 <span
+class="math inline">\(12\)</span> 和 <span
+class="math inline">\(7\)</span>，但第 1
+轮的决策完全相同。这种波动来自后续轮次的随机性，却被当作第 1
+轮决策的评价信号，导致梯度估计震荡剧烈。</li>
+<li><strong>回合更新（Episodic）</strong>：必须等三轮面试全部结束，才能算出
+<span class="math inline">\(G_1\)</span> 并更新参数。如果面试有 100
+轮呢？效率极低。</li>
+</ol>
+<p><strong>REINFORCE 的完整实现：</strong></p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 张量与自动求导，用于实现策略网络与梯度更新</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 模型定义</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># actor: 策略网络 π_θ(a|s), 输入状态, 输出动作概率分布</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># REINFORCE 只需要 Actor, 不需要 Critic</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ActorModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim, action_dim)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略网络：把状态映射为动作分布（如各类别的 logits → softmax）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 只优化 Actor 参数 θ，无 Critic</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 1: 数据采集 — 必须跑完一整局 (回合制)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 数据格式: 一条完整轨迹 [(s₀,a₀,r₀), (s₁,a₁,r₁), ...]</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">trajectory </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 存储每步的 log π 与即时奖励，供回合末算 G_t 与策略梯度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 初始状态 s₀</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> False</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # 是否已到达终止状态</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">while</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前 s_t 下动作的概率分布 π_θ(·|s_t)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    action </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 从策略分布采样 a_t，与环境交互并探索</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π_θ(a_t|s_t)，策略梯度里要对 θ 求导的项</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_state, reward, done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 执行动作得 r_t、s_&#123;t+1&#125;、是否结束</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    trajectory.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((log_prob, reward))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 只记策略相关量与奖励，状态可从环境重放（此处未存）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_state  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 进入下一时刻状态</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 2: 计算累积回报 G_t (回合结束后才能算!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># G_t = r_t + γ·r_&#123;t+1&#125; + γ²·r_&#123;t+2&#125; + ...</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 与 trajectory 时间顺序一致的各步回报 G_t</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">G </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # 从轨迹末尾反向累加的折扣回报</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> _, reward </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> reversed</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(trajectory):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    G </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> reward </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gamma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> G  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 自后向前：G_t = r_t + γ·G_&#123;t+1&#125;，得到从 t 起的累积折扣回报</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    returns.</span><span style="color:#383A42;--shiki-dark:#61AFEF">insert</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, G)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 插在列表头部，把逆序递推结果还原成 t=0,1,... 的正序</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">tensor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(returns)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 转为张量，便于与 log_prob 逐元素相乘</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 3: 策略梯度更新 (用 G_t 作为 Q 的无偏估计)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># loss = -Σ log π(a|s) · G_t</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # 标量损失；最小化 −Σ log π·G_t 等价于沿 ∇log π·G_t 方向改进策略</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (log_prob, _), G_t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> zip</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(trajectory, returns):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> G_t  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 累加策略梯度项：G_t 充当 Q 的蒙特卡洛无偏估计</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 清空旧梯度，避免累加</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">policy_loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 反传：G_t 视为常数，梯度来自各步 log π 对 θ 的导数</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Adam 更新 θ，实现 θ ← θ + α·∇_θ log π·G_t 这一类随机梯度上升</span></span></code></pre></div>
+<h2 id="引入基线-reinforce-with-baseline">2. 引入基线 (REINFORCE with
+Baseline)</h2>
+<p><strong>先看例子：</strong> 为了更准确地评价第 1
+轮的决策，我们请出那位面试顾问（Critic）。他说："历史上从第 1
+轮开始，面试者的平均总分是 <span class="math inline">\(V_\phi(s_1) =
+9\)</span> 分。"</p>
+<p>有了这个参考值，我们就可以算出"这局面试比平均水平好了多少"：</p>
+<p><span class="math display">\[\text{更新信号} = G_1 - V_\phi(s_1) = 12
+- 9 = \mathbf{+3}\]</span></p>
+<p><span class="math inline">\(+3\)</span>
+的含义很清晰：<strong>这局比平均高了 3
+分，"讲项目经历"是好于平均的选择。</strong></p>
+<p>如果另一局总分是 <span class="math inline">\(7\)</span> 分，信号就是
+<span class="math inline">\(7 - 9 =
+-2\)</span>（不如平均，应降低该决策的概率）。对比两种算法的信号：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;"></th>
+<th style="text-align: center;">第 1 局</th>
+<th style="text-align: center;">第 2 局</th>
+<th style="text-align: center;">信号波动范围</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>REINFORCE</strong></td>
+<td style="text-align: center;"><span
+class="math inline">\(12\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(7\)</span></td>
+<td style="text-align: center;"><span class="math inline">\([7,
+12]\)</span>（大正数）</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>+ Baseline</strong></td>
+<td style="text-align: center;"><span
+class="math inline">\(+3\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(-2\)</span></td>
+<td style="text-align: center;"><span class="math inline">\([-2,
++3]\)</span>（0 附近）</td>
+</tr>
+</tbody>
+</table>
+<p>减去基线后，信号的幅度从 <span class="math inline">\([7, 12]\)</span>
+缩小到了 <span class="math inline">\([-2,
++3]\)</span>，梯度被乘以的数值大大减小，参数更新的震荡随之降低。而且正负号直接告诉你决策是好是坏，方向更清晰。</p>
+<p><strong>一般化的算法原理：</strong></p>
+<p>我们在 <span class="math inline">\(G_t\)</span>
+的基础上减去一个状态价值的估计值 <span
+class="math inline">\(V_\phi(s_t)\)</span>（用另一个神经网络拟合，参数为
+<span class="math inline">\(\phi\)</span>），用 <span
+class="math inline">\((G_t - V_\phi(s_t))\)</span> 来近似优势函数 <span
+class="math inline">\(A(s_t, a_t)\)</span>。</p>
+<p><strong>参数更新公式：</strong> <span class="math display">\[
+\theta \leftarrow \theta + \alpha \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot (G_t - V_\phi(s_t))
+\]</span></p>
+<p>需要注意一个微妙之处：虽然信号的<strong>绝对幅度</strong>降低了，但
+<span class="math inline">\(G_t\)</span>
+本身的<strong>随机波动</strong>（它仍然包含 <span
+class="math inline">\(r_{t+1}, r_{t+2}, \dots\)</span>
+等后续时步的随机性）并没有改变。基线解决的是"信号偏离零点太远"的问题，而非"信号内部的随机性太大"的问题。</p>
+<p>回到面试的例子，这个方法<strong>依然没有解决"回合更新"的问题</strong>——计算
+<span class="math inline">\(G_1 = r_1 + r_2 + r_3\)</span>
+仍然需要等三轮面试全部结束。有没有办法<strong>不等面试结束，走一步就能评价</strong>呢？</p>
+<p><strong>REINFORCE with Baseline 的完整实现：</strong></p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 张量计算与自动求导</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 损失函数等（此处用 MSE 训练 Critic）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 模型定义 (新增 Critic 网络作为基线!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># actor:  策略网络 π_θ(a|s)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># critic: 价值网络 V_φ(s), 用于估计状态价值作为基线</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ActorModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim, action_dim)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Actor：选动作；梯度里乘的是 (G−V) 而非裸 G，减小方差</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> CriticModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic：估计 V_φ(s) 作基线；减 V 不改变策略梯度期望，只降方差</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 更新策略参数 θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 更新价值参数 φ</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 1: 数据采集 — 仍需跑完一整局 (与 REINFORCE 相同)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">trajectory </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 每步保存 log π、r、以及当步采样的 V(s)，供优势与 Critic 监督</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> False</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">while</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前状态下的动作分布 π_θ(·|s)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    action </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 采样动作与环境交互</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略项，供 Actor 反传</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    value </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state).</span><span style="color:#383A42;--shiki-dark:#61AFEF">squeeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># V_φ(s)：基线估计；squeeze 去掉多余维度便于标量运算</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_state, reward, done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    trajectory.</span><span style="color:#383A42;--shiki-dark:#61AFEF">append</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((log_prob, reward, value))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 保留 value，与后面 G_t 对齐到同一时刻 t</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_state</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 2: 计算累积回报 G_t (仍需等回合结束!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> []  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 各步蒙特卡洛回报，仍须整局结束后才能算全</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">G </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> _, reward, _ </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> reversed</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(trajectory):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    G </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> reward </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gamma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> G  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 反向递推 G_t = r_t + γ·G_&#123;t+1&#125;</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    returns.</span><span style="color:#383A42;--shiki-dark:#61AFEF">insert</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, G)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 插入表头，恢复时间正序与 trajectory 一一对应</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">returns </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">tensor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(returns)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 作为 Critic 的回归目标（真值标签为 G_t）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Step 3: 用 (G_t - V(s)) 替代 G_t, 降低方差</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # Actor 损失：−log π·(G_t − V)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # Critic 损失：让 V_φ(s) 拟合 G_t</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (log_prob, _, value), G_t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> zip</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(trajectory, returns):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantage </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> G_t </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> value.</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 优势近似 A≈G_t−V；detach 截断到 V 的梯度，避免 policy_loss 反传到 φ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantage  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 相对基线偏高则增大该动作概率，偏低则抑制</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    value_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">+=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mse_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(value, torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">tensor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(G_t))  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic 用 MSE 把 V_φ(s_t) 拉向蒙特卡洛回报 G_t</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 清 Actor 梯度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">policy_loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 仅 θ 从 policy_loss 获得梯度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 更新 Actor</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 清 Critic 梯度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">value_loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># φ 从 value_loss 获得梯度（advantage 里 value 已 detach，互不串扰）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 更新 Critic</span></span></code></pre></div>
+<h2 id="actor-critic-架构-时序差分与单步更新">3. Actor-Critic 架构
+(时序差分与单步更新)</h2>
+<blockquote>
+<p>关于 Actor-Critic 方法及其变体（A2C、GAE）的系统介绍，推荐 <a
+target="_blank" rel="noopener" href="https://avandekleut.github.io/a2c/">Actor-Critic Methods, A2C and
+GAE</a>。</p>
+</blockquote>
+<p><strong>先看例子：</strong> Actor-Critic 的核心想法是——评价第 1
+轮的决策，何必等到面试结束？第 1 轮结束后，我们已经知道两件事：这轮拿了
+<span class="math inline">\(r_1 = 6\)</span> 分，且进入了状态 <span
+class="math inline">\(s_2\)</span>。面试顾问（Critic）告诉我们 <span
+class="math inline">\(V_\phi(s_2) = 5\)</span>，即"从 <span
+class="math inline">\(s_2\)</span> 开始平均还能拿 5 分"。</p>
+<p>于是我们可以<strong>立刻</strong>估算：走完第 1 步后的"实际表现"
+<span class="math inline">\(\approx r_1 + V_\phi(s_2) = 6 + 5 =
+11\)</span>。而 Critic 之前对 <span class="math inline">\(s_1\)</span>
+的预期是 <span class="math inline">\(V_\phi(s_1) =
+9\)</span>。两者之差：</p>
+<p><span class="math display">\[\delta_1 = r_1 + \gamma V_\phi(s_2) -
+V_\phi(s_1) = 6 + 5 - 9 = \mathbf{+2}\]</span></p>
+<p><span class="math inline">\(\delta_1 = +2\)</span>
+的含义是：实际表现比预期好了 2
+分，"讲项目经历"是个不错的决策。关键是——<strong>第 1
+轮一结束就算出来了，不用等后面两轮！</strong></p>
+<p><strong>一般化的算法原理：</strong></p>
+<p>上面的 <span class="math inline">\(\delta_1\)</span>
+就是著名的<strong>时序差分误差（TD
+Error）</strong>。其核心思想叫<strong>自举（Bootstrapping）</strong>：不再等待真实的完整回报
+<span class="math inline">\(G_t\)</span>，而是用 Critic 对下一状态的估值
+<span class="math inline">\(V_\phi(s_{t+1})\)</span>
+来"代替"未来的实际奖励：</p>
+<p><span class="math display">\[Q(s_t, a_t) \approx r_t + \gamma
+V_\phi(s_{t+1})\]</span></p>
+<p>将其代入优势函数 <span class="math inline">\(A(s_t, a_t) = Q(s_t,
+a_t) - V(s_t)\)</span>，就得到了 TD 误差： <span class="math display">\[
+\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)
+\]</span></p>
+<p><span class="math inline">\(\delta_t\)</span> 近似了优势函数 <span
+class="math inline">\(A(s_t,
+a_t)\)</span>，而且<strong>只需要走一步（获得 <span
+class="math inline">\(r_t\)</span> 和 <span
+class="math inline">\(s_{t+1}\)</span>）就能计算</strong>。</p>
+<p>在 Actor-Critic 架构中，我们同时训练两个神经网络：</p>
+<ol type="1">
+<li><strong>Actor（演员/策略网络）</strong> <span
+class="math inline">\(\pi_\theta(a|s)\)</span>：负责选择动作。用 Critic
+算出的 <span class="math inline">\(\delta_t\)</span> 来更新策略： <span
+class="math display">\[
+\theta \leftarrow \theta + \alpha \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot \delta_t
+\]</span></li>
+<li><strong>Critic（评委/价值网络）</strong> <span
+class="math inline">\(V_\phi(s)\)</span>：负责估计状态价值。目标是让自己的预测越来越准，即最小化
+TD 误差的平方： <span class="math display">\[
+\phi \leftarrow \phi - \beta \nabla_\phi \left( \frac{1}{2} \delta_t^2
+\right)
+\]</span></li>
+</ol>
+<p><strong>用面试的例子理解 Critic 的更新</strong>：我们算出了 <span
+class="math inline">\(\delta_1 = +2\)</span>，说明 Critic 之前对 <span
+class="math inline">\(s_1\)</span> 的预估 <span
+class="math inline">\(V_\phi(s_1) = 9\)</span>
+偏低了——实际的单步证据显示"得了 6 分，且到达了一个价值 5
+分的状态"，合计预期 <span class="math inline">\(11\)</span> 分，而
+Critic 只预测了 <span class="math inline">\(9\)</span> 分。</p>
+<p>Critic 的目标是<strong>减小这个预测误差</strong>，即最小化 <span
+class="math inline">\(\frac{1}{2}\delta_t^2\)</span>。让我们展开梯度下降的计算，看看它是否真的会让
+<span class="math inline">\(V_\phi(s_1)\)</span> 往上调：</p>
+<p><span class="math display">\[\nabla_\phi \frac{1}{2}\delta_t^2 =
+\delta_t \cdot \nabla_\phi \delta_t\]</span></p>
+<p>由于 <span class="math inline">\(\delta_t = r_t + \gamma
+V_\phi(s_{t+1}) - V_\phi(s_t)\)</span>，其中"目标值" <span
+class="math inline">\(r_t + \gamma V_\phi(s_{t+1})\)</span>
+在实际训练中被视为常数（停止梯度），所以：</p>
+<p><span class="math display">\[\nabla_\phi \delta_t = -\nabla_\phi
+V_\phi(s_t)\]</span></p>
+<p>代入更新公式（注意梯度下降的减号和链式法则的减号<strong>相消</strong>了）：</p>
+<p><span class="math display">\[\phi \leftarrow \phi - \beta \cdot
+\delta_t \cdot (-\nabla_\phi V_\phi(s_t)) = \phi + \beta \delta_t
+\nabla_\phi V_\phi(s_t)\]</span></p>
+<p>当 <span class="math inline">\(\delta_t = +2 &gt; 0\)</span>
+时，最终效果是<strong>加上</strong> <span class="math inline">\(\beta
+\cdot 2 \cdot \nabla_\phi V_\phi(s_t)\)</span>，推动 <span
+class="math inline">\(V_\phi(s_1)\)</span> 增大——正好从 <span
+class="math inline">\(9\)</span> 往真实值 <span
+class="math inline">\(11\)</span> 靠拢。反之，如果 <span
+class="math inline">\(\delta_t &lt; 0\)</span>（预估偏高），则会推动
+<span class="math inline">\(V_\phi\)</span>
+减小。这就是标准梯度下降自动做到"偏低就调高、偏高就调低"的数学原因。</p>
+<p>随着训练迭代，Critic 的预测会越来越准，<span
+class="math inline">\(\delta_t\)</span> 会越来越小，Actor
+收到的信号也就越来越精确。</p>
+<p>回到面试的例子，Actor-Critic
+相比前两种方法的两个关键优势就很清楚了：</p>
+<ol type="1">
+<li><strong>单步更新</strong>：第 1 轮一结束就能计算 <span
+class="math inline">\(\delta_1\)</span>，无需等后续轮次。</li>
+<li><strong>方差更低</strong>：<span
+class="math inline">\(\delta_1\)</span>
+仅依赖<strong>单步</strong>的随机性（<span
+class="math inline">\(r_1\)</span> 和 <span
+class="math inline">\(s_2\)</span>），与第 2、3
+轮的随机结果完全解耦。相比 <span class="math inline">\(G_1\)</span>
+累积了三步的随机性，波动自然更小。</li>
+</ol>
+<p>代价是引入了<strong>偏差（Bias）</strong>：如果 Critic 对 <span
+class="math inline">\(V_\phi(s_2)\)</span> 的估计不准（比如真实值是
+<span class="math inline">\(6\)</span> 而非 <span
+class="math inline">\(5\)</span>），<span
+class="math inline">\(\delta_1\)</span>
+也会偏离真实优势值。这就是经典的<strong>偏差-方差权衡（Bias-Variance
+Trade-off）</strong>：Actor-Critic
+用一定的偏差换来了更低的方差和更高的学习效率。随着训练推进，Critic
+的估值会越来越准，偏差也会逐渐减小。</p>
+<p>Actor-Critic
+完美结合了策略梯度和价值函数的优势，极大地降低了方差，并实现了高效的在线单步更新。然而，它仍然面临着策略更新步长难以控制的问题，过大的更新可能导致策略崩溃。这就引出了下一篇要讲的
+TRPO 和 PPO 算法。</p>
+<p><strong>Actor-Critic 的完整实现：</strong></p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 张量与自动求导</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">import</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.nn.functional </span><span style="color:#A626A4;--shiki-dark:#C678DD">as</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> F  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 与前后代码块风格一致；需要时可接 F.smooth_l1_loss 等</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 模型定义 (与 Baseline 相同: Actor + Critic)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> ActorModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim, action_dim)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 策略 π_θ(a|s)，用 TD 误差 δ 作优势信号更新</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> CriticModel</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state_dim)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 价值 V_φ(s)，用自举目标训练，供一步 TD 目标</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">actor_optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(actor.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">critic_optimizer </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.optim.</span><span style="color:#383A42;--shiki-dark:#61AFEF">Adam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(critic.</span><span style="color:#383A42;--shiki-dark:#61AFEF">parameters</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(), </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">lr</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1e-3</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 训练循环: 每走一步就更新! (不需要等回合结束)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 当前状态 s_t</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> step </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(max_steps):  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 固定步数或可与 done 组合使用</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # --- 前向传播 ---</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    dist </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> actor</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state)                             </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># π_θ(·|s)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    action </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># a_t ~ π_θ(·|s_t)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">log_prob</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># log π，供策略梯度</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    value </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(state).</span><span style="color:#383A42;--shiki-dark:#61AFEF">squeeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()                 </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># V_φ(s)：当前状态价值，TD 残差的一端</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_state, reward, done </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(action)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 单步转移：得 r_t、s_&#123;t+1&#125;、是否终止</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    next_value </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> critic</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(next_state).</span><span style="color:#383A42;--shiki-dark:#61AFEF">squeeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">().</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># V_φ(s')：自举用下一状态价值；detach 使 Actor 不把梯度灌进「目标」侧</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 计算 TD 误差 (走一步就能算! 不用等回合结束)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # δ = r + γ·V(s') - V(s) ≈ A(s,a)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    td_target </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> reward </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gamma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_value </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 一步 TD 目标：终止则不再加未来项，(1−done) 截断 bootstrap</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    delta </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> td_target </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> value  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># TD 误差 δ ≈ 优势：实际单步回报+bootstrap 与当前 V(s) 的差</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ============================================================</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 同时更新 Actor 和 Critic (每一步都更新!)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # ============================================================</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    actor_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">log_prob </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> delta.</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()    </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Actor：δ 当系数；detach 使 Critic 误差不通过 δ 回传到 θ（标准 Actor-Critic 分工）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    critic_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> delta.</span><span style="color:#383A42;--shiki-dark:#61AFEF">pow</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)                 </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># Critic：最小化 δ²，等价于让 V(s) 去拟合 r+γV(s')（目标端已 detach）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    actor_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 清 Actor 梯度缓存</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    actor_loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 反传更新 θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    actor_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zero_grad</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 清 Critic 梯度缓存</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    critic_loss.</span><span style="color:#383A42;--shiki-dark:#61AFEF">backward</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 梯度经 δ 回传到 V_φ(s)；next_value 已 detach，不把 Actor 侧目标再反传到 φ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    critic_optimizer.</span><span style="color:#383A42;--shiki-dark:#61AFEF">step</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    state </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> next_state </span><span style="color:#A626A4;--shiki-dark:#C678DD">if</span><span style="color:#A626A4;--shiki-dark:#C678DD"> not</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> done </span><span style="color:#A626A4;--shiki-dark:#C678DD">else</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> env.</span><span style="color:#383A42;--shiki-dark:#61AFEF">reset</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 未结束则继续 s_&#123;t+1&#125;；结束则新开一局</span></span></code></pre></div>
+<h2 id="对比总结">对比总结</h2>
+<p>回到面试的例子，三种算法对第 1 轮"讲项目经历"的评价一目了然：</p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: center;"><strong>REINFORCE</strong></th>
+<th style="text-align: center;"><strong>+ Baseline</strong></th>
+<th style="text-align: center;"><strong>Actor-Critic</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>更新信号</strong></td>
+<td style="text-align: center;"><span
+class="math inline">\(G_t\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(G_t -
+V_\phi(s_t)\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\delta_t =
+r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>本例数值</strong></td>
+<td style="text-align: center;"><span
+class="math inline">\(12\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(+3\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(+2\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>信号含义</strong></td>
+<td style="text-align: center;">绝对总回报</td>
+<td style="text-align: center;">相对于平均的优势</td>
+<td style="text-align: center;">单步 TD 误差</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>何时可计算</strong></td>
+<td style="text-align: center;">回合结束后</td>
+<td style="text-align: center;">回合结束后</td>
+<td style="text-align: center;">每走一步即可</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>梯度方差</strong></td>
+<td style="text-align: center;">高（信号幅度大 + 累积多步随机性）</td>
+<td
+style="text-align: center;">较低（信号幅度小，但仍累积多步随机性）</td>
+<td style="text-align: center;">低（信号幅度小 + 仅含单步随机性）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>偏差</strong></td>
+<td style="text-align: center;">无偏（<span
+class="math inline">\(G_t\)</span> 是 <span
+class="math inline">\(Q\)</span> 的无偏估计）</td>
+<td style="text-align: center;">无偏（减去常数不影响期望）</td>
+<td style="text-align: center;">有偏（取决于 <span
+class="math inline">\(V_\phi\)</span> 的精度）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>从 REINFORCE → + Baseline →
+Actor-Critic，算法的演进路线非常清晰：<strong>先解决信号幅度过大的问题</strong>（引入基线，将信号从绝对值拉到
+0 附近），<strong>再解决学习效率低的问题</strong>（用 Critic
+自举替代完整回报，将多步随机性压缩为单步，同时实现即时更新）。</p>
+</blockquote>
+<hr />
+<h1
+id="广义优势估计gae蒙特卡洛与-td-的统一框架">广义优势估计（GAE）：蒙特卡洛与
+TD 的统一框架</h1>
+<p>上面三种算法分别用了蒙特卡洛（<span
+class="math inline">\(G_t\)</span>）、蒙特卡洛减基线（<span
+class="math inline">\(G_t - V\)</span>）、单步 TD（<span
+class="math inline">\(\delta_t\)</span>）来估计优势。但蒙特卡洛无偏却方差大，TD
+方差小却有偏——有没有一种方法能<strong>在这两个极端之间自由调节</strong>？这就是
+<strong>GAE（Generalized Advantage Estimation）</strong>（<a
+target="_blank" rel="noopener" href="https://arxiv.org/abs/1506.02438">原始论文</a>）要解决的问题，它是后续
+TRPO 和 PPO 算法的基础组件。</p>
+<h2 id="三种优势估计方法的关系">三种优势估计方法的关系</h2>
+<p>不同的估计方法，本质上是在回答同一个问题——<strong>"估计 <span
+class="math inline">\(Q(s_t, a_t)\)</span>
+时，我们应该多大程度地依赖真实观测（实际奖励），多大程度地依赖 Critic
+的预测（<span class="math inline">\(V_\phi\)</span>）？"</strong></p>
+<p><strong>方法 1：蒙特卡洛估计（完全不信 Critic）。</strong> 从 <span
+class="math inline">\(t\)</span>
+时刻开始，一直走到回合结束，用实际获得的累积奖励替代 <span
+class="math inline">\(Q\)</span>：</p>
+<p><span class="math display">\[\hat{A}_t^{MC} = G_t - V(s_t) =
+\left(\sum_{l=0}^{T-t-1} \gamma^l r_{t+l}\right) - V(s_t)\]</span></p>
+<p>因为 <span class="math inline">\(G_t\)</span> 是 <span
+class="math inline">\(Q(s_t, a_t)\)</span> 的无偏估计（<span
+class="math inline">\(\mathbb{E}[G_t | s_t, a_t] = Q(s_t,
+a_t)\)</span>），所以 <span
+class="math inline">\(\hat{A}_t^{MC}\)</span>
+是真实优势的<strong>无偏估计</strong>。但它累积了从 <span
+class="math inline">\(t\)</span> 到 <span
+class="math inline">\(T\)</span>
+每一步的随机性，方差极大。用面试的例子说：<span
+class="math inline">\(G_1 = r_1 + r_2 +
+r_3\)</span>，后两轮的随机性全部混进了对第 1 轮决策的评价。</p>
+<p><strong>方法 2：单步 TD 误差（完全信任 Critic）。</strong>
+只看一步实际奖励，未来的部分全部交给 Critic 预测：</p>
+<p><span class="math display">\[\hat{A}_t^{TD} = \delta_t = r_t + \gamma
+V(s_{t+1}) - V(s_t)\]</span></p>
+<p><span class="math inline">\(\delta_t\)</span> 仅含一步随机性（<span
+class="math inline">\(r_t\)</span> 和 <span
+class="math inline">\(s_{t+1}\)</span>），方差很低。但如果 <span
+class="math inline">\(V(s_{t+1})\)</span> 不准确，<span
+class="math inline">\(\delta_t\)</span>
+就会有偏差。用面试的例子说：<span class="math inline">\(\delta_1 = r_1 +
+V(s_2) - V(s_1) = 6 + 5 - 9 = +2\)</span>，这个 <span
+class="math inline">\(+2\)</span> 完全依赖 Critic 对 <span
+class="math inline">\(V(s_2) = 5\)</span>
+的预估准不准。如果实际后续得分是 <span class="math inline">\(6\)</span>
+而非 <span class="math inline">\(5\)</span>，<span
+class="math inline">\(\delta_1\)</span> 就低估了真实优势。</p>
+<p><strong>方法 3：n 步估计（折中方案）。</strong>
+自然的想法是：多看几步实际奖励，减少对 Critic 的依赖。n
+步优势估计为：</p>
+<p><span class="math display">\[\hat{A}_t^{(n)} = \left(\sum_{l=0}^{n-1}
+\gamma^l r_{t+l}\right) + \gamma^n V(s_{t+n}) - V(s_t)\]</span></p>
+<p>看 <span class="math inline">\(n\)</span> 步真实奖励，然后用 Critic
+估计剩余部分。<span class="math inline">\(n\)</span>
+越大，偏差越小（用了更多真实数据），但方差越大（累积了更多随机性）。容易验证：<span
+class="math inline">\(n = 1\)</span> 时退化为 TD 误差 <span
+class="math inline">\(\delta_t\)</span>，<span class="math inline">\(n =
+T - t\)</span> 时退化为蒙特卡洛估计 <span class="math inline">\(G_t -
+V(s_t)\)</span>。</p>
+<h2 id="n-步优势估计-td-误差的折扣累加">n 步优势估计 = TD
+误差的折扣累加</h2>
+<p>一个关键的数学等式是：<strong>n 步优势估计恰好等于前 n 个 TD
+误差的折扣累加</strong>：</p>
+<p><span class="math display">\[\hat{A}_t^{(n)} = \sum_{l=0}^{n-1}
+\gamma^l \delta_{t+l}\]</span></p>
+<p>我们用面试例子（<span class="math inline">\(n =
+3\)</span>，三轮面试，令 <span class="math inline">\(\gamma = 1\)</span>
+简化）来<strong>逐项展开</strong>验证。先把 3 个 TD 误差写出来：</p>
+<p><span class="math display">\[\delta_1 = r_1 + V(s_2) - V(s_1), \quad
+\delta_2 = r_2 + V(s_3) - V(s_2), \quad \delta_3 = r_3 + V(s_4) -
+V(s_3)\]</span></p>
+<p>把它们加起来，按类型分组（<span
+class="math inline">\(\color{blue}{\text{蓝色 =
+真实奖励}}\)</span>、<span
+class="math inline">\(\color{green}{\text{绿色 = 正 V
+项}}\)</span>、<span class="math inline">\(\color{red}{\text{红色 = 负 V
+项}}\)</span>）：</p>
+<p><span class="math display">\[\delta_1 + \delta_2 + \delta_3 =
+\underbrace{\color{blue}{r_1 + r_2 + r_3}}_{\text{真实奖励}} +
+\underbrace{\color{green}{V(s_2) + V(s_3) + V(s_4)}}_{\text{来自
+}+\gamma V(s_{t+l+1})} - \underbrace{\color{red}{V(s_1) + V(s_2) +
+V(s_3)}}_{\text{来自 }-V(s_{t+l})}\]</span></p>
+<p>现在逐项比较<span
+class="math inline">\(\color{green}{\text{绿色}}\)</span>和<span
+class="math inline">\(\color{red}{\text{红色}}\)</span>两组（<span
+class="math inline">\(\color{gray}{\text{灰色}}\)</span>表示已抵消的项）：</p>
+<p><span class="math display">\[= \color{blue}{r_1 + r_2 + r_3} +
+\color{gray}{V(s_2)} + \color{gray}{V(s_3)} + \color{green}{V(s_4)} -
+\color{red}{V(s_1)} - \color{gray}{V(s_2)} -
+\color{gray}{V(s_3)}\]</span></p>
+<p><span class="math inline">\(\color{gray}{V(s_2)}\)</span>
+在绿色组出现一次（<span
+class="math inline">\(+\)</span>），在红色组也出现一次（<span
+class="math inline">\(-\)</span>），抵消变灰；<span
+class="math inline">\(\color{gray}{V(s_3)}\)</span>
+同理抵消。<strong>中间所有 <span class="math inline">\(V\)</span>
+项两两对消，只剩下首尾</strong>：</p>
+<p><span class="math display">\[= \color{blue}{(r_1 + r_2 + r_3)} +
+\color{green}{V(s_4)} - \color{red}{V(s_1)} = \hat{A}_1^{(3)} \quad
+\checkmark\]</span></p>
+<p>这正是 3 步优势估计的定义！如果回合在第 3 步结束（<span
+class="math inline">\(V(s_4) = 0\)</span>），则 <span
+class="math inline">\(= G_1 - V(s_1)\)</span>，退化为蒙特卡洛。</p>
+<p><strong>一般情况</strong>（<span class="math inline">\(\gamma \neq
+1\)</span>）同理：每个正 <span class="math inline">\(V\)</span> 项 <span
+class="math inline">\(\gamma^{l+1} V(s_{t+l+1})\)</span> 与下一个负
+<span class="math inline">\(V\)</span> 项 <span
+class="math inline">\(\gamma^{l+1} V(s_{t+l+1})\)</span>
+配对抵消，最终只剩首尾：</p>
+<p><span class="math display">\[\sum_{l=0}^{n-1} \gamma^l \delta_{t+l} =
+\sum_{l=0}^{n-1} \gamma^l r_{t+l} + \gamma^n V(s_{t+n}) - V(s_t) =
+\hat{A}_t^{(n)} \quad \square\]</span></p>
+<p><strong>这个等式解释了一个常见的困惑：为什么"不属于第 <span
+class="math inline">\(t\)</span> 步"的后续 TD 误差 <span
+class="math inline">\(\delta_{t+1}, \delta_{t+2}, \ldots\)</span>
+也被加进了对动作 <span class="math inline">\(a_t\)</span>
+的优势评价？</strong> 答案是：累加后续 TD 误差并不是在"重复衡量动作
+<span class="math inline">\(a_t\)</span>
+好不好"，而是在<strong>用实际观测逐步替换 Critic
+的预测</strong>——每多加一个 <span
+class="math inline">\(\delta\)</span>，就多看了一步真实奖励，少依赖一步
+Critic 的猜测。</p>
+<p>用面试例子来说：<span class="math inline">\(\delta_1 = +2\)</span>
+完全信任 Critic 对 <span class="math inline">\(V(s_2) = 5\)</span>
+的预估。如果面试继续走下去，发现 <span class="math inline">\(\delta_2
+&gt; 0\)</span>（第 2 步实际表现比 Critic 预估好），这说明 <span
+class="math inline">\(V(s_2)\)</span> 被低估了——而这正是 <span
+class="math inline">\(\delta_1\)</span> 被低估的同一个原因。把 <span
+class="math inline">\(\delta_2\)</span> 加进来（2 步估计 <span
+class="math inline">\(\hat{A}_1^{(2)} = \delta_1 +
+\gamma\delta_2\)</span>），就是用第 2 步的实际奖励替换了 Critic 对 <span
+class="math inline">\(V(s_2)\)</span> 的不完美预测，修正了偏差。</p>
+<h2 id="从-n-步估计到-gae指数加权平均">从 n 步估计到
+GAE：指数加权平均</h2>
+<p>现在问题变成了：<strong>n 取多少合适？</strong> <span
+class="math inline">\(n=1\)</span> 偏差大方差小，<span
+class="math inline">\(n=T-t\)</span> 偏差小方差大，中间的 <span
+class="math inline">\(n\)</span> 是某种折中。但每个 <span
+class="math inline">\(n\)</span>
+都给出了真实优势的一个合理估计，选哪个都有道理。</p>
+<p>GAE 的巧妙之处在于：<strong>不选任何单一的 <span
+class="math inline">\(n\)</span>，而是把所有 n
+步估计做指数加权平均</strong>：</p>
+<p><span class="math display">\[\hat{A}_t^{\text{GAE}(\gamma,\lambda)} =
+(1-\lambda) \sum_{n=1}^{\infty} \lambda^{n-1}
+\hat{A}_t^{(n)}\]</span></p>
+<p>展开来看，各个 n 步估计分到的权重为：</p>
+<table>
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 21%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">n 步估计</th>
+<th style="text-align: left;">含义</th>
+<th style="text-align: center;">权重</th>
+<th style="text-align: center;"><span class="math inline">\(\lambda =
+0.95\)</span> 时</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><span
+class="math inline">\(\hat{A}_t^{(1)} = \delta_t\)</span></td>
+<td style="text-align: left;">只看 1 步，完全信任 Critic</td>
+<td style="text-align: center;"><span class="math inline">\((1-\lambda)
+= 0.05\)</span></td>
+<td style="text-align: center;">5%</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><span
+class="math inline">\(\hat{A}_t^{(2)} = \delta_t +
+\gamma\delta_{t+1}\)</span></td>
+<td style="text-align: left;">看 2 步</td>
+<td style="text-align: center;"><span
+class="math inline">\((1-\lambda)\lambda = 0.0475\)</span></td>
+<td style="text-align: center;">4.75%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><span
+class="math inline">\(\hat{A}_t^{(3)} = \delta_t + \gamma\delta_{t+1} +
+\gamma^2\delta_{t+2}\)</span></td>
+<td style="text-align: left;">看 3 步</td>
+<td style="text-align: center;"><span
+class="math inline">\((1-\lambda)\lambda^2 = 0.0451\)</span></td>
+<td style="text-align: center;">4.51%</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><span
+class="math inline">\(\vdots\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\vdots\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(\vdots\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(\vdots\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>权重总和为 <span class="math inline">\((1-\lambda)(1 + \lambda +
+\lambda^2 + \cdots) = (1-\lambda) \cdot \frac{1}{1-\lambda} =
+1\)</span>。由于 <span class="math inline">\(\lambda^n\)</span> 随 <span
+class="math inline">\(n\)</span> 指数衰减，短步估计的权重总是更大。<span
+class="math inline">\(\lambda\)</span> 越接近 <span
+class="math inline">\(0\)</span>，1 步估计的权重 <span
+class="math inline">\((1-\lambda)\)</span> 越接近 <span
+class="math inline">\(1\)</span>，几乎只用 <span
+class="math inline">\(\delta_t\)</span>（低方差、高偏差）；<span
+class="math inline">\(\lambda\)</span> 越接近 <span
+class="math inline">\(1\)</span>，各步估计的权重越均匀，等效于看更多步的实际奖励（低偏差、高方差）。</p>
+<p>将 <span class="math inline">\(\hat{A}_t^{(n)} = \sum_{l=0}^{n-1}
+\gamma^l \delta_{t+l}\)</span> 代入，对于固定的 <span
+class="math inline">\(l\)</span>，<span
+class="math inline">\(\delta_{t+l}\)</span> 出现在所有 <span
+class="math inline">\(n \geq l+1\)</span> 的估计中。交换求和顺序：</p>
+<p><span class="math display">\[\hat{A}_t^{\text{GAE}} = (1-\lambda)
+\sum_{l=0}^{\infty} \gamma^l \delta_{t+l} \sum_{n=l+1}^{\infty}
+\lambda^{n-1} = (1-\lambda) \sum_{l=0}^{\infty} \gamma^l \delta_{t+l}
+\cdot \frac{\lambda^l}{1-\lambda} = \sum_{l=0}^{\infty}
+(\gamma\lambda)^l \delta_{t+l}\]</span></p>
+<p>得到 GAE 的标准形式：</p>
+<p><span
+class="math display">\[\boxed{\hat{A}_t^{\text{GAE}(\gamma,\lambda)} =
+\sum_{l=0}^{T-t-1} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t =
+r_t + \gamma V(s_{t+1}) - V(s_t)}\]</span></p>
+<h2 id="严格推导lambda-1-时-gae-退化为蒙特卡洛无偏">严格推导：<span
+class="math inline">\(\lambda = 1\)</span> 时 GAE
+退化为蒙特卡洛（无偏）</h2>
+<p>当 <span class="math inline">\(\lambda = 1\)</span> 时，GAE 公式变为
+<span class="math inline">\(\hat{A}_t = \sum_{l=0}^{T-t-1} \gamma^l
+\delta_{t+l}\)</span>。这和上面 n 步估计的 telescoping
+<strong>完全相同</strong>——只是 <span class="math inline">\(n\)</span>
+取到了最大值 <span class="math inline">\(T -
+t\)</span>（看完全程）。</p>
+<p>仍然用面试例子（<span class="math inline">\(\gamma = 1\)</span>，3
+轮面试，<span class="math inline">\(T - t = 3\)</span>）具体展开：</p>
+<p><span class="math display">\[\hat{A}_1^{\text{GAE}(1,1)} = \delta_1 +
+\delta_2 + \delta_3\]</span></p>
+<p><span class="math display">\[= \underbrace{\color{blue}{r_1 + r_2 +
+r_3}}_{\text{真实奖励}} + \underbrace{\color{gray}{V(s_2)} +
+\color{gray}{V(s_3)} + \color{green}{V(s_4)}}_{\text{正 V 项}} -
+\underbrace{\color{red}{V(s_1)} + \color{gray}{V(s_2)} +
+\color{gray}{V(s_3)}}_{\text{负 V 项}}\]</span></p>
+<p><span class="math display">\[= \color{blue}{(r_1 + r_2 + r_3)} +
+\color{green}{V(s_4)} - \color{red}{V(s_1)}\]</span></p>
+<p>若 <span class="math inline">\(s_4\)</span> 为终止状态（<span
+class="math inline">\(V(s_4) = 0\)</span>）：<span
+class="math inline">\(= (r_1 + r_2 + r_3) - V(s_1) = G_1 -
+V(s_1)\)</span>，即蒙特卡洛估计。</p>
+<p><strong>一般情况</strong>（<span class="math inline">\(\gamma \neq
+1\)</span>）同理，抵消规律与上面完全一致（只是每项多了 <span
+class="math inline">\(\gamma^l\)</span>
+系数，不影响配对抵消），最终只剩首尾：</p>
+<p><span class="math display">\[\hat{A}_t^{\text{GAE}(\gamma,1)} =
+\sum_{l=0}^{T-t-1} \gamma^l r_{t+l} + \gamma^{T-t} V(s_T) -
+V(s_t)\]</span></p>
+<p>若回合在 <span class="math inline">\(T\)</span>
+时刻终止（终止状态价值为零，<span class="math inline">\(V(s_T) =
+0\)</span>）：</p>
+<p><span class="math display">\[\hat{A}_t^{\text{GAE}(\gamma,1)} =
+\underbrace{\sum_{l=0}^{T-t-1} \gamma^l r_{t+l}}_{= \; G_t} - V(s_t) =
+G_t - V(s_t) = \hat{A}_t^{MC} \quad \square\]</span></p>
+<p>所有 <span class="math inline">\(V\)</span>
+项被望远镜抵消消灭，估计中不再依赖 Critic 的任何预测——这就是 <span
+class="math inline">\(\lambda = 1\)</span> 无偏的根本原因。类似地，<span
+class="math inline">\(\lambda = 0\)</span> 时 <span
+class="math inline">\(\hat{A}_t^{\text{GAE}(\gamma,0)} =
+\delta_t\)</span>，退化为单步 TD。</p>
+<h2 id="蒙特卡洛td-误差与-gae-的对比总结">蒙特卡洛、TD 误差与 GAE
+的对比总结</h2>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: center;"><strong>蒙特卡洛</strong> <span
+class="math inline">\(G_t - V(s_t)\)</span></th>
+<th style="text-align: center;"><strong>TD 误差</strong> <span
+class="math inline">\(\delta_t\)</span></th>
+<th style="text-align: center;"><strong>GAE</strong> <span
+class="math inline">\(\sum (\gamma\lambda)^l \delta_{t+l}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>等价于</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\lambda =
+1\)</span> 的 GAE</td>
+<td style="text-align: center;"><span class="math inline">\(\lambda =
+0\)</span> 的 GAE</td>
+<td style="text-align: center;"><span class="math inline">\(\lambda \in
+(0,1)\)</span> 的加权混合</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>公式展开</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\sum_{l}
+\gamma^l r_{t+l} - V(s_t)\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(r_t + \gamma
+V(s_{t+1}) - V(s_t)\)</span></td>
+<td style="text-align: center;">所有 n 步估计的指数加权平均</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>信任 Critic 程度</strong></td>
+<td style="text-align: center;">完全不信（只用 <span
+class="math inline">\(V(s_t)\)</span> 作基线）</td>
+<td style="text-align: center;">完全信任（用 <span
+class="math inline">\(V(s_{t+1})\)</span> 替代全部未来）</td>
+<td style="text-align: center;">部分信任（<span
+class="math inline">\(\lambda\)</span> 调节）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>偏差</strong></td>
+<td style="text-align: center;">无（<span
+class="math inline">\(G_t\)</span> 是 <span
+class="math inline">\(Q\)</span> 的无偏估计）</td>
+<td style="text-align: center;">有（<span
+class="math inline">\(V(s_{t+1})\)</span> 可能不准）</td>
+<td style="text-align: center;">介于两者之间</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>方差</strong></td>
+<td style="text-align: center;">高（累积 <span
+class="math inline">\(T-t\)</span> 步随机性）</td>
+<td style="text-align: center;">低（仅 1 步随机性）</td>
+<td style="text-align: center;">介于两者之间</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>何时可计算</strong></td>
+<td style="text-align: center;">回合结束后</td>
+<td style="text-align: center;">每走一步即可</td>
+<td style="text-align: center;">回合结束后（需后续 <span
+class="math inline">\(\delta\)</span>）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>物理意义</strong></td>
+<td style="text-align: center;">动作 <span
+class="math inline">\(a_t\)</span>
+走完全程后<strong>实际</strong>比平均好多少</td>
+<td style="text-align: center;">动作 <span
+class="math inline">\(a_t\)</span> 的<strong>即时</strong>表现比 Critic
+预期好多少</td>
+<td
+style="text-align: center;">综合即时和多步信息的<strong>平滑</strong>估计</td>
+</tr>
+</tbody>
+</table>
+<p>实践中 <span class="math inline">\(\lambda = 0.95\)</span>
+是一个好的折中——保留了 95% 的长期信息，同时通过 <span
+class="math inline">\(0.95^l\)</span> 的指数衰减使远处（方差大的）TD
+误差权重递减，有效抑制方差。</p>
+<h2 id="gae-的递推实现">GAE 的递推实现</h2>
+<p>GAE 公式可以从后向前<strong>递推</strong>计算，避免显式求和：</p>
+<p><span class="math display">\[
+\hat{A}_t = \delta_t + \gamma \lambda \, \hat{A}_{t+1}
+\]</span></p>
+<p>下面是具体实现：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> compute_gae</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">rewards</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> values</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> gamma</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.99</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> lam</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">0.95</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> dones</span><span style="color:#383A42;--shiki-dark:#ABB2BF">=</span><span style="color:#986801;--shiki-dark:#D19A66">None</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    广义优势估计 (Generalized Advantage Estimation)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    rewards: Tensor [T]                  每步即时奖励</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    values:  Tensor [T] 或 [T+1]         Critic 对各状态的价值估计</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">                                         推荐 T+1，最后一个元素是 bootstrap 值 V(s_T)</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    gamma:   折扣因子，控制对远期奖励的衰减（通常 0.99）</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    lam:     GAE 平滑参数 λ，越大方差越高但偏差越小（通常 0.95）</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    dones:   Tensor [T] (0/1)            1 表示回合在该步结束</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">                                         用于在 episode 边界处截断 GAE 递推链</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    T </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(rewards)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # zeros_like 自动继承 device/dtype，多 GPU 训练时不会出错</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zeros_like</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(rewards)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 没有提供 dones 时，默认全部为 0（假设一个连续回合，不推荐）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dones </span><span style="color:#A626A4;--shiki-dark:#C678DD">is</span><span style="color:#986801;--shiki-dark:#D19A66"> None</span><span style="color:#383A42;--shiki-dark:#ABB2BF">:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        dones </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zeros_like</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(rewards)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 如果 values 长度为 T（没有 bootstrap），补一个 0</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 什么是 bootstrap？当回合被截断（达到最大步数但游戏未结束）时，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 后面还有未知的奖励。我们用 Critic 的估计 V(s_T) 来"替代"看不到的未来回报，</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 这个"用估计代替真实值"的操作就叫 bootstrap。</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 截断场景下建议传 T+1 维度的 values，使末尾能正确 bootstrap</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(values) </span><span style="color:#383A42;--shiki-dark:#56B6C2">==</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> T:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        values </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([values, torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">zeros</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">device</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">values.device)])</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    gae </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66"> 0.0</span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">  # 递推中的累积量，从末尾往前滚动</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> t </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> reversed</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(T)):  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 从 t=T-1 向前递推到 t=0</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # TD 残差 δ_t = r_t + γ·V(s_&#123;t+1&#125;)·(1-done_t) − V(s_t)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 当 done_t=1 时，回合已结束，V(s_&#123;t+1&#125;) 属于新回合，用 (1-done) 归零</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        delta </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> rewards[t] </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gamma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> values[t </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#986801;--shiki-dark:#D19A66"> 1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">] </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dones[t]) </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> values[t]</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # GAE 递推：Â_t = δ_t + γλ·(1-done_t)·Â_&#123;t+1&#125;</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # (1-done_t) 同时截断递推链，防止新回合的优势信号泄漏回旧回合</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        gae </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> delta </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gamma </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> lam </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> dones[t]) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gae</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        advantages[t] </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gae</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> advantages  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># [Â_0, Â_1, ..., Â_&#123;T-1&#125;]</span></span></code></pre></div>
+<blockquote>
+<p><strong>什么是 Bootstrap？</strong> 在 TD 误差 <span
+class="math inline">\(\delta_t = r_t + \gamma V(s_{t+1}) -
+V(s_t)\)</span> 中，<span class="math inline">\(V(s_{t+1})\)</span> 就是
+bootstrap——我们不知道从 <span class="math inline">\(s_{t+1}\)</span>
+开始真正能拿多少分，所以<strong>用 Critic 的预测值 <span
+class="math inline">\(V(s_{t+1})\)</span>
+来"代替"看不到的未来回报</strong>，这种"用估计值替代真实值"的操作就叫
+bootstrap（自举）。</p>
+<p><strong>为什么需要 <code>dones</code>？</strong> 一个 rollout buffer
+往往包含多个回合片段。用面试的例子来说：假设 AI 连续跑了两局面试，数据在
+buffer 中紧挨着排列：</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">位置</th>
+<th style="text-align: center;"><span
+class="math inline">\(t=1\)</span></th>
+<th style="text-align: center;"><span
+class="math inline">\(t=2\)</span></th>
+<th style="text-align: center;"><span
+class="math inline">\(t=3\)</span>（第1局结束）</th>
+<th style="text-align: center;"><span
+class="math inline">\(t=4\)</span>（第2局开始）</th>
+<th style="text-align: center;"><span
+class="math inline">\(t=5\)</span></th>
+<th style="text-align: center;">...</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">状态</td>
+<td style="text-align: center;"><span
+class="math inline">\(s_1^{(1)}\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(s_2^{(1)}\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(s_3^{(1)}\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(s_1^{(2)}\)</span></td>
+<td style="text-align: center;"><span
+class="math inline">\(s_2^{(2)}\)</span></td>
+<td style="text-align: center;">...</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">done</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">...</td>
+</tr>
+</tbody>
+</table>
+<p><strong>没有 <code>dones</code> 会怎样？</strong> 计算 <span
+class="math inline">\(t=3\)</span>（第 1 局最后一步）的 TD 误差时：<span
+class="math inline">\(\delta_3 = r_3 + \gamma V(s_4) -
+V(s_3)\)</span>。但 <span class="math inline">\(s_4\)</span> 是第 2
+局的初始状态——一场全新的面试！<span
+class="math inline">\(V(s_4)\)</span> 与第 1 局完全无关，不应被当作第 1
+局末尾的 bootstrap 值。如果直接使用，等于把"第 2
+局开局的预期分数"算进了第 1 局的优势评价，导致估计错误。</p>
+<p><strong>加上 <code>(1 - done_t)</code> 后</strong>：当 <span
+class="math inline">\(\text{done}_3 = 1\)</span> 时，<span
+class="math inline">\((1 - \text{done}_3) = 0\)</span>，于是 <span
+class="math inline">\(\delta_3 = r_3 + \gamma \cdot V(s_4) \cdot 0 -
+V(s_3) = r_3 - V(s_3)\)</span>。bootstrap 值被归零，第 1
+局的最后一步不再"偷看"第 2 局的信息。同时，GAE 递推链 <span
+class="math inline">\(\hat{A}_3 = \delta_3 + \gamma\lambda \cdot 0 \cdot
+\hat{A}_4 = \delta_3\)</span> 也被截断，第 2 局的优势不会泄漏回第 1
+局。</p>
+</blockquote>
+<hr />
+<p><strong>开源代码参考：</strong> 在实际应用中，REINFORCE
+由于方差过大，几乎不再被单独用于复杂任务；Actor-Critic（特别是其变体
+A2C/A3C）则被广泛使用。目前最主流的强化学习开源库如
+<strong>Stable-Baselines3</strong> 和 Hugging Face 的 <strong>TRL
+(Transformer Reinforcement Learning)</strong>
+都提供了这些基础算法的实现。上面三个算法各自的完整 PyTorch
+实现已附在对应小节末尾，从模型定义、数据采集到参数更新的完整前向流程可以直接参考。</p>
+<p><strong>参考资料：</strong> 本文的理论基础主要来自 Sutton &amp; Barto
+的经典教材 <a
+target="_blank" rel="noopener" href="http://incompleteideas.net/book/the-book-2nd.html">Reinforcement
+Learning: An Introduction</a>，其中 Chapter 13
+详细讨论了策略梯度方法。更偏实践的入门推荐 <a
+target="_blank" rel="noopener" href="https://spinningup.openai.com/en/latest/">OpenAI Spinning
+Up</a>，提供了从概念到代码的完整路径。</p>
+<p><strong>这些基础算法与大模型 RLHF 的关系：</strong>
+本文介绍的三种算法都是经典 RL 场景中的理论基础，它们本身没有直接的 RLHF
+版本，但它们的核心思想直接催生了大模型对齐中的关键算法：</p>
+<ul>
+<li><strong>Actor-Critic → PPO</strong>：PPO 本质上是加了裁剪机制的
+Actor-Critic，是目前 RLHF 中最主流的算法。在 RLHF
+场景下需要四个模型（Actor、Critic、Reference、Reward）协同工作，详见<a
+href="/chengYi-xun/posts/52-trpo-ppo/">下一篇</a>。</li>
+<li><strong>REINFORCE → GRPO</strong>：GRPO（Group Relative Policy
+Optimization）的核心思想来自 REINFORCE——对同一个 prompt
+生成一组回答，用组内相对排名替代 Critic 的价值估计，彻底去掉了 Critic
+模型。</li>
+</ul>
+<hr />
+<h1 id="附录强化学习的分类体系">附录：强化学习的分类体系</h1>
+<p>学完上面的算法后，我们回过头来梳理一下强化学习的两个核心分类维度，这对理解后续系列文章中各算法的定位非常重要。</p>
+<h2 id="在线强化学习-vs-离线强化学习">在线强化学习 vs 离线强化学习</h2>
+<p>根据<strong>训练过程中是否需要与环境实时交互</strong>，强化学习可以分为两大范式：</p>
+<p><strong>在线强化学习（Online
+RL）</strong>：训练时，智能体<strong>主动与环境交互</strong>——执行动作、观察反馈、收集新数据，然后用这些新鲜数据更新策略。每一轮训练都需要"真的去玩"。</p>
+<p><strong>离线强化学习（Offline
+RL）</strong>：训练时，<strong>不与环境交互</strong>，只从一批预先收集好的固定数据集中学习。数据可能是其他策略（甚至人类专家）收集的，训练过程中不再产生新数据。</p>
+<p>继续用训狗的例子：</p>
+<ul>
+<li><strong>在线
+RL</strong>：你每天带狗到公园训练，狗做出动作、你给奖惩、它当场学习。训练质量取决于你和狗的实时互动。</li>
+<li><strong>离线
+RL</strong>：你给狗看一堆"别人家狗"的训练录像——哪些动作得了奖、哪些被罚了——让它从录像中自己总结经验，不需要亲自下场。</li>
+</ul>
+<h2 id="on-policy-vs-off-policy">On-Policy vs Off-Policy</h2>
+<p>这是另一个容易和在线/离线混淆的分类维度。它关注的不是"是否与环境交互"，而是<strong>用来更新策略的数据是谁产生的</strong>。</p>
+<p><strong>On-Policy（同策略）</strong>：用<strong>当前正在训练的策略</strong>
+<span class="math inline">\(\pi_\theta\)</span> 产生的数据来更新 <span
+class="math inline">\(\pi_\theta\)</span>
+自己。每次策略更新后，旧数据就"过期"了，必须重新采集。</p>
+<p><strong>Off-Policy（异策略）</strong>：用<strong>其他策略</strong>（称为行为策略
+<span class="math inline">\(\beta\)</span>）产生的数据来更新目标策略
+<span
+class="math inline">\(\pi_\theta\)</span>。数据可以来自旧版本的自己、其他算法、甚至人类专家，通过<strong>重要性采样</strong>等技术修正分布差异。</p>
+<p>还是用训狗的例子：</p>
+<ul>
+<li><strong>On-Policy</strong>：你亲自带狗训练，狗每次做出动作后你立刻给反馈，它根据<strong>自己刚才的表现</strong>学习。学完一轮后，之前的经验就不再使用，因为狗的行为模式已经变了。</li>
+<li><strong>Off-Policy</strong>：你让狗看<strong>别的狗</strong>（或者它自己以前）的训练录像，从中学习哪些动作好、哪些不好。录像不是它当前策略产生的，但仍然可以从中提取有用信息。</li>
+</ul>
+<h2 id="两个维度的交叉分类">两个维度的交叉分类</h2>
+<p>在线/离线和 on-policy/off-policy
+是<strong>两个独立的维度</strong>，它们的组合产生了不同类型的算法：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: left;">On-Policy</th>
+<th style="text-align: left;">Off-Policy</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>在线（Online）</strong></td>
+<td
+style="text-align: left;">REINFORCE、A2C：每次用当前策略采集数据，用完即弃</td>
+<td style="text-align: left;">DQN、SAC：与环境交互，但数据存入 replay
+buffer 反复使用</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>离线（Offline）</strong></td>
+<td
+style="text-align: left;">（不存在：不交互就无法用当前策略采集数据）</td>
+<td style="text-align: left;">DPO、KTO：从预先收集的固定数据集学习</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>PPO 和 GRPO 在哪里？</strong> 它们是在线 + <strong>近似
+on-policy</strong>。严格的 on-policy 要求每次更新后立刻丢弃旧数据，但
+PPO/GRPO 会把同一批数据复用 K 个 epoch（通常 K=3~4），通过 clip
+机制或重要性采样权重来限制新旧策略的偏差，使得复用旧数据不会导致严重的分布失配。这种"采一批、用几轮、再采新的"的方式，比纯
+on-policy 高效，又比完全 off-policy 稳定。</p>
+</blockquote>
+<p>在大模型对齐的语境下：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: left;">在线 RL</th>
+<th style="text-align: left;">离线 RL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>训练时</strong></td>
+<td
+style="text-align: left;">模型<strong>实时生成回答</strong>，奖励模型/环境打分</td>
+<td
+style="text-align: left;">从<strong>预先收集好的偏好数据</strong>中学习</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>典型算法</strong></td>
+<td style="text-align: left;">PPO、GRPO、DAPO、REINFORCE++</td>
+<td style="text-align: left;">DPO、IPO、KTO</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>优点</strong></td>
+<td style="text-align: left;">能不断探索新策略，利用最新反馈</td>
+<td style="text-align: left;">无需 4 模型架构，训练简单高效</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>缺点</strong></td>
+<td style="text-align: left;">需要维护生成+打分的完整流水线</td>
+<td style="text-align: left;">受限于离线数据的质量和覆盖范围</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement
+Learning: An Introduction</em>. MIT press.</li>
+<li>Schulman, J., Moritz, P., Levine, S., Jordan, M., &amp; Abbeel, P.
+(2015). <em>High-Dimensional Continuous Control Using Generalized
+Advantage Estimation</em>. ICLR 2016.</li>
+<li><a
+target="_blank" rel="noopener" href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html">Part
+3: Intro to Policy Optimization — OpenAI Spinning Up</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/">Policy
+Gradient Algorithms — Lil'Log</a></li>
+<li><a target="_blank" rel="noopener" href="https://avandekleut.github.io/a2c/">Actor-Critic Methods,
+A2C and GAE</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/52-trpo-ppo/">笔记｜强化学习（二）：信任区域与近端策略优化
+(从 TRPO 到 PPO)</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/">https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（十五）：Flux 架构解析</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</div></div></a></div><div><a href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">36</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">39</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%BB%8E%E8%AE%AD%E7%8B%97%E8%AF%B4%E8%B5%B7"><span class="toc-number">1.</span> <span class="toc-text">强化学习基础概念：从&quot;训狗&quot;说起</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A9%AC%E5%B0%94%E5%8F%AF%E5%A4%AB%E5%86%B3%E7%AD%96%E8%BF%87%E7%A8%8B-mdp"><span class="toc-number">1.1.</span> <span class="toc-text">马尔可夫决策过程 (MDP)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%B7%E5%80%BC%E5%87%BD%E6%95%B0%E4%B8%8E%E4%BC%98%E5%8A%BF%E5%87%BD%E6%95%B0%E6%80%8E%E4%B9%88%E5%88%A4%E6%96%AD%E4%B8%80%E4%B8%AA%E5%8A%A8%E4%BD%9C%E6%98%AF%E5%A5%BD%E6%98%AF%E5%9D%8F"><span class="toc-number">1.2.</span> <span class="toc-text">价值函数与优势函数：怎么判断一个动作是好是坏？</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%E5%AE%9A%E7%90%86%E5%A6%82%E4%BD%95%E8%AE%A9%E6%A8%A1%E5%9E%8B%E5%8F%98%E8%81%AA%E6%98%8E"><span class="toc-number">2.</span> <span class="toc-text">策略梯度定理：如何让模型&quot;变聪明&quot;？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E7%9B%AE%E6%A0%87%E5%87%BD%E6%95%B0-jtheta"><span class="toc-number">2.0.1.</span> <span class="toc-text">深入理解目标函数 \(J(\theta)\)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A2%AF%E5%BA%A6%E7%9A%84%E7%9B%B4%E8%A7%82%E7%90%86%E8%A7%A3"><span class="toc-number">2.0.2.</span> <span class="toc-text">梯度的直观理解</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%BB%8E-reinforce-%E5%88%B0-actor-critic%E7%AE%97%E6%B3%95%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="toc-number">3.</span> <span class="toc-text">从 REINFORCE 到
+Actor-Critic：算法的演进</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%80%E6%9C%B4%E7%B4%A0%E7%9A%84%E5%AE%9E%E7%8E%B0reinforce-%E7%AE%97%E6%B3%95"><span class="toc-number">3.1.</span> <span class="toc-text">1. 最朴素的实现：REINFORCE 算法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%95%E5%85%A5%E5%9F%BA%E7%BA%BF-reinforce-with-baseline"><span class="toc-number">3.2.</span> <span class="toc-text">2. 引入基线 (REINFORCE with
+Baseline)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#actor-critic-%E6%9E%B6%E6%9E%84-%E6%97%B6%E5%BA%8F%E5%B7%AE%E5%88%86%E4%B8%8E%E5%8D%95%E6%AD%A5%E6%9B%B4%E6%96%B0"><span class="toc-number">3.3.</span> <span class="toc-text">3. Actor-Critic 架构
+(时序差分与单步更新)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AF%B9%E6%AF%94%E6%80%BB%E7%BB%93"><span class="toc-number">3.4.</span> <span class="toc-text">对比总结</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%B9%BF%E4%B9%89%E4%BC%98%E5%8A%BF%E4%BC%B0%E8%AE%A1gae%E8%92%99%E7%89%B9%E5%8D%A1%E6%B4%9B%E4%B8%8E-td-%E7%9A%84%E7%BB%9F%E4%B8%80%E6%A1%86%E6%9E%B6"><span class="toc-number">4.</span> <span class="toc-text">广义优势估计（GAE）：蒙特卡洛与
+TD 的统一框架</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E7%A7%8D%E4%BC%98%E5%8A%BF%E4%BC%B0%E8%AE%A1%E6%96%B9%E6%B3%95%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="toc-number">4.1.</span> <span class="toc-text">三种优势估计方法的关系</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#n-%E6%AD%A5%E4%BC%98%E5%8A%BF%E4%BC%B0%E8%AE%A1-td-%E8%AF%AF%E5%B7%AE%E7%9A%84%E6%8A%98%E6%89%A3%E7%B4%AF%E5%8A%A0"><span class="toc-number">4.2.</span> <span class="toc-text">n 步优势估计 &#x3D; TD
+误差的折扣累加</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%8E-n-%E6%AD%A5%E4%BC%B0%E8%AE%A1%E5%88%B0-gae%E6%8C%87%E6%95%B0%E5%8A%A0%E6%9D%83%E5%B9%B3%E5%9D%87"><span class="toc-number">4.3.</span> <span class="toc-text">从 n 步估计到
+GAE：指数加权平均</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%A5%E6%A0%BC%E6%8E%A8%E5%AF%BClambda-1-%E6%97%B6-gae-%E9%80%80%E5%8C%96%E4%B8%BA%E8%92%99%E7%89%B9%E5%8D%A1%E6%B4%9B%E6%97%A0%E5%81%8F"><span class="toc-number">4.4.</span> <span class="toc-text">严格推导：\(\lambda &#x3D; 1\) 时 GAE
+退化为蒙特卡洛（无偏）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%92%99%E7%89%B9%E5%8D%A1%E6%B4%9Btd-%E8%AF%AF%E5%B7%AE%E4%B8%8E-gae-%E7%9A%84%E5%AF%B9%E6%AF%94%E6%80%BB%E7%BB%93"><span class="toc-number">4.5.</span> <span class="toc-text">蒙特卡洛、TD 误差与 GAE
+的对比总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#gae-%E7%9A%84%E9%80%92%E6%8E%A8%E5%AE%9E%E7%8E%B0"><span class="toc-number">4.6.</span> <span class="toc-text">GAE 的递推实现</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E9%99%84%E5%BD%95%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0%E7%9A%84%E5%88%86%E7%B1%BB%E4%BD%93%E7%B3%BB"><span class="toc-number">5.</span> <span class="toc-text">附录：强化学习的分类体系</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9C%A8%E7%BA%BF%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0-vs-%E7%A6%BB%E7%BA%BF%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0"><span class="toc-number">5.1.</span> <span class="toc-text">在线强化学习 vs 离线强化学习</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#on-policy-vs-off-policy"><span class="toc-number">5.2.</span> <span class="toc-text">On-Policy vs Off-Policy</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%A4%E4%B8%AA%E7%BB%B4%E5%BA%A6%E7%9A%84%E4%BA%A4%E5%8F%89%E5%88%86%E7%B1%BB"><span class="toc-number">5.3.</span> <span class="toc-text">两个维度的交叉分类</span></a></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/62-reward-model-advanced/" title="笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励">笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励</a><time datetime="2026-04-05T11:00:00.000Z" title="发表于 2026-04-05 19:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成">笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-rl-alignment-comparison/" title="笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow">笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow</a><time datetime="2026-04-05T09:00:00.000Z" title="发表于 2026-04-05 17:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/107-world-model-frontier/" title="笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛">笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛</a><time datetime="2026-04-05T17:00:00.000Z" title="发表于 2026-04-06 01:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js"></script><script src="/chengYi-xun/js/main.js"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/51-rl-basics/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/',
+      title: '笔记｜强化学习（一）：强化学习基础与策略梯度',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
