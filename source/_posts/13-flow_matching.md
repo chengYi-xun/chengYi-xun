@@ -363,6 +363,23 @@ def step(self, model_output, timestep, sample, return_dict=True):
 
 这种设计让Flow Matching既可以确定性生成（保证质量），也可以随机生成（增加多样性）。
 
+# Rectified Flow 与 Optimal Transport (OT-CFM)
+
+在 Flow Matching 的框架下，**Rectified Flow (RF)** 是最著名、最简单的一个具体实现。它的核心特征是强制规定从数据 $x_0$ 到噪声 $x_1 \sim \mathcal{N}(0, I)$ 的概率路径必须是最简单的直线：$x_t = (1-t)x_0 + t x_1$。
+
+然而，在最初训练 RF 时（称为 1-Rectified Flow），由于噪声 $x_1$ 和图像 $x_0$ 是**独立随机配对**的，这会导致不同图像的生成轨迹在空间中发生**严重交叉**。一旦轨迹交叉，速度场就会变得极度非线性，ODE 求解器必须用非常小的步长（很多步）才能准确积分。
+
+为了解决这个问题，原论文提出了一种叫做 **Reflow** 的迭代微调技术：
+
+1. 先用训练好的 1-RF 模型生成一批图像，记录下每个噪声 $x_1$ 和它最终生成的图像 $x_0$ 的**确定性映射对**。
+2. 用这些**已经绑定好**的数据对去训练一个新的模型（2-Rectified Flow）。
+这个过程在数学上等价于在寻找**最优传输（Optimal Transport）**的解，能把交叉的轨迹彻底“拉直”成互不交叉的平行直线。轨迹越直，ODE 积分误差越小，最终甚至只需要 1 步 Euler 步进就能生成高质量图像。
+
+**工程实践中的演进（如 FLUX / SD3）**
+虽然理论上的 Reflow 很优美，但在工业界训练大模型时，先生成几十亿张图片再去训练 2-RF 的成本太高了。因此，**当前最前沿的开源大模型（如 Stable Diffusion 3、FLUX）在实践中并没有使用多阶段的迭代 Reflow**。
+
+相反，它们在第一阶段训练（1-RF）时，直接在每个 Batch 内部使用**最优传输（Optimal Transport, OT）算法**对噪声和图像进行配对，这种方法被称为 **OT-CFM (Optimal Transport Conditional Flow Matching)**。通过在训练源头上强制让每个噪声点去寻找离它“最近”的真实图像，模型在单阶段训练中就能直接学到几乎不交叉的直线轨迹，从而实现极少步数的高质量生成。
+
 # 总结与算法对比
 
 **算法对比：Flow Matching vs DDPM**

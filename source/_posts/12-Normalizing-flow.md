@@ -134,12 +134,17 @@ $$
 \mathcal{L} = \mathbb{E}_{\mathbf{x} \sim p_{data}}[\log p(\mathbf{x})]
 $$
 
-根据变量变换公式：
+根据变量变换公式，如果我们将生成过程记为 $\mathbf{x} = f(\mathbf{z})$，那么：
 $$
-\log p(\mathbf{x}) = \log \pi(\mathbf{z}) + \sum_{i=1}^K \log \left|\det \frac{\partial f_i}{\partial \mathbf{z}_{i-1}}\right|
+\log p(\mathbf{x}) = \log \pi(\mathbf{z}) - \sum_{i=1}^K \log \left|\det \frac{\partial f_i}{\partial \mathbf{z}_{i-1}}\right|
 $$
 
-其中 $\mathbf{z} = f^{-1}(\mathbf{x})$，$\pi(\mathbf{z})$ 是基础分布（通常是标准高斯分布）。
+在实际代码实现中，我们通常计算从数据到噪声的逆向映射 $\mathbf{z} = f^{-1}(\mathbf{x})$。如果我们把这个逆向映射的网络层记为 $g_i$，则有：
+$$
+\log p(\mathbf{x}) = \log \pi(\mathbf{z}) + \sum_{i=1}^K \log \left|\det \frac{\partial g_i}{\partial \mathbf{x}_{i-1}}\right|
+$$
+
+其中 $\pi(\mathbf{z})$ 是基础分布（通常是标准高斯分布）。代码中的 `log_det_jacobian` 就是上述公式中的雅可比行列式对数之和。
 
 ## 训练算法
 
