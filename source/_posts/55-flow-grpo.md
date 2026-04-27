@@ -546,6 +546,92 @@ $$
 
 ---
 
+# GRPO-Guard：缓解隐式过优化
+
+> 论文：[GRPO-Guard: Mitigating Implicit Over-Optimization in Flow Matching via Regulated Clipping](https://arxiv.org/abs/2510.22319)（同为 Flow-GRPO 团队，2025）
+> 代码：已集成在 [flow_grpo](https://github.com/yifan123/flow_grpo) 和 [Flow-Factory](https://github.com/X-GenGroup/Flow-Factory) 中
+
+## 问题：Importance Ratio 的固有偏差
+
+Flow-GRPO 和 DanceGRPO 在训练中使用 PPO-style clipping 来约束策略更新。PPO 的 clipping 机制假设 importance ratio $r_t = \pi_\theta(a_t|s_t) / \pi_{\theta_\text{old}}(a_t|s_t)$ 的分布**以 1 为中心**。但在 Flow Matching 模型中，importance ratio 的分布存在**系统性的负向偏差**：
+
+1. **均值始终低于 1**，在低噪声步（如 SD3.5-M 的 step 8）偏差尤为显著。
+2. **方差在不同去噪步之间差异极大**，低噪声步方差远小于高噪声步。
+
+{% note info no-icon %}
+**深度解析：为什么偏差是"负向"的？为什么方差随时间步变化？**
+
+在 Flow Matching SDE 中，每一步的"策略"是一个高斯分布：$\pi_\theta(x_{t+1}|x_t) = \mathcal{N}(\mu_\theta, \sigma_t^2 I)$。设 $\delta = \mu_\theta - \mu_{\theta_\text{old}}$ 为策略更新导致的均值偏移，$e = x_{t+1} - \mu_{\theta_\text{old}} \sim \mathcal{N}(0, \sigma_t^2 I)$ 为采样噪声，则 log-ratio 可以精确展开为：
+
+$$\log r_t = \frac{e^T \delta}{\sigma_t^2} - \frac{\|\delta\|^2}{2\sigma_t^2}$$
+
+第一项 $\frac{e^T \delta}{\sigma_t^2}$ 是零均值的随机项（因为 $\mathbb{E}[e] = 0$），第二项 $-\frac{\|\delta\|^2}{2\sigma_t^2}$ 是一个**恒为负的常数偏置**。因此：
+
+$$\mathbb{E}[\log r_t] = -\frac{\|\delta\|^2}{2\sigma_t^2} < 0$$
+
+**1. 为什么偏差一定是负向的？**
+由于 $\|\delta\|^2 \geq 0$，这个偏置**永远是负的**——这是高斯分布的固有数学性质，与策略更新的方向无关。只要 $\theta \neq \theta_\text{old}$（即策略发生了任何更新），$\log r_t$ 的均值就必然小于 0。虽然理论上 $\mathbb{E}[r_t] = 1$（对数正态分布的性质），但在图像 latent 的高维空间中（维度 $d \sim 16 \times 64 \times 64 = 65536$），$\|\delta\|^2$ 与 $d$ 成正比，导致 $\log r_t$ 的分布极度右偏：绝大多数样本的 $r_t \ll 1$，仅有极少数样本 $r_t \gg 1$ 来拉平均值。在有限样本下，这些极端值几乎观测不到，因此经验均值始终远低于 1。
+
+**2. 为什么低噪声步方差小、高噪声步方差大？**
+$\log r_t$ 的方差为 $\text{Var}[\log r_t] = \frac{\|\delta\|^2}{\sigma_t^2}$。在低噪声步（$\sigma_t$ 小），高斯分布 $\mathcal{N}(\mu_{\theta_\text{old}}, \sigma_t^2 I)$ 非常"尖锐"，样本 $x_{t+1}$ 紧紧聚拢在均值附近。虽然 log-ratio 的波动范围大，但由于偏置项 $-\|\delta\|^2/(2\sigma_t^2)$ 也极大，几乎所有样本都被压到了 $r_t \approx 0$ 的位置——方差自然极小（大家都挤在零附近）。相反，在高噪声步（$\sigma_t$ 大），高斯分布宽而平坦，偏置项较小，样本的 $r_t$ 在 1 附近分散得更开，方差更大。
+{% endnote %}
+
+这种偏差使得 PPO 的 clipping 区间 $[1-\varepsilon, 1+\varepsilon]$ 变得**不对称**。由于绝大多数样本的 $r_t$ 远小于 1，正样本（高奖励的好图）的 ratio 反而更容易落在 clipping 区间内部（不被截断），导致正样本的梯度更新不受约束，策略模型不断向这些样本偏移。
+
+{% note warning no-icon %}
+**为什么向"好图"方向偏移，图像质量反而会下降？**
+
+这是经典的**古德哈特定律（Goodhart's Law）**："当一个度量成为了目标，它就不再是一个好的度量。"
+
+GRPO 训练中的"正样本"（好图）是由**代理奖励模型**（如 PickScore）定义的，而非真实的人类偏好。PickScore 本质上是一个有限能力的神经网络，它对"好图"的判断存在系统性的盲点和偏见（例如对某些纹理模式的虚假偏好）。当策略模型被过度优化后，它学会了**精准利用奖励模型的这些弱点**——生成那些"PickScore 认为很好，但人类觉得不对"的图像。
+
+因此，**代理分数（proxy score）持续上升**（模型越来越擅长"取悦" PickScore），但**真实质量（gold score）不断下降**（人类评估者认为图像质量在退化）。这就是隐式过优化（Implicit Over-Optimization）的本质。
+{% endnote %}
+
+## 解决方案：RatioNorm + Gradient Reweight
+
+GRPO-Guard 提出了两个互补的机制：
+
+### 1. RatioNorm（比率归一化）
+
+RatioNorm 的目标是纠正 importance ratio 的分布偏差，使其均值回归到 1、方差在不同步之间保持一致。
+
+具体做法是引入一个时间步相关的缩放因子 $c_t = \sqrt{\Delta t} \cdot \sigma_t$（其中 $\Delta t$ 是步长，$\sigma_t$ 是噪声标准差），并用它来重新缩放 log-ratio：
+
+$$\hat{r}_t = \exp\left[({\log \pi_\theta - \log \pi_{\theta_\text{old}}}) \cdot c_t + \frac{\|\mu_\theta - \mu_{\theta_\text{old}}\|^2}{2 c_t}\right]$$
+
+其中 $\mu_\theta$ 和 $\mu_{\theta_\text{old}}$ 分别是当前策略和旧策略预测的去噪均值。第二项 $\frac{\|\mu_\theta - \mu_{\theta_\text{old}}\|^2}{2c_t}$ 用于补偿均值偏移导致的 ratio 下降。
+
+经过 RatioNorm 校正后，importance ratio 的分布在所有时间步上都以 1 为中心，PPO 的 clipping 机制重新恢复了对称性。
+
+### 2. Gradient Reweight（梯度重加权）
+
+即使 RatioNorm 校正了 ratio 的分布，不同时间步对总 loss 的梯度贡献仍然不均衡。Gradient Reweight 对最终的 policy loss 进行时间步相关的重加权：
+
+$$\mathcal{L}_\text{Guard} = \frac{\mathcal{L}_\text{PPO}(\hat{r}_t)}{(\sqrt{\Delta t})^2}$$
+
+这使得每个时间步对总梯度的贡献大致相等，防止某些特定噪声水平下的过度优化。
+
+## 与 MixGRPO 的对比：哪个更好？
+
+GRPO-Guard 与 MixGRPO 都试图解决 Flow-GRPO 的过优化/Reward Hacking 问题，但它们解决的是**不同层面**的问题，严格来说不构成"谁更好"的竞争关系，而是互补关系。
+
+**切入点完全不同：**
+
+- **GRPO-Guard** 从**梯度端**入手：认为问题的根源是 SDE 使 importance ratio 的统计特性产生了偏差，导致 PPO clipping 失效。解决方法是 RatioNorm + Gradient Reweight。
+- **MixGRPO** 从**采样端**入手：认为问题的根源是标准 SDE 的高频伪影欺骗了奖励模型。解决方法是 CPS 采样（消除伪影）+ Hybrid Inference（推理时混合原始模型限制传播）+ 滑动窗口提升训练效率。
+
+**各自的优势领域：**
+
+- **抗过优化能力**：GRPO-Guard 是专门为此设计的。GRPO-Guard 论文的实验表明，在 SD3.5-M 上以 GenEval 为 proxy reward 训练 1860 步后，Flow-GRPO 的 Gold Score（三项真实指标 HPS-v2、ImageReward、UnifiedReward 的归一化均值）跌至 0.84（基线 = 1.00），而 GRPO-Guard 维持在 0.89（提升 +0.05）。在 Flux.1-dev 上，DanceGRPO 的 Gold Score 跌至 0.88，GRPO-Guard 则恢复到 1.02（甚至超过原始模型）。视觉上，Flow-GRPO 和 DanceGRPO 在训练后期会出现严重的水平/垂直条纹伪影、面部同质化和人体比例失调，而 GRPO-Guard 保持了正常的图像质量和多样性。
+- **训练效率**：MixGRPO 在这方面优势明显，通过 Mixed ODE-SDE + 滑动窗口机制将训练开销削减了约 50%，同时在 ImageReward 和 HPS-v2.1 等指标上超越了 Flow-GRPO 和 DanceGRPO。
+
+**GRPO-Guard 的局限**（论文自己承认的）：RatioNorm 只能修复 clipping 机制的失效问题，**无法消除奖励模型本身的固有缺陷**（proxy score 与 gold score 之间的 gap）。如果奖励模型本身就有系统性偏见，单纯修复 clipping 也无法完全阻止 reward hacking。彻底的解决方案是提升奖励模型本身的能力（如 RewardDance），但这会引入大量计算开销。
+
+**实际使用建议**：这两种方法并不互斥，可以组合使用。[Flow-Factory](https://github.com/X-GenGroup/Flow-Factory) 已经同时支持了两者，用户可以选择 `trainer_type: 'grpo-guard'` + `dynamics_type: 'CPS'`，将梯度端的 ratio 修正与采样端的伪影消除同时启用，理论上能获得最佳的抗过优化效果。
+
+---
+
 # 算法对比与开源生态
 
 | 维度 | Diffusion-DPO | DDPO (PPO) | Flow-GRPO |
@@ -572,5 +658,6 @@ $$
 > 1. Liu, Y., Wang, P., Shao, Z., ... & Hao, K. (2025). *Flow-GRPO: Training Flow Matching Models via Online RL*. arXiv:2505.05470.
 > 2. Black Forest Labs. (2024). *Flux.1 [dev]*. https://blackforestlabs.ai/
 > 3. [flow_grpo](https://github.com/yifan123/flow_grpo)
+> 4. Wang, J., et al. (2025). *GRPO-Guard: Mitigating Implicit Over-Optimization in Flow Matching via Regulated Clipping*. arXiv:2510.22319.
 
 > 下一篇：[笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践](/chengYi-xun/posts/56-dapo/)
