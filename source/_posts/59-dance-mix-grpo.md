@@ -357,230 +357,68 @@ MixGRPO 在 HunyuanVideo-1.5 的 T2V 任务上展现了更强的稳定性：Flow
 
 ---
 
-## Part III: 源码实现对比
+## Part III: 采样与训练循环的核心代码实现
 
-本节对比 DanceGRPO 与 Flow-GRPO/MixGRPO 的 SDE 单步更新函数。两者的代码形态差异显著，但可严格证明其数学等价性。
+在前一篇 [Flow-GRPO 笔记](/chengYi-xun/posts/55-flow-grpo/) 中，我们已经详细对比了 Flow-GRPO 与 DanceGRPO 在 **SDE 单步去噪（显式 Score vs 算子融合）**上的数学等价性与底层代码实现。
 
-### SDE 单步去噪（一）：DanceGRPO 的显式 Score 分解
+本节我们将重点聚焦于本篇涉及的三大创新机制的代码落地：**Flow-CPS 的单步采样**、**DanceGRPO 的随机抽样训练循环**，以及 **MixGRPO 的混合 ODE-SDE 窗口与加速**。
 
-来自 [DanceGRPO](https://github.com/ByteDance/DanceGRPO) 仓库 `fastvideo/train_grpo_flux.py`，函数 `flux_step`（所有训练脚本共用）：
+### 1. Flow-CPS 的单步采样实现
 
-```python
-def flux_step(model_output, latents, eta, sigmas, index, prev_sample, grpo, sde_solver):
-    sigma = sigmas[index]
-    dsigma = sigmas[index + 1] - sigma                     # < 0（去噪方向）
-    prev_sample_mean = latents + dsigma * model_output     # ODE 基础步进
-
-    pred_original_sample = latents - sigma * model_output  # Tweedie: x̂₀ = x_t − σv_θ
-
-    delta_t = sigma - sigmas[index + 1]                    # > 0
-    std_dev_t = eta * math.sqrt(delta_t)                   # 常数噪声设计
-
-    if sde_solver:
-        # 显式 Score：s(x_t) = −(x_t − x̂₀·(1−σ)) / σ²
-        score_estimate = -(latents - pred_original_sample * (1 - sigma)) / sigma**2
-        # Langevin 修正：μ += −½η²·s·Δσ
-        log_term = -0.5 * eta**2 * score_estimate
-        prev_sample_mean = prev_sample_mean + log_term * dsigma
-
-    if grpo and prev_sample is None:
-        prev_sample = prev_sample_mean + torch.randn_like(prev_sample_mean) * std_dev_t
-
-    if grpo:
-        log_prob = (
-            -((prev_sample.detach().float() - prev_sample_mean.float()) ** 2)
-                / (2 * std_dev_t**2)
-            - math.log(std_dev_t)
-            - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
-        )
-        log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-        return prev_sample, pred_original_sample, log_prob
-    else:
-        return prev_sample_mean, pred_original_sample
-```
-
-### SDE 单步去噪（二）：算子融合形式
-
-来自 [flow_grpo](https://github.com/yifan123/flow_grpo) 仓库 `flow_grpo/diffusers_patch/sd3_sde_with_logprob.py`，函数 `sde_step_with_logprob`。其中 `sde_type='sde'` 分支对应 Flow-GRPO 原始论文的算子融合均值；`sde_type='cps'` 分支是后续集成的 MixGRPO CPS 采样（[arXiv:2509.05952](https://arxiv.org/abs/2509.05952)）：
+如前文所述，Flow-CPS 利用待定系数法隐式保证了边缘分布的方差守恒，替代了依赖显式 Score 估算的标准 SDE。以下是开源仓库中集成的 CPS 采样分支代码：
 
 ```python
-def sde_step_with_logprob(self, model_output, timestep, sample, noise_level=0.7,
-                          prev_sample=None, generator=None, sde_type='sde'):
-    model_output = model_output.float()
-    sample = sample.float()
+def cps_step_with_logprob(model_output, timestep, sample, noise_level=0.8, prev_sample=None, generator=None):
+    # ── CPS (Coefficient-Preserving Sampling)：有界噪声，σ→1 时不爆炸 ──
+    # 噪声尺度：sin 映射保证 std_dev_t ∈ [0, σ_prev]（有上界，不爆方差）
+    std_dev_t = sigma_prev * math.sin(noise_level * math.pi / 2)
 
-    step_index = [self.index_for_timestep(t) for t in timestep]
-    prev_step_index = [step + 1 for step in step_index]
-    sigma = self.sigmas[step_index].view(-1, *([1] * (len(sample.shape) - 1)))
-    sigma_prev = self.sigmas[prev_step_index].view(-1, *([1] * (len(sample.shape) - 1)))
-    sigma_max = self.sigmas[1].item()
-    dt = sigma_prev - sigma  # < 0
+    # x̂_0 和噪声估计 ε̂（两个方向的"锚点"）
+    pred_original_sample = sample - sigma * model_output
+    noise_estimate = sample + model_output * (1 - sigma)  # ε̂ = x + v·(1-σ)
 
-    if sde_type == 'sde':
-        # 自适应噪声：g(σ) = √(σ/(1−σ)) · η
-        std_dev_t = torch.sqrt(
-            sigma / (1 - torch.where(sigma == 1, sigma_max, sigma))
-        ) * noise_level
+    # CPS 均值：在干净图和噪声之间做"系数保持"插值
+    # μ = (1-σ_prev)·x̂_0 + √(σ_prev² - std²)·ε̂
+    # 严格保证 μ 的范数不会因后续的噪声注入而膨胀
+    prev_sample_mean = (
+        pred_original_sample * (1 - sigma_prev)
+        + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
+    )
 
-        # 算子融合均值（无需显式 Score）
-        prev_sample_mean = (
-            sample * (1 + std_dev_t**2 / (2 * sigma) * dt)
-            + model_output * (1 + std_dev_t**2 * (1 - sigma) / (2 * sigma)) * dt
-        )
+    # CPS 采样：x_{next} = μ + std · ε
+    if prev_sample is None:
+        variance_noise = randn_tensor(model_output.shape, generator=generator)
+        prev_sample = prev_sample_mean + std_dev_t * variance_noise
 
-        if prev_sample is None:
-            variance_noise = randn_tensor(model_output.shape, generator=generator,
-                                          device=model_output.device, dtype=model_output.dtype)
-            prev_sample = prev_sample_mean + std_dev_t * torch.sqrt(-1 * dt) * variance_noise
-
-        log_prob = (
-            -((prev_sample.detach() - prev_sample_mean) ** 2)
-                / (2 * ((std_dev_t * torch.sqrt(-1 * dt))**2))
-            - torch.log(std_dev_t * torch.sqrt(-1 * dt))
-            - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
-        )
-
-    elif sde_type == 'cps':
-        # ── CPS (Coefficient-Preserving Sampling)：有界噪声，σ→1 时不爆炸 ──
-        # 与标准 SDE 的区别：噪声量 = σ_prev · sin(η·π/2)，永远 ≤ σ_prev
-        _noise_level = 0.8 if noise_level is None else noise_level
-        # 噪声尺度：sin 映射保证 std ∈ [0, σ_prev]（有上界，不爆方差）
-        std_dev_t = sigma_prev * math.sin(_noise_level * math.pi / 2)
-
-        # x̂_0 和噪声估计 ε̂（两个方向的"锚点"）
-        pred_original_sample = sample - sigma * model_output
-        noise_estimate = sample + model_output * (1 - sigma)  # ε̂ = x + v·(1-σ)
-
-        # CPS 均值：在干净图和噪声之间做"系数保持"插值
-        # μ = (1-σ_prev)·x̂_0 + √(σ_prev² - std²)·ε̂
-        # 保证 μ 的范数不会因噪声注入而膨胀
-        prev_sample_mean = (
-            pred_original_sample * (1 - sigma_prev)
-            + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
-        )
-
-        # CPS 采样：x_{next} = μ + std · ε
-        if prev_sample is None:
-            variance_noise = randn_tensor(model_output.shape, generator=generator,
-                                          device=model_output.device, dtype=model_output.dtype)
-            prev_sample = prev_sample_mean + std_dev_t * variance_noise
-
-        # CPS log_prob（简化形式：省略常数项，只保留 -(x-μ)² 信号）
-        log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
-
+    # CPS log_prob（简化形式：由于方差守恒，常数项被抵消，仅保留核心的高斯指数衰减信号）
+    log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
     log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+    
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 ```
 
-{% note info no-icon %}
-**关于 `log_prob.mean()` 的数学说明**：
-在上述两段代码的最后，都调用了 `log_prob.mean(...)` 对空间和通道维度求均值。严格来说，多元高斯的对数似然应是所有维度（设总维度为 $d$）对数概率的**求和**。代码中取均值，在数学上等价于将 Importance Ratio 从 $r_t = \exp(\Delta \log \pi_\text{sum})$ 变为了 $\hat{r}_t = \exp(\frac{1}{d} \Delta \log \pi_\text{sum}) = (r_t)^{1/d}$。
-这并非简单的 Loss 缩放！在图像的极高维空间中（$d \sim 65536$），严谨的 $\Delta \log \pi_\text{sum}$ 的绝对值会非常大，直接取指数会导致 $r_t$ 数值溢出或下溢为 0。通过取均值（即对概率比开 $d$ 次方），使得 $\hat{r}_t$ 能够保持在合理的数值范围内，从而让 PPO 的梯度能够正常反传。这是高维连续空间 RL 中不可或缺的工程处理。
-{% endnote %}
+### 2. DanceGRPO 的训练循环：随机抽样优化
 
-### 等价性证明：显式 Score ↔ 算子融合
-
-以下证明两种均值公式的数学等价性。为保证学术严谨性，本文将 $t \in [0,1]$ 严格作为连续时间变量，而将 $\sigma$ 定义为离散化采样时的调度节点。设当前状态为 $z_t$（对应离散节点 $\sigma$），模型预测速度场为 $v_\theta$。
-
-**起点**：DanceGRPO 的显式公式（设 $\Delta\sigma = \sigma_\text{next} - \sigma < 0$）
-
-$$\mu = \underbrace{(z_t + v_\theta \Delta\sigma)}_{\text{ODE 步}} + \underbrace{\left(-\frac{1}{2}\eta^2 \cdot \text{Score}\right) \cdot \Delta\sigma}_{\text{Langevin 修正}}$$
-
-**Step 1. 化简 Score Function**
-
-将 $\hat{x}_0 = z_t - \sigma v_\theta$ 代入基于高斯特威迪公式的 Score 估计：
-
-$$
-\begin{aligned}
-\nabla_{z_t}\log p_t &= -\frac{z_t - (1-\sigma)\hat{x}_0}{\sigma^2} = -\frac{z_t - (1-\sigma)(z_t - \sigma v_\theta)}{\sigma^2} \\[4pt]
-&= -\frac{\cancel{z_t} - \cancel{z_t} + \sigma z_t + \sigma(1-\sigma)v_\theta}{\sigma^2} = -\frac{z_t + (1-\sigma)v_\theta}{\sigma}
-\end{aligned}
-$$
-
-**Step 2. 代入自适应 $g^2$ 并展开**
-
-设 $g^2 = \frac{\sigma\eta^2}{1-\sigma}$（对应 `std_dev_t² = sigma * noise_level² / (1-sigma)`），则 Langevin 系数为 $\frac{g^2}{2\sigma} = \frac{\eta^2}{2(1-\sigma)}$。代入 $\mu$：
-
-$$
-\begin{aligned}
-\mu &= z_t + v_\theta\Delta\sigma + \frac{\eta^2}{2(1-\sigma)}\bigl(z_t + (1-\sigma)v_\theta\bigr)\Delta\sigma \\[4pt]
-&= z_t + v_\theta\Delta\sigma + \frac{\eta^2}{2(1-\sigma)}z_t\,\Delta\sigma + \frac{\eta^2}{2}v_\theta\,\Delta\sigma
-\end{aligned}
-$$
-
-**Step 3. 合并同类项**
-
-$$
-\mu = z_t \left(1 + \frac{\eta^2}{2(1-\sigma)}\Delta\sigma\right) + v_\theta \left(1 + \frac{\eta^2}{2}\right)\Delta\sigma
-$$
-
-通过对比代码 `sde_step_with_logprob`，我们可以清晰地看到上述代数项与底层 CUDA Kernel 标量乘加逻辑的**字节级对应**：
-- 提取 $z_t$ 的系数：$1 + \frac{\eta^2}{2(1-\sigma)}\Delta\sigma$，这精确对应了代码中的 `1 + std_dev_t**2 / (2 * sigma) * dt`。
-- 提取 $v_\theta$ 的系数：$(1 + \frac{\eta^2}{2})\Delta\sigma$，这精确对应了代码中的 `(1 + std_dev_t**2 * (1 - sigma) / (2 * sigma)) * dt`。
-
-验证系数回代：$\frac{\text{std\_dev\_t}^2}{2\sigma} = \frac{\sigma\eta^2/(1-\sigma)}{2\sigma} = \frac{\eta^2}{2(1-\sigma)}$ ✓；$\frac{\text{std\_dev\_t}^2(1-\sigma)}{2\sigma} = \frac{\sigma\eta^2}{2\sigma} = \frac{\eta^2}{2}$ ✓。$\blacksquare$
-
-{% note warning no-icon %}
-**工程差异对照**
-
-| 维度 | DanceGRPO `flux_step` | MixGRPO `flow_grpo_step` / flow_grpo 仓库 `sde_step_with_logprob` |
-|:---|:---|:---|
-| **均值公式** | 显式：pred_x₀ → Score → Langevin 修正 | 融合：标量系数 × (z_t, v_θ) 线性组合 |
-| **噪声强度** | 常数 `η·√Δt` | 自适应 `√(σ/(1-σ))·η` |
-| **数值稳定性** | 分母含 σ²，σ→0 时奇异 | `torch.where` 条件替换，σ→1 时保护 |
-| **CPS 分支** | 无（原始论文） | 有（MixGRPO 引入，源自 CPS 论文 arXiv:2509.05952） |
-| **计算开销** | 3 个中间 tensor | 标量乘加，可融合为单 kernel（消除 $\sigma \to 0$ 奇异点，并减少 Memory-Bound 读写） |
-| **SDE 分支数学等价性** | ✓ | ✓ |
-{% endnote %}
-
-### DanceGRPO 的采样循环：全轨迹 SDE
-
-DanceGRPO 在采样时对**每一步都调用 SDE**（来自 `fastvideo/train_grpo_hunyuan.py`）：
+DanceGRPO 在采样阶段生成了完整的 $T$ 步轨迹，但在 PPO 训练截断，为了优化极端的显存占用，它对时间步进行了打乱和随机截断采样（截取比例 $\tau$）：
 
 ```python
-def run_sample_step(args, z, progress_bar, sigma_schedule, transformer, ...):
-    all_latents = [z]
-    all_log_probs = []
-
-    for i in progress_bar:  # 遍历所有 T 步
-        model_pred = transformer(hidden_states=z, timestep=timesteps, ...)
-
-        # 关键：sde_solver=True，对每一步都注入噪声并记录 log_prob
-        z, pred_original, log_prob = flux_step(
-            model_pred, z, args.eta, sigma_schedule, i,
-            prev_sample=None, grpo=True, sde_solver=True
-        )
-
-        all_latents.append(z)
-        all_log_probs.append(log_prob)
-
-    return z, latents, torch.stack(all_latents, dim=1), torch.stack(all_log_probs, dim=1)
-```
-
-### DanceGRPO 的训练循环：随机抽样优化
-
-```python
-# ① 随机打乱时间步索引
+# ① 随机打乱时间步索引 (打破相邻时间步的梯度相关性)
 perms = torch.stack([torch.randperm(T) for _ in range(batch_size)]).to(device)
 for key in ["timesteps", "latents", "next_latents", "log_probs"]:
     samples[key] = samples[key][torch.arange(batch_size)[:, None], perms]
 
-# ② 只取前 K 步训练
+# ② 只取前 K 步训练 (缓解 OOM)
 train_timesteps = int(T * args.timestep_fraction)  # 默认 0.6
 
 for i, sample in enumerate(samples_batched_list):
     for t in range(train_timesteps):
         # 用当前策略重新计算 log_prob
-        new_log_probs = grpo_one_step(
-            args, sample["latents"][:, t], sample["next_latents"][:, t],
-            encoder_hidden_states, encoder_attention_mask,
-            transformer, sample["timesteps"][:, t], perms[i][t], sigma_schedule
-        )
+        new_log_probs = grpo_one_step(...)
 
         # 重要性比率
         ratio = torch.exp(new_log_probs - sample["log_probs"][:, t])
 
-        # 分维度 PPO clip loss（视频任务特有）
+        # 分维度 PPO clip loss（视频任务特有的 VQ 和 MQ 独立裁剪）
         vq_loss = torch.mean(torch.maximum(
             -vq_advantages * ratio,
             -vq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
@@ -591,14 +429,14 @@ for i, sample in enumerate(samples_batched_list):
             -mq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
         )) / (gradient_accumulation_steps * train_timesteps)
 
-        # 加权组合并反传（每步独立 backward，释放计算图）
+        # 加权组合并反传（关键：每步独立 backward，立刻释放计算图，极致省显存！）
         final_loss = vq_coef * vq_loss + mq_coef * mq_loss
         final_loss.backward()
 ```
 
-### MixGRPO 的采样循环：混合 ODE-SDE
+### 3. MixGRPO 的采样循环：混合 ODE-SDE
 
-MixGRPO 的关键差异在于**根据窗口位置选择性地启用 SDE**。其底层调用的是 `sde_step_with_logprob`（算子融合版本），而非 DanceGRPO 的 `flux_step`：
+MixGRPO 的核心创新在于**根据滑动窗口位置选择性地启用 SDE**。只有在窗口内才调用带噪声的 SDE 步，窗口外全部使用纯确定性的 ODE 步：
 
 ```python
 class GRPOStates:
@@ -608,53 +446,45 @@ class GRPOStates:
     def update_iteration(self):
         self.current_iteration += 1
         if self.current_iteration % self.iters_per_group == 0:
+            # 随训练进程，窗口向高 SNR（低噪声）区域滑动
             self.left = min(self.left + self.stride, self.total_steps - self.group_size)
 
 current_window = grpo_states.get_current_timesteps()
+
 for i in range(total_steps):
     deterministic = (i not in current_window)
 
     if deterministic:
-        # ODE：纯 Euler 步进，无噪声
+        # 窗口外：ODE 纯 Euler 步进，无随机噪声注入
         prev_sample = sample + dt * model_output
     else:
-        # SDE：调用 sde_step_with_logprob（自适应噪声 + 算子融合均值）
+        # 窗口内：SDE 步进（注入噪声，支持标准 sde 或 cps）
         prev_sample, log_prob, prev_sample_mean, std_dev_t = sde_step_with_logprob(
             scheduler, model_output, timestep, sample,
             noise_level=args.noise_level, sde_type=args.sde_type
         )
 ```
 
-### MixGRPO-Flash：DPM-Solver++ 加速 ODE 段
+### 4. MixGRPO-Flash：DPM-Solver++ 加速 ODE 段
 
-窗口后面的 ODE 步可以用高阶求解器压缩：
+MixGRPO-Flash 进一步利用高阶求解器对**窗口后面的 ODE 步**进行了加速压缩：
 
 ```python
-# 判断当前步是否在窗口后、应用 DPM-Solver++ 加速
+# 判断当前步是否在窗口后，并应用 DPM-Solver++ 加速
 if dpm_apply_strategy == "post" and i >= window_end:
     # 二阶 DPM-Solver++ 多步法
-    # 需要至少两个历史 x̂₀ 预测值
-    x0_pred_current = latents - sigma * model_output  # 当前 x̂₀
+    # 需要利用至少两个历史 x̂₀ 的预测值进行高阶多项式插值
+    x0_pred_current = latents - sigma * model_output  # 当前时刻的 x̂₀
+    
+    # 结合上一时刻的 x0_pred_prev 和更早的 x0_pred_prev2 计算高阶修正项 D
     D = (1 + h_i/(2*h_prev)) * x0_pred_prev - (h_i/(2*h_prev)) * x0_pred_prev2
+    
+    # 大步长跨越，计算下一步的 latent
     next_latent = (sigma_next/sigma) * latents - (1-sigma_next) * (exp(-h_i)-1) * D
 else:
-    # 常规一阶 Euler 步进
+    # 窗口内 (SDE) 或窗口前 (ODE)：只能使用常规的一阶 Euler 步进
     next_latent = latents + dsigma * model_output
 ```
-
-### 三者的核心差异汇总
-
-| 代码层面 | Flow-GRPO | DanceGRPO | MixGRPO |
-|:---|:---|:---|:---|
-| **核心函数** | `sde_step_with_logprob`（算子融合） | `flux_step`（显式 Score） | `flow_grpo_step`（算子融合） + `dance_grpo_step`（显式 Score） |
-| **SDE 均值公式** | $z_t(1+\frac{g^2}{2\sigma}dt) + v_\theta(1+\frac{g^2(1-\sigma)}{2\sigma})dt$ | $\mu_\text{ODE} - \frac{1}{2}\eta^2 \cdot \text{Score} \cdot d\sigma$ | 同 Flow-GRPO |
-| **噪声设计** | 自适应 $\sqrt{\sigma/(1-\sigma)}\cdot\eta$ | 常数 $\eta\sqrt{\Delta t}$ | 自适应（同 Flow-GRPO） |
-| **CPS 采样** | 原始论文无；代码仓库后续集成 | 无 | **首次引入**（源自 CPS 论文 arXiv:2509.05952） |
-| **采样时 SDE** | 全部 $T$ 步 | 全部 $T$ 步 | 仅窗口内 $w$ 步 |
-| **训练步选择** | 全部 $T$ 步 | `randperm` + `timestep_fraction` | 窗口内 $w$ 步 |
-| **初始噪声** | 不同 | 相同（`use_same_noise`） | 相同 |
-| **高阶求解器** | 无 | 无 | 窗口后 DPM-Solver++ |
-| **数值稳定性** | `torch.where` 防护 | 无保护（σ→0 风险） | `torch.where` 防护 |
 
 ---
 
