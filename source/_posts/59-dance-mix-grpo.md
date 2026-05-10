@@ -23,7 +23,7 @@ series: Diffusion Models theory
 >
 > 论文：
 > - [DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（ByteDance, 2025）
-> - [MixGRPO: Unlocking Flow-based GRPO Efficiency with Mixed ODE-SDE](https://arxiv.org/abs/2507.21802)（Tencent Hunyuan, 2026）
+> - [MixGRPO: Unlocking Flow-based GRPO Efficiency with Mixed ODE-SDE](https://arxiv.org/abs/2507.21802)（Tencent Hunyuan, 2025）
 
 ---
 
@@ -283,7 +283,9 @@ MixGRPO 将 DPM-Solver++ 适配到了 Flow Matching 框架中。简单来说，D
 2. **早期探索的决定性作用（粗到细的生成直觉）**：在生成模型中，去噪是一个“粗到细（Coarse-to-Fine）”的过程。在低 SNR 阶段（纯噪声附近），模型每一步去噪都在注入巨大的“语义信息量”（决定画面主体是猫还是狗）；而在高 SNR 阶段，模型注入的主要是“高频纹理信息”。因为代理奖励模型（如 ImageReward）对核心语义和全局构图更敏感，所以将 SDE 探索（RL 优化的计算力）全部集中在早期（低 SNR），而在后期使用高阶 ODE 快速滑过，是信息论视角下的最优算力分配。只要在开头几步（窗口内）做好了 SDE 探索和优化，即使后面全用确定性加速跳过，依然能拿到极高的 RM 分数（1.624）。
 3. **权衡**：MixGRPO-Flash 在 HPS-v2.1 上略高一点（0.362 vs 0.357），说明滑动窗口确实对某些细节指标有帮助。但综合考虑巨大的时间收益和 ImageReward 的显著提升，MixGRPO-Flash\* 是性价比最高的选择。
 
-### 关键贡献四：CPS 采样替代标准 SDE
+### 补充发展：Flow-CPS 采样替代标准 SDE
+
+在 MixGRPO 提出后不久，另一篇独立工作 **Flow-CPS (arXiv:2509.05952)** 专门针对标准 SDE 采样的伪影问题提出了 **Coefficients-Preserving Sampling (CPS，系数保持采样)**。这一技术由于效果极佳，随后被快速集成到了 MixGRPO 等各大开源代码库中。
 
 从直觉上看，CPS 公式与之前的 SDE 似乎都在路径上注入了噪声 $\epsilon_i$（以提供 RL 所需的探索空间）。但两者的核心差异在于：**在注入噪声后，如何保证生成轨迹的概率分布不被破坏？**
 
@@ -305,7 +307,7 @@ MixGRPO 将 DPM-Solver++ 适配到了 Flow Matching 框架中。简单来说，D
    {% endnote %}
 
 2.    **CPS 的做法（系数守恒，重新分配）**：
-   MixGRPO 引入的 **Coefficients-Preserving Sampling (CPS，系数保持采样)** 借鉴了 DDIM 的核心思想（**待定系数法**）。正如 DDIM 在 Diffusion 中通过待定系数法（令 $x_{t-1} = \lambda x_0 + k x_t + \sigma \epsilon$）来严格保证边缘分布一致，CPS 也在 Flow Matching 中使用了同样的思路：它**绕开了误差极大的显式 Score 估算（Tweedie 近似）**，转而通过待定系数法在代数层面隐式地实现了对分布发散的修正。它严格解出了在注入噪声 $\sigma_{t_i}\epsilon_i$ 时，图像信号 $x_{t_i}$ 和速度场 $v_{t_i}$ 应该缩小的精确比例。
+   **Flow-CPS** 提出的系数保持采样借鉴了 DDIM 的核心思想（**待定系数法**）。正如 DDIM 在 Diffusion 中通过待定系数法（令 $x_{t-1} = \lambda x_0 + k x_t + \sigma \epsilon$）来严格保证边缘分布一致，CPS 也在 Flow Matching 中使用了同样的思路：它**绕开了误差极大的显式 Score 估算（Tweedie 近似）**，转而通过待定系数法在代数层面隐式地实现了对分布发散的修正。它严格解出了在注入噪声 $\sigma_{t_i}\epsilon_i$ 时，图像信号 $x_{t_i}$ 和速度场 $v_{t_i}$ 应该缩小的精确比例。
 
    **CPS 的待定系数法推导过程：**
    
@@ -699,7 +701,7 @@ else:
 > 参考资料：
 >
 > 1. Xue, Z., et al. (2025). *DanceGRPO: Unleashing GRPO on Visual Generation*. arXiv:2505.07818.
-> 2. Li, J., et al. (2026). *MixGRPO: Unlocking Flow-based GRPO Efficiency with Mixed ODE-SDE*. arXiv:2507.21802.
+> 2. Li, J., et al. (2025). *MixGRPO: Unlocking Flow-based GRPO Efficiency with Mixed ODE-SDE*. arXiv:2507.21802.
 > 3. Liu, J., et al. (2025). *Flow-GRPO: Training Flow Matching Models via Online RL*. arXiv:2505.05470.
 > 4. Wang, F., Yu, Z. (2025). *Coefficients-Preserving Sampling for RL with Flow Matching*. arXiv:2509.05952.
 > 5. *DenseGRPO: From Sparse to Dense Reward for Flow Matching Model Alignment*. arXiv:2601.20218.
