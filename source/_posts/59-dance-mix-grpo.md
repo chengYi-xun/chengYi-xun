@@ -441,19 +441,31 @@ def sde_step_with_logprob(self, model_output, timestep, sample, noise_level=0.7,
         )
 
     elif sde_type == 'cps':
-        std_dev_t = sigma_prev * math.sin(noise_level * math.pi / 2)
+        # ── CPS (Coefficient-Preserving Sampling)：有界噪声，σ→1 时不爆炸 ──
+        # 与标准 SDE 的区别：噪声量 = σ_prev · sin(η·π/2)，永远 ≤ σ_prev
+        _noise_level = 0.8 if noise_level is None else noise_level
+        # 噪声尺度：sin 映射保证 std ∈ [0, σ_prev]（有上界，不爆方差）
+        std_dev_t = sigma_prev * math.sin(_noise_level * math.pi / 2)
+
+        # x̂_0 和噪声估计 ε̂（两个方向的"锚点"）
         pred_original_sample = sample - sigma * model_output
-        noise_estimate = sample + model_output * (1 - sigma)
+        noise_estimate = sample + model_output * (1 - sigma)  # ε̂ = x + v·(1-σ)
+
+        # CPS 均值：在干净图和噪声之间做"系数保持"插值
+        # μ = (1-σ_prev)·x̂_0 + √(σ_prev² - std²)·ε̂
+        # 保证 μ 的范数不会因噪声注入而膨胀
         prev_sample_mean = (
             pred_original_sample * (1 - sigma_prev)
             + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
         )
 
+        # CPS 采样：x_{next} = μ + std · ε
         if prev_sample is None:
             variance_noise = randn_tensor(model_output.shape, generator=generator,
                                           device=model_output.device, dtype=model_output.dtype)
             prev_sample = prev_sample_mean + std_dev_t * variance_noise
 
+        # CPS log_prob（简化形式：省略常数项，只保留 -(x-μ)² 信号）
         log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
 
     log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
