@@ -214,7 +214,7 @@ for episode in range(num_episodes):
 >
 > [上一篇](/chengYi-xun/posts/51-rl-basics/)推导出的策略梯度定理包含 $\gamma^t$ 因子——$\nabla J_\gamma = \mathbb{E}[\sum_t \gamma^t \nabla \log \pi \cdot Q]$，但代码里用的是 $\sum_t \nabla \log \pi \cdot G_t$（没有 $\gamma^t$）。这并非疏忽，而是 RL 领域**一个已知的"理论 vs 实践"缺口**：
 >
-> - **Nota & Thomas (2020) ["Is the Policy Gradient a Gradient?"](https://all.cs.umass.edu/pubs/2020/Nota%20and%20Thomas%20-%20Is%20the%20Policy%20Gradient%20a%20Gradient.pdf)** 严格证明了：丢掉 $\gamma^t$ 后的更新方向 $\nabla J^? = \mathbb{E}[\sum_t \nabla \log \pi \cdot Q]$ **不是任何目标函数的梯度**——它不对应任何明确的优化目标。
+> - **Nota & Thomas (2020) ["Is the Policy Gradient a Gradient?"](https://all.cs.umass.edu/pubs/2020/Nota%20and%20Thomas%20-%20Is%20the%20Policy%20Gradient%20a%20Gradient.pdf)** 严格证明了：丢掉 $\gamma^t$ 后，大家实际使用的更新方向**不对应任何明确的优化目标**。打个比方：梯度上升就像"沿山坡最陡方向往上爬"，只要你爬的是一座真实的山（某个目标函数 $J$），就一定能到达山顶（局部最优）。但丢掉 $\gamma^t$ 后的方向就像"一组看似上坡却拼不出任何连贯地形的箭头"——你沿着走通常也能走到高处，但理论上不保证。Nota & Thomas 甚至构造了一个反例，在某个 MDP 中，沿这个方向走最终收敛到了全局最差策略。
 > - 但几乎**所有**主流实现（[Spinning Up](https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html)、[CleanRL](https://github.com/vwxyzjn/cleanrl)、[PyTorch 示例](https://github.com/pytorch/examples/blob/main/reinforcement_learning/reinforce.py)、stable-baselines 中的 A2C/PPO/TRPO/SAC/TD3）都这样做。Nota & Thomas 调查了这些实现，确认**全部丢掉了 $\gamma^t$**。
 > - **实际原因**：保留 $\gamma^t$ 会让后期决策的梯度信号指数衰减（$\gamma=0.99, t=100$ 时 $\gamma^{100} \approx 0.37$），严重拖慢对后期决策的学习。丢掉它虽然理论上不严格，但让每个时间步都有平等的学习机会，实践中效果更好。
 > - **研究仍在继续**：[Che et al. (ICML 2023)](https://proceedings.mlr.press/v202/che23a.html) 提出了修正方案来缓解这个 discount-factor mismatch。
