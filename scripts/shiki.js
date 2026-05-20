@@ -8,17 +8,15 @@ const lightTheme = (config.themes && config.themes.light) || config.theme || 'on
 const darkTheme = (config.themes && config.themes.dark) || null;
 const allThemes = darkTheme ? [lightTheme, darkTheme] : [lightTheme];
 
-const highlighter = await shiki.createHighlighter({
-  themes: allThemes,
-  langs: Array.isArray(config.langs) ? config.langs : Object.keys(shiki.bundledLanguages),
-  langAlias: config.lang_alias || undefined,
-});
-
+let highlighter = null;
 const missingLanguages = new Set();
 
 hexo.extend.highlight.register(
   'shiki',
   (code, options) => {
+    if (!highlighter) {
+      return `<pre><code>${escapeHTML(code)}</code></pre>`;
+    }
     try {
       let themeOpts;
       if (darkTheme) {
@@ -51,6 +49,14 @@ hexo.extend.highlight.register(
     }
   },
 );
+
+hexo.extend.filter.register('after_init', async () => {
+  highlighter = await shiki.createHighlighter({
+    themes: allThemes,
+    langs: Array.isArray(config.langs) ? config.langs : Object.keys(shiki.bundledLanguages),
+    langAlias: config.lang_alias || undefined,
+  });
+});
 
 if (enabled) {
   hexo.extend.filter.register('before_exit', () => {

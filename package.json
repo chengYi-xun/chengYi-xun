@@ -28,6 +28,6 @@
     "hexo-server": "^2.0.0",
     "hexo-tag-aplayer": "^3.0.4",
     "hexo-util": "^4.0.0",
-    "shiki": "^4.0.2"
+    "shiki": "^4.1.0"
   }
 }
