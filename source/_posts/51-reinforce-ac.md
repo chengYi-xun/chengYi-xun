@@ -202,7 +202,9 @@ for episode in range(num_episodes):
     # 对应公式: loss = −Σ_t log π_θ(a_t|s_t) · G_t
     # 最小化此 loss ⟺ 沿 Σ_t ∇_θ log π · G_t 方向做梯度上升
     policy_loss = 0
-    for (log_prob, _), G_t in zip(trajectory, returns):
+    for t in range(len(trajectory)):
+        log_prob = trajectory[t][0]                   # 第 t 步的 log π_θ(a_t|s_t)
+        G_t = returns[t]                              # 第 t 步的累积回报
         policy_loss += -log_prob * G_t                # 每个时间步的梯度贡献
 
     optimizer.zero_grad()
@@ -308,7 +310,11 @@ for episode in range(num_episodes):
 
     policy_loss = 0  # Actor 损失
     value_loss = 0   # Critic 损失
-    for (log_prob, _, value), G_t in zip(trajectory, returns):
+    for t in range(len(trajectory)):
+        log_prob = trajectory[t][0]                   # log π_θ(a_t|s_t)
+        value    = trajectory[t][2]                   # V_φ(s_t)
+        G_t      = returns[t]                         # 蒙特卡洛回报
+
         # 优势估计: A_t ≈ G_t − V_φ(s_t)
         # detach(): 阻止 policy_loss 的梯度流入 Critic 参数 φ
         advantage = G_t - value.detach()
