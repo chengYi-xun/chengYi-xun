@@ -18,7 +18,7 @@ series: Diffusion Models theory
 >
 > ➡️ 下一篇：[笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)](/chengYi-xun/posts/52-trpo-ppo/)
 
-在[上一篇](/chengYi-xun/posts/51-rl-basics/)中，我们通过策略梯度定理推导出了梯度公式 $\nabla_\theta J(\theta) = \mathbb{E}[\nabla_\theta \log \pi \cdot Q]$，并证明了为什么梯度中会出现 $\log$ 概率。
+在[上一篇](/chengYi-xun/posts/51-rl-basics/)中，我们通过策略梯度定理推导出了梯度公式 $\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_t \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot Q^{\pi_\theta}(s_t, a_t)\right]$，并证明了为什么梯度中会出现 $\log$ 概率。
 
 # 从 REINFORCE 到 Actor-Critic：算法的演进
 
@@ -197,6 +197,15 @@ for episode in range(num_episodes):
     policy_loss.backward()                           # 反传: ∂loss/∂θ = −Σ G_t · ∂log π/∂θ
     optimizer.step()                                 # θ ← θ - α·∂loss/∂θ = θ + α·Σ G_t·∇log π
 ```
+
+> **代码中为什么省略了 $\gamma^t$？**
+>
+> [上一篇](/chengYi-xun/posts/51-rl-basics/)推导出的策略梯度定理包含 $\gamma^t$ 因子——$\nabla J_\gamma = \mathbb{E}[\sum_t \gamma^t \nabla \log \pi \cdot Q]$，但代码里用的是 $\sum_t \nabla \log \pi \cdot G_t$（没有 $\gamma^t$）。这并非疏忽，而是 RL 领域**一个已知的"理论 vs 实践"缺口**：
+>
+> - **Nota & Thomas (2020) ["Is the Policy Gradient a Gradient?"](https://all.cs.umass.edu/pubs/2020/Nota%20and%20Thomas%20-%20Is%20the%20Policy%20Gradient%20a%20Gradient.pdf)** 严格证明了：丢掉 $\gamma^t$ 后的更新方向 $\nabla J^? = \mathbb{E}[\sum_t \nabla \log \pi \cdot Q]$ **不是任何目标函数的梯度**——它不对应任何明确的优化目标。
+> - 但几乎**所有**主流实现（[Spinning Up](https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html)、[CleanRL](https://github.com/vwxyzjn/cleanrl)、[PyTorch 示例](https://github.com/pytorch/examples/blob/main/reinforcement_learning/reinforce.py)、stable-baselines 中的 A2C/PPO/TRPO/SAC/TD3）都这样做。Nota & Thomas 调查了这些实现，确认**全部丢掉了 $\gamma^t$**。
+> - **实际原因**：保留 $\gamma^t$ 会让后期决策的梯度信号指数衰减（$\gamma=0.99, t=100$ 时 $\gamma^{100} \approx 0.37$），严重拖慢对后期决策的学习。丢掉它虽然理论上不严格，但让每个时间步都有平等的学习机会，实践中效果更好。
+> - **研究仍在继续**：[Che et al. (ICML 2023)](https://proceedings.mlr.press/v202/che23a.html) 提出了修正方案来缓解这个 discount-factor mismatch。
 
 ## 2. 引入基线 (REINFORCE with Baseline)
 
