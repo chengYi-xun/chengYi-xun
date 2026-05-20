@@ -28,7 +28,7 @@ mathjax: true
 
 DreamerV3 换了一种思路：**先学一个环境的"脑内模型"，然后在脑子里大量练习**。它是首个在**不使用人类示范、不依赖自适应课程**的前提下，从零开始在 Minecraft 中稳定采到钻石的算法；更惊人的是，它与 Atari、DeepMind Control Suite 等完全不同的域共用**同一套默认超参数**（Hafner et al., Nature 2025 / arXiv:2301.04104）。
 
-本文将拆解 Dreamer 系列的三代演进，解释每一代解决了什么问题、为什么这样设计、核心代码如何实现。如果你读过[上一篇的强化学习基础](/chengYi-xun/posts/51-rl-basics/)，你已经知道 Actor-Critic 和 $\lambda$-return；Dreamer 的核心贡献在于**Actor-Critic 不在真实环境中训练，而是在学到的世界模型中"想象"着训练**。
+本文将拆解 Dreamer 系列的三代演进，解释每一代解决了什么问题、为什么这样设计、核心代码如何实现。如果你读过强化学习基础（[理论篇](/chengYi-xun/posts/51-rl-basics/)和[算法篇](/chengYi-xun/posts/51-reinforce-ac/)），你已经知道 Actor-Critic 和 $\lambda$-return；Dreamer 的核心贡献在于**Actor-Critic 不在真实环境中训练，而是在学到的世界模型中"想象"着训练**。
 
 ## 1. RSSM：Dreamer 的心脏
 
@@ -113,7 +113,7 @@ $$
 
 ### 2.1 核心思想：为什么不在真实环境中训练策略？
 
-在[上一篇 RL 基础](/chengYi-xun/posts/51-rl-basics/)中，我们介绍了 Actor-Critic 架构——Actor 选动作，Critic 评价好坏，两者交替改进。但传统的 Actor-Critic（包括 PPO）有一个根本性的瓶颈：**每一步策略梯度都需要与真实环境交互**。
+在[RL 基础·算法篇](/chengYi-xun/posts/51-reinforce-ac/)中，我们介绍了 Actor-Critic 架构——Actor 选动作，Critic 评价好坏，两者交替改进。但传统的 Actor-Critic（包括 PPO）有一个根本性的瓶颈：**每一步策略梯度都需要与真实环境交互**。
 
 在 Atari 游戏中，一次交互就是渲染一帧画面 + 执行一步动作 + 返回奖励，速度还能接受。但在 Minecraft 或真实机器人上，一次交互可能耗时数秒甚至数分钟。训练 PPO 需要几百万步交互——在真实世界中这意味着几千小时的机器人运行时间。
 
@@ -147,7 +147,7 @@ $$
 \max_\psi \sum_{t=1}^{H} V_\xi(h_t, z_t)
 $$
 
-其中 $V_\xi$ 是在想象轨迹上训练的 Critic 网络，采用 $\lambda$-return（与[上一篇 GAE](/chengYi-xun/posts/51-rl-basics/) 的思想一致，$\lambda$ 在 TD 偏差和蒙特卡洛方差之间权衡）：
+其中 $V_\xi$ 是在想象轨迹上训练的 Critic 网络，采用 $\lambda$-return（与[GAE 章节](/chengYi-xun/posts/51-reinforce-ac/#广义优势估计（GAE）：蒙特卡洛与-TD-的统一框架) 的思想一致，$\lambda$ 在 TD 偏差和蒙特卡洛方差之间权衡）：
 
 $$
 V_t^\lambda = r_t + \gamma \left[(1-\lambda) V_\xi(s_{t+1}) + \lambda V_{t+1}^\lambda\right]

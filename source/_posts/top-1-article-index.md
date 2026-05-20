@@ -46,6 +46,7 @@ tags:
 ## 强化学习
 
 51. [笔记｜强化学习（一）：强化学习基础与策略梯度](../51-rl-basics)
+    - [笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic](../51-reinforce-ac)
 52. [笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)](../52-trpo-ppo)
 53. [笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](../53-dpo)
 54. [笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解](../54-grpo)

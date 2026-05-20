@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 本文为系列第二篇。在上一篇中，我们介绍了策略梯度和 Actor-Critic 架构。然而，包括 REINFORCE 在内的所有基础策略梯度方法，都存在更新步长难以控制、训练不稳定的核心困境。本文将首先深入剖析这一不稳定性的三个层面，然后详细推导如何通过限制策略更新幅度来保证训练的单调递增，从 TRPO 的数学思想一路演进到目前大模型 RLHF（Reinforcement Learning from Human Feedback，基于人类反馈的强化学习）的基石——PPO 算法。
 >
-> ⬅️ 上一篇：[笔记｜强化学习（一）：强化学习基础与策略梯度](/chengYi-xun/posts/51-rl-basics/)
+> ⬅️ 上一篇：[笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic](/chengYi-xun/posts/51-reinforce-ac/)
 >
 > ➡️ 下一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
 
@@ -306,7 +306,7 @@ $$\nabla_d L = g - \lambda F d = 0 \implies d^* = \frac{1}{\lambda} F^{-1} g$$
 
 **复杂网络结构的问题。** 这一要求使得 TRPO 难以与现代深度网络结合：**Dropout** 在每次前向传播中随机丢弃神经元，使有效网络结构不断变化，FIM 在随机子网络上的估计变得不稳定；**BatchNorm** 的归一化统计量依赖于当前 mini-batch 中的所有样本，引入了样本间的相互依赖，而 FIM 的推导假设样本独立；**Transformer** 中的多头注意力、残差连接等组件使得损失函数的 Hessian 结构极其复杂，二阶导数的计算既慢又不稳定。这些因素叠加在一起，使得 TRPO 在参数动辄上亿的现代深度网络上几乎无法实际使用。
 
-在下面的 TRPO 和 PPO 代码中，优势函数 $\hat{A}_t$ 的估计都使用 **GAE（Generalized Advantage Estimation）**，其理论推导和代码实现详见[上一篇的 GAE 章节](/chengYi-xun/posts/51-rl-basics/#广义优势估计（GAE）：蒙特卡洛与-TD-的统一框架)。这里只回顾核心公式——GAE 通过参数 $\lambda$ 在偏差（$\lambda \to 0$，单步 TD）和方差（$\lambda \to 1$，蒙特卡洛）之间权衡：
+在下面的 TRPO 和 PPO 代码中，优势函数 $\hat{A}_t$ 的估计都使用 **GAE（Generalized Advantage Estimation）**，其理论推导和代码实现详见[上一篇的 GAE 章节](/chengYi-xun/posts/51-reinforce-ac/#广义优势估计（GAE）：蒙特卡洛与-TD-的统一框架)。这里只回顾核心公式——GAE 通过参数 $\lambda$ 在偏差（$\lambda \to 0$，单步 TD）和方差（$\lambda \to 1$，蒙特卡洛）之间权衡：
 
 $$
 \hat{A}_t^{\text{GAE}(\gamma,\lambda)} = \sum_{l=0}^{T-t-1} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
