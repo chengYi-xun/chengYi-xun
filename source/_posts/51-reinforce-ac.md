@@ -138,13 +138,23 @@ $$\mathbb{E}\left[\frac{\partial \text{Loss}}{\partial \theta}\right] = \mathbb{
 
 ```python
 import torch
+import gymnasium as gym
+
+# ============================================================
+# 超参数与环境
+# ============================================================
+gamma = 0.99                                        # 折扣因子 γ ∈ [0,1)
+num_episodes = 1000                                 # 训练总局数
+env = gym.make("CartPole-v1")                       # Gymnasium 环境（可替换为任意环境）
+state_dim = env.observation_space.shape[0]           # 状态向量维度（CartPole: 4）
+action_dim = env.action_space.n                     # 离散动作数（CartPole: 2）
 
 # ============================================================
 # 模型定义
 # actor: 策略网络 π_θ(a|s)，输入状态 s，输出动作概率分布
 # REINFORCE 只需要 Actor，不需要 Critic
 # ============================================================
-actor = ActorModel(state_dim, action_dim)
+actor = ActorModel(state_dim, action_dim)            # 需自行定义，如两层 MLP → Softmax
 optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)
 
 def collect_episode(env, actor):
@@ -153,13 +163,15 @@ def collect_episode(env, actor):
     必须跑完整局（回合制），因为 G_t 需要直到终止的所有奖励
     """
     trajectory = []
-    state = env.reset()                             # 初始状态 s₀
+    state, _ = env.reset()                           # Gymnasium 返回 (obs, info)
     done = False
     while not done:
-        dist = actor(state)                         # 前向传播: s → π_θ(·|s_t)
-        action = dist.sample()                      # 从策略分布采样: a_t ~ π_θ(·|s_t)
-        log_prob = dist.log_prob(action)             # 记录 log π_θ(a_t|s_t)，策略梯度公式中的核心项
-        next_state, reward, done = env.step(action)  # 与环境交互，得到 r_t, s_{t+1}
+        state_t = torch.tensor(state, dtype=torch.float32)
+        dist = actor(state_t)                        # 前向传播: s → π_θ(·|s_t)
+        action = dist.sample()                       # 从策略分布采样: a_t ~ π_θ(·|s_t)
+        log_prob = dist.log_prob(action)              # 记录 log π_θ(a_t|s_t)，策略梯度公式中的核心项
+        next_state, reward, terminated, truncated, _ = env.step(action.item())
+        done = terminated or truncated
         trajectory.append((log_prob, reward))
         state = next_state
     return trajectory
@@ -172,7 +184,7 @@ def compute_returns(trajectory, gamma):
     """
     returns, G = [], 0
     for _, reward in reversed(trajectory):
-        G = reward + gamma * G                      # 从末尾反向累加
+        G = reward + gamma * G                       # 从末尾反向累加
         returns.insert(0, G)
     # requires_grad=False（默认），G_t 在计算图中充当常数系数
     return torch.tensor(returns)
@@ -183,19 +195,19 @@ def compute_returns(trajectory, gamma):
 # 每局: 采一条轨迹 → 算 G_t → 梯度更新 → 丢弃数据（on-policy）
 # ============================================================
 for episode in range(num_episodes):
-    trajectory = collect_episode(env, actor)         # Step 1: 采集轨迹 τ ~ π_θ
-    returns = compute_returns(trajectory, gamma)      # Step 2: 计算各步 G_t
+    trajectory = collect_episode(env, actor)          # Step 1: 采集轨迹 τ ~ π_θ
+    returns = compute_returns(trajectory, gamma)       # Step 2: 计算各步 G_t
 
     # Step 3: 构建代理损失
     # 对应公式: loss = −Σ_t log π_θ(a_t|s_t) · G_t
     # 最小化此 loss ⟺ 沿 Σ_t ∇_θ log π · G_t 方向做梯度上升
     policy_loss = 0
     for (log_prob, _), G_t in zip(trajectory, returns):
-        policy_loss += -log_prob * G_t               # 每个时间步的梯度贡献
+        policy_loss += -log_prob * G_t                # 每个时间步的梯度贡献
 
     optimizer.zero_grad()
-    policy_loss.backward()                           # 反传: ∂loss/∂θ = −Σ G_t · ∂log π/∂θ
-    optimizer.step()                                 # θ ← θ - α·∂loss/∂θ = θ + α·Σ G_t·∇log π
+    policy_loss.backward()                            # 反传: ∂loss/∂θ = −Σ G_t · ∂log π/∂θ
+    optimizer.step()                                  # θ ← θ - α·∂loss/∂θ = θ + α·Σ G_t·∇log π
 ```
 
 > **代码中为什么省略了 $\gamma^t$？**
@@ -244,16 +256,26 @@ $$
 ```python
 import torch
 import torch.nn.functional as F
+import gymnasium as gym
+
+# ============================================================
+# 超参数与环境（同上）
+# ============================================================
+gamma = 0.99
+num_episodes = 1000
+env = gym.make("CartPole-v1")
+state_dim = env.observation_space.shape[0]
+action_dim = env.action_space.n
 
 # ============================================================
 # 模型定义（新增 Critic 网络作为基线）
 # actor:  策略网络 π_θ(a|s)
 # critic: 价值网络 V_φ(s)，估计状态价值，用于减小方差
 # ============================================================
-actor = ActorModel(state_dim, action_dim)
-critic = CriticModel(state_dim)
-actor_optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)   # 更新 θ
-critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)  # 更新 φ
+actor = ActorModel(state_dim, action_dim)             # 需自行定义
+critic = CriticModel(state_dim)                       # 需自行定义，如两层 MLP → 标量输出
+actor_optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)
+critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
 
 def collect_episode_with_values(env, actor, critic):
     """
@@ -261,14 +283,16 @@ def collect_episode_with_values(env, actor, critic):
     仍需跑完一整局（回合制），因为计算 G_t 需要全部奖励
     """
     trajectory = []
-    state = env.reset()
+    state, _ = env.reset()
     done = False
     while not done:
-        dist = actor(state)                         # π_θ(·|s_t)
-        action = dist.sample()                      # a_t ~ π_θ(·|s_t)
-        log_prob = dist.log_prob(action)             # log π_θ(a_t|s_t)
-        value = critic(state).squeeze()             # V_φ(s_t)：基线估计值
-        next_state, reward, done = env.step(action)
+        state_t = torch.tensor(state, dtype=torch.float32)
+        dist = actor(state_t)                        # π_θ(·|s_t)
+        action = dist.sample()                       # a_t ~ π_θ(·|s_t)
+        log_prob = dist.log_prob(action)              # log π_θ(a_t|s_t)
+        value = critic(state_t).squeeze()            # V_φ(s_t)：基线估计值
+        next_state, reward, terminated, truncated, _ = env.step(action.item())
+        done = terminated or truncated
         trajectory.append((log_prob, reward, value))
         state = next_state
     return trajectory
@@ -280,7 +304,7 @@ def collect_episode_with_values(env, actor, critic):
 # ============================================================
 for episode in range(num_episodes):
     trajectory = collect_episode_with_values(env, actor, critic)
-    returns = compute_returns(trajectory, gamma)     # 复用上面定义的 compute_returns
+    returns = compute_returns(trajectory, gamma)      # 复用上面定义的 compute_returns
 
     policy_loss = 0  # Actor 损失
     value_loss = 0   # Critic 损失
@@ -299,11 +323,11 @@ for episode in range(num_episodes):
 
     # Actor 和 Critic 分开更新，互不干扰
     actor_optimizer.zero_grad()
-    policy_loss.backward()                           # ∂loss/∂θ: 只经过 log π → θ
+    policy_loss.backward()                            # ∂loss/∂θ: 只经过 log π → θ
     actor_optimizer.step()
 
     critic_optimizer.zero_grad()
-    value_loss.backward()                            # ∂loss/∂φ: 只经过 V_φ → φ
+    value_loss.backward()                             # ∂loss/∂φ: 只经过 V_φ → φ
     critic_optimizer.step()
 ```
 
@@ -374,13 +398,23 @@ Actor-Critic 完美结合了策略梯度和价值函数的优势，极大地降�
 
 ```python
 import torch
+import gymnasium as gym
+
+# ============================================================
+# 超参数与环境（同上）
+# ============================================================
+gamma = 0.99
+total_steps = 100_000                                # 总训练步数
+env = gym.make("CartPole-v1")
+state_dim = env.observation_space.shape[0]
+action_dim = env.action_space.n
 
 # ============================================================
 # 模型定义（与 Baseline 版相同: Actor + Critic）
 # 关键区别: 不再需要 G_t，用 TD 误差 δ_t 替代优势估计
 # ============================================================
-actor = ActorModel(state_dim, action_dim)       # 策略 π_θ(a|s)
-critic = CriticModel(state_dim)                 # 价值 V_φ(s)
+actor = ActorModel(state_dim, action_dim)            # 需自行定义
+critic = CriticModel(state_dim)                      # 需自行定义
 actor_optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)
 critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
 
@@ -389,25 +423,29 @@ critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
 # 对应公式: θ ← θ + α · ∇_θ log π_θ(a_t|s_t) · δ_t
 #           其中 δ_t = r_t + γ·V_φ(s_{t+1}) − V_φ(s_t)
 # ============================================================
-state = env.reset()
+state, _ = env.reset()
 for step in range(total_steps):
+    state_t = torch.tensor(state, dtype=torch.float32)
+
     # --- 前向传播 ---
-    dist = actor(state)                         # s_t → π_θ(·|s_t)
-    action = dist.sample()                      # a_t ~ π_θ(·|s_t)
-    log_prob = dist.log_prob(action)             # log π_θ(a_t|s_t)
-    value = critic(state).squeeze()             # V_φ(s_t): TD 残差的 "预测" 端
+    dist = actor(state_t)                            # s_t → π_θ(·|s_t)
+    action = dist.sample()                           # a_t ~ π_θ(·|s_t)
+    log_prob = dist.log_prob(action)                  # log π_θ(a_t|s_t)
+    value = critic(state_t).squeeze()                # V_φ(s_t): TD 残差的 "预测" 端
 
     # --- 与环境交互（只需走一步！）---
-    next_state, reward, done = env.step(action)  # 得到 r_t, s_{t+1}
+    next_state, reward, terminated, truncated, _ = env.step(action.item())
+    done = terminated or truncated
+    next_state_t = torch.tensor(next_state, dtype=torch.float32)
     # V_φ(s_{t+1}): TD 残差的 "目标" 端
     # detach(): 目标值视为常数，不让梯度流回去（类似 DQN 的 target network 思想）
-    next_value = critic(next_state).squeeze().detach()
+    next_value = critic(next_state_t).squeeze().detach()
 
     # --- 计算 TD 误差 δ_t ≈ A(s_t, a_t) ---
     # 公式: δ_t = r_t + γ·V_φ(s_{t+1}) − V_φ(s_t)
     # (1-done): 终止状态时 V(s_{T+1})=0，不再 bootstrap
     td_target = reward + gamma * next_value * (1 - done)
-    delta = td_target - value                   # δ_t: 单步 TD 误差 ≈ 优势函数
+    delta = td_target - value                        # δ_t: 单步 TD 误差 ≈ 优势函数
 
     # --- Actor 更新 ---
     # 公式: loss_actor = −log π_θ(a_t|s_t) · δ_t
@@ -420,14 +458,17 @@ for step in range(total_steps):
     critic_loss = delta.pow(2)
 
     actor_optimizer.zero_grad()
-    actor_loss.backward()                       # ∂loss/∂θ = −δ · ∂log π/∂θ
+    actor_loss.backward()                            # ∂loss/∂θ = −δ · ∂log π/∂θ
     actor_optimizer.step()
 
     critic_optimizer.zero_grad()
-    critic_loss.backward()                      # ∂loss/∂φ = −2δ · ∂V_φ(s)/∂φ
+    critic_loss.backward()                           # ∂loss/∂φ = −2δ · ∂V_φ(s)/∂φ
     critic_optimizer.step()
 
-    state = next_state if not done else env.reset()
+    if done:
+        state, _ = env.reset()
+    else:
+        state = next_state
 ```
 
 ## 对比总结
