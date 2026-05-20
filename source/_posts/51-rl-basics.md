@@ -735,11 +735,9 @@ def compute_gae(rewards, values, gamma=0.99, lam=0.95, dones=None):
     if dones is None:
         dones = torch.zeros_like(rewards)
 
-    # 如果 values 长度为 T（没有 bootstrap），补一个 0
-    # 什么是 bootstrap？当回合被截断（达到最大步数但游戏未结束）时，
-    # 后面还有未知的奖励。我们用 Critic 的估计 V(s_T) 来"替代"看不到的未来回报，
-    # 这个"用估计代替真实值"的操作就叫 bootstrap。
-    # 截断场景下建议传 T+1 维度的 values，使末尾能正确 bootstrap
+    # 如果 values 长度为 T（调用方未提供末状态的 bootstrap 值），末尾补 0
+    # 等价于假设 V(s_T)=0（终止状态）；若回合是被截断而非正常结束，
+    # 应传入 T+1 维度的 values，让末尾能用 Critic 估计值正确 bootstrap
     if len(values) == T:
         values = torch.cat([values, torch.zeros(1, device=values.device)])
 
