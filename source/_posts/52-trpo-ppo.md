@@ -253,9 +253,48 @@ $$
 
 $\delta$ 通常设为 0.01 这样的小值。如果以面试例子来说，当 $\delta = 0.01$ 时，策略从 70%/30% 最多只能调到大约 74%/26%——每次只迈一小步。这样就保证了 $\hat{A}$ 在更新前后几乎不变，旧的优势估计始终有效。
 
-**TRPO 的缺点**：TRPO 在理论上非常严谨，保证了策略的单调改进。但它的求解过程要求**二阶优化**，这在大规模深度网络上带来了严重的实际困难。
+### 为什么 TRPO 必须用二阶优化？
 
-**为什么不能只用一阶梯度？** 前文"第二层"已经指出，参数空间和策略空间的几何结构截然不同。TRPO 的约束加在**概率分布空间**上（KL 散度），而梯度下降操作在**参数空间**中。一阶梯度只能告诉你"哪个方向能提升目标函数"，但无法告诉你"沿这个方向走多远，分布才会变化到 KL 约束的边界"。
+到此为止，我们已经写出了完整的约束优化问题。一个非常自然的疑问浮现：**二阶信息到底是从哪一步冒出来的？** 替代目标只用了一阶梯度（重要性采样比率），KL 约束也只是定义了"不准走太远"——看起来跟普通的约束优化没区别。更尖锐地问：**既然 KL 散度可以直接算出来，为什么不能把它当一个 loss 项，用 `loss.backward()` 一步搞定？**
+
+**追踪推导：二阶信息从哪里进入？** 沿着 TRPO 的推导主线，可以精确地标出二阶信息进入的那一步：
+
+1. **建立替代目标函数**：构造 $\mathcal{L}(\theta) = \mathbb{E}_t[r_t(\theta) \hat{A}_t]$。只是用重要性采样改写了期望，涉及的全是策略概率的**一阶信息**。没碰二阶。
+2. **加上 KL 约束**：要求 $\mathbb{E}_t[\text{KL}[\pi_{\theta_\text{old}} \| \pi_\theta]] \le \delta$。到这里仍然没有二阶——约束只是定义了"距离"，**但还没说怎么解它**。
+3. **用泰勒展开近似 KL 约束——就是这一步引入了二阶。** 为了把约束优化转为可解的形式，对 KL 散度在 $\theta_\text{old}$ 处做泰勒展开。零阶项和一阶项恰好都是零（下节严格证明），**只剩下二阶项**：$\text{KL} \approx \frac{1}{2} d^T F d$，其中 $F$ 是 Fisher 信息矩阵——一个 $N \times N$ 的二阶矩阵（$N$ 是参数数量）。
+4. **拉格朗日对偶求解**：有了二次约束 $\frac{1}{2}d^T F d \le \delta$ 和一阶目标 $g^T d$，对偶直接给出 $d^* \propto F^{-1}g$——**自然梯度**。Fisher 矩阵的逆乘上一阶梯度，二阶信息正式进入参数更新。
+
+**一句话总结：正是对 KL 散度的二阶泰勒展开，把 Fisher 信息矩阵引入了更新公式。在此之前的所有推导都是一阶的。** 展开后，KL 约束从一个抽象的"不准走太远"变成了一个具体可解的二次型 $\frac{1}{2}d^T F d$，而这个二次型的系数矩阵就是二阶信息。之后的共轭梯度、线搜索等步骤，本质上都是围绕 $F^{-1}g$ 做文章——想办法不显式构建 $F^{-1}$ 而近似得到自然梯度方向。PPO 原文也印证了这一点——TRPO 通过 "a linear approximation to the objective and **a quadratic approximation to the constraint**" 来近似求解（[Schulman et al., 2017, Section 2.2](https://arxiv.org/abs/1707.06347)）。
+
+> **Fisher 矩阵 vs. 传统 Hessian：** 值得强调的是，$F$ 不是目标函数 $\mathcal{L}(\theta)$ 对 $\theta$ 的 Hessian（即传统意义上的"损失函数的二阶导"），而是 **KL 散度对 $\theta$ 的 Hessian**。从信息几何的角度看，$F$ 是策略分布参数空间上的**黎曼度量（Riemannian metric）**，衡量的是 $\theta$ 空间中一个微小位移在概率分布空间中对应多大的距离（[Amari, 1998](https://doi.org/10.1162/089976698300017746)）。这正是它作为 KL 的 Hessian 而非目标函数 Hessian 出现的深层原因。
+
+**为什么不能直接构造 KL loss 用 backward？** 既然 KL 散度在 PyTorch 中一行 `kl_divergence()` 就能算出来，一个看似更简单的做法是：把约束优化强行改成无约束优化，直接加一个 KL 惩罚项：
+
+$$\mathcal{L}_\text{total}(\theta) = \mathbb{E}_t[r_t(\theta) \hat{A}_t] - \beta \cdot \text{KL}[\pi_{\theta_\text{old}} \| \pi_\theta]$$
+
+然后 `loss.backward()` + Adam 更新，十行代码搞定。**这种做法技术上完全可行**，它已经有名字了——**KL-regularized policy gradient**。PPO 原始论文（[Schulman et al., 2017](https://arxiv.org/abs/1707.06347)）的第一个方案 **PPO-Penalty**（Section 4: Adaptive KL Penalty Coefficient）正是这个思路，配合自适应调整 $\beta$ 的启发式规则。
+
+但**约束优化和惩罚项是两个完全不同的数学问题**，核心矛盾在于 **$\beta$ 没法确定**。PPO 论文原文直接指出了这一点："*it is hard to choose a single value of $\beta$ that performs well across different problems—or even within a single problem, where the characteristics change over the course of learning*"。$\beta$ 是你手动设的自由参数，不是从数学中推出来的。而同一个 $\beta$ 在不同训练阶段的效果截然不同——reward 的尺度在变、策略的 curvature 在变、advantage 的分布也在变：
+
+| $\beta$ 取值 | 效果 |
+|:---:|:---|
+| 太大 | 策略几乎不更新，学不到东西 |
+| 太小 | KL 惩罚形同虚设，策略更新过猛，回到崩溃问题 |
+| "合适" | 能工作——但什么值算"合适"是未知的，且它随训练进程不断变化 |
+
+如果试图自适应地调 $\beta$（KL 过大就增大 $\beta$，过小就减小），本质上你是在用数值方法**隐式地求解约束优化问题**——找一个 $\beta$ 使得最终 KL 落在 $\delta$ 附近。而 TRPO 的做法是**一步到位**：二阶泰勒展开把 KL 约束转为 $\frac{1}{2}d^T F d \le \delta$，拉格朗日对偶直接解出最优 $d^*$，同时自动确定对应的 $\beta$（拉格朗日乘子 $\lambda$ 恰好扮演了 $\beta$ 的角色）。换言之，**你用 KL loss 调 $\beta$ 是在手动搜索，TRPO 用二阶优化是在数学求解**。
+
+三种方案的本质区别如下：
+
+| 方案 | 对待 $\beta$ 的方式 | 需要二阶信息？ |
+|:---|:---|:---:|
+| KL loss + backward（PPO-Penalty） | $\beta$ 是超参数，手动调或启发式自适应 | 不需要 |
+| TRPO | $\beta$ 是约束条件的拉格朗日乘子，数学解出 | **需要** |
+| PPO-Clip | 重新设计目标函数，根本不需要 $\beta$ | 不需要 |
+
+PPO 论文的实验（Table 1）直接验证了这一点：PPO-Clip（$\epsilon = 0.2$，平均归一化得分 0.82）显著优于 PPO-Penalty（Adaptive KL 最高 0.74）和 Fixed KL（最高 0.72），因此 PPO-Penalty 在实践中被淘汰。PPO-Clip 走了一条更彻底的路：既不去精确求解 KL 约束（需要二阶），也不去调 $\beta$（不够稳定），而是直接用 $\text{clip}(r, 1-\epsilon, 1+\epsilon)$ 在目标函数层面限制概率比率的变化范围。$\epsilon$ 可以固定为常数（通常 0.2），因为 clip 作用于每个动作的概率比率 $r$，天然 scale-free——不管 reward 尺度如何变化，$\epsilon = 0.2$ 始终翻译为"不许把某个动作的概率改超过约 20%"。
+
+**几何直觉：一阶梯度为什么不够？** 从几何角度进一步理解为什么 TRPO 不能只用一阶梯度。前文"第二层"已经指出，参数空间和策略空间的几何结构截然不同。TRPO 的约束加在**概率分布空间**上（KL 散度），而梯度下降操作在**参数空间**中。一阶梯度只能告诉你"哪个方向能提升目标函数"，但无法告诉你"沿这个方向走多远，分布才会变化到 KL 约束的边界"。
 
 还是用前面的徒步比喻来说明：假设 KL 约束是"只能离当前位置走 100 米"。一阶梯度告诉你"正北方向最陡"，于是你往北走 100 米。但地形的不均匀性意味着——往北走 1 米海拔就升 50 米（分布极敏感），往东走 100 米海拔才升 1 米（分布不敏感）——径直往北走 100 米，等于在分布空间中远远飞出了信任区域。
 
@@ -822,7 +861,8 @@ PPO 凭借其简单、高效、稳定的特点，成为了 ChatGPT 等大模型 
 > 1. Schulman, J., Levine, S., Abbeel, P., Jordan, M., & Moritz, P. (2015). *Trust Region Policy Optimization*. ICML 2015.
 > 2. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). *Proximal Policy Optimization Algorithms*. arXiv:1707.06347.
 > 3. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., ... & Lowe, R. (2022). *Training language models to follow instructions with human feedback*. NeurIPS 2022.
-> 4. [Trust Region Methods: From REINFORCE to TRPO to PPO](https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo)
-> 5. [Natural Gradient Descent — Agustinus Kristiadi](https://agustinus.kristia.de/blog/natural-gradient/)
+> 4. Amari, S. (1998). *Natural Gradient Works Efficiently in Learning*. Neural Computation, 10(2), 251-276.
+> 5. [Trust Region Methods: From REINFORCE to TRPO to PPO](https://sesen.ai/blog/trust-region-methods-reinforce-trpo-ppo)
+> 6. [Natural Gradient Descent — Agustinus Kristiadi](https://agustinus.kristia.de/blog/natural-gradient/)
 
 > 下一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
