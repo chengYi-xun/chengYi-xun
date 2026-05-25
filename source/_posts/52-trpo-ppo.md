@@ -18,6 +18,8 @@ series: Diffusion Models theory
 >
 > ➡️ 下一篇：[笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)](/chengYi-xun/posts/53-dpo/)
 
+**核心摘要：**
+PPO 的核心是根据 TRPO 发展而来的。TRPO 在 Actor-Critic 的基础上，通过限制更新步长（引入 KL 散度约束），使得策略更新单调递增。其最大的贡献在于**从数学上精确求解了参数空间与分布空间（策略变化）的映射关系（即 Fisher 信息矩阵，它是 KL 散度对网络参数的二阶导数矩阵。具体来说，是计算新策略和旧策略之间的 KL 散度，然后对新策略的参数 $\theta$ 求二阶偏导数）**，从而避免了使用启发式学习率导致的两个空间（参数空间和分布空间）优化步长不匹配的问题。然而，TRPO 引入了二阶优化。虽然在实际工程中，TRPO 并没有直接去求那个极其庞大的二阶矩阵的逆（而是巧妙地用了共轭梯度法 Conjugate Gradient 算矩阵向量乘积），但它依然需要进行多次反向传播来计算二阶信息，这对于动辄百亿参数的大模型来说计算代价是不可接受的。PPO 继承了 TRPO 限制分布变化步长的核心思想，但巧妙地通过**裁剪（Clip）重要性采样比率**，避开了二阶矩阵的求解。它仅用一阶优化的计算成本就实现了类似的安全更新效果，从而成为了目前大模型 RLHF 的基石算法。
 
 # 关键概念回顾：Q 函数与优势函数
 
@@ -395,101 +397,109 @@ $$
 
    熵衡量的是**策略在当前状态下对动作空间的概率分布的不确定性**，其取值范围为 $[0, \log|\mathcal{A}|]$：
 
-   - **上限 $\log|\mathcal{A}|$（均匀分布）**：当 $\pi_\theta(a|s_t) = \frac{1}{|\mathcal{A}|}$ 对所有 $a$ 成立时，代入得 $S = -\sum_{a=1}^{|\mathcal{A}|} \frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|} = -|\mathcal{A}| \cdot \frac{1}{|\mathcal{A}|} \cdot (-\log|\mathcal{A}|) = \log|\mathcal{A}|$。可以用拉格朗日乘数法证明，均匀分布是在 $\sum_a \pi(a)=1$ 约束下的**全局最大熵分布**。
+   - **上限 $\log|\mathcal{A}|$（均匀分布）**：当策略完全随机，即对所有动作 $a$ 都有 $\pi_\theta(a|s_t) = \frac{1}{|\mathcal{A}|}$ 时，熵达到最大。
+     - **直觉计算**：代入熵公式 $S = -\sum_{a=1}^{|\mathcal{A}|} \frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|}$。因为求和项里没有跟 $a$ 相关的变量，这就相当于把 $\frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|}$ 累加了 $|\mathcal{A}|$ 次。即 $S = -|\mathcal{A}| \cdot \left( \frac{1}{|\mathcal{A}|}\log\frac{1}{|\mathcal{A}|} \right)$。前面的 $|\mathcal{A}|$ 和分母抵消，剩下 $-\log\frac{1}{|\mathcal{A}|}$，根据对数性质即等于 $\log|\mathcal{A}|$。
+     - **数学证明（拉格朗日乘数法）**：这是一个带约束的优化问题。目标是最大化熵 $H(p) = -\sum_i p_i \log p_i$，约束条件是概率之和为 1（$\sum_i p_i = 1$）。构造拉格朗日函数 $L(p, \lambda) = -\sum_i p_i \log p_i + \lambda (\sum_i p_i - 1)$。对每个 $p_i$ 求偏导并令其为 0，得到 $\frac{\partial L}{\partial p_i} = -\log p_i - 1 + \lambda = 0$，解得 $p_i = e^{\lambda - 1}$。这说明要使熵最大，所有的 $p_i$ 必须相等（因为它们都等于同一个常数 $e^{\lambda - 1}$）。再结合概率和为 1 的约束，必然得出每个 $p_i = \frac{1}{|\mathcal{A}|}$，从而证明了均匀分布是**全局最大熵分布**。
    - **下限 $0$（确定性策略）**：当存在某个 $a_k$ 使得 $\pi_\theta(a_k|s_t)=1$，其余 $\pi_\theta(a|s_t)=0$ 时，代入得 $S = -(1\cdot\log 1 + 0\cdot\log 0 + \cdots) = 0$。这里约定 $0\log 0 = 0$，与极限 $\lim_{x\to 0^+} x\log x = 0$ 一致。
 
    损失函数中以 $+c_2 \cdot S$ 的形式出现（注意正号），因为最小化 loss 时该项等价于**最大化熵**——鼓励策略保持随机性、避免过早坍缩到确定性行为，这正是**探索与利用（exploration vs. exploitation）权衡**的体现。系数 $c_2$（通常 0.01）较小，确保探索激励不会盖过策略优化信号。
 
-下面用 PyTorch 风格的伪代码展示 PPO 的完整训练流程：
+下面用 PyTorch 风格的伪代码展示 PPO 的完整训练流程。这段代码展示了**一个完整的 PPO 训练循环**，包括外层的全局迭代（数据采样）和内层的多次小批量参数更新。
 
 ```python
 import torch
 import torch.nn.functional as F
 
 # ============================================================
-# 模型定义 (与 TRPO 相同: Actor + Critic)
+# 模型定义与超参数 (与 TRPO 相同: Actor + Critic)
 # ============================================================
 actor = ActorModel(state_dim, action_dim)
 critic = CriticModel(state_dim)
 optimizer = torch.optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=3e-4)
+
 clip_range = 0.2      # ε：比率 r 允许偏离 1 的幅度，对应 clip 区间 [1-ε, 1+ε]
 vf_coef = 0.5         # 价值损失权重 c₁
 entropy_coef = 0.01   # 熵奖励权重 c₂
 K_epochs = 4          # 同一批 rollout 数据做 K 轮 epoch，配合 clip 复用样本、提高样本效率
+batch_size = 64
+total_training_steps = 10000
 
-# ============================================================
-# Step 1: 数据采集 (同 TRPO)
-# ============================================================
-buffer = []
-state = env.reset()
-for t in range(T):
-    with torch.no_grad():
-        dist = actor(state)       # 当前策略下动作分布
-        action = dist.sample()
-        log_prob = dist.log_prob(action)  # 采样时策略的 log π，用作 PPO 旧概率
-        value = critic(state)     # 同时记下 V，用于 GAE
-    next_state, reward, done = env.step(action)
-    buffer.append((state, action, reward, log_prob, value, done))  # 同时存 done
-    state = next_state if not done else env.reset()
-
-states, actions, rewards, old_log_probs, old_values, dones = collate(buffer)
-
-# ============================================================
-# Step 2: 优势估计 (同 TRPO)
-# ============================================================
-with torch.no_grad():
-    advantages = compute_gae(rewards, old_values, gamma=0.99, lam=0.95, dones=dones)  # GAE 估计 Â，供裁剪目标使用
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)  # 优势标准化，稳定训练
-    returns = advantages + old_values  # Critic 的回归目标
-
-# ============================================================
-# Step 3: 多 epoch 小批量更新 (PPO 核心 — 替代了 TRPO 的 Step 4~5)
-# 同一批数据安全地复用 K 次, 每次用 clip 防止偏离过远
-# ============================================================
-# minibatch_indices 把全量数据随机拆成若干小批次，每次返回一组整数索引
-# 例如: len(states)=1024, batch_size=64 → 每 epoch 产生 16 组 idx
-# idx 的 shape 是 [batch_size]，即 [64]，内容是随机打乱的样本下标
+# 辅助函数：生成小批量索引
 def minibatch_indices(total, batch_size):
     """将 [0, total) 随机打乱后按 batch_size 切分，yield 每个小批次的索引"""
     perm = torch.randperm(total)                  # 随机排列所有样本下标
     for start in range(0, total, batch_size):     # 按 batch_size 步进切片
         yield perm[start : start + batch_size]    # 返回一组索引，shape = [batch_size]
 
-for epoch in range(K_epochs):
-    for idx in minibatch_indices(len(states), batch_size=64):
-        s, a = states[idx], actions[idx]
-        old_lp, adv, ret = old_log_probs[idx], advantages[idx], returns[idx]
-
-        # --- 前向传播 ---
-        dist = actor(s)                           # 新策略分布 π_θ(·|s)
-        new_log_probs = dist.log_prob(a)          # log π_θ(a|s)
-        values = critic(s).squeeze()              # V_φ(s)
-        # 策略熵的 batch 均值：鼓励探索，避免过早确定性策略（乘以系数后从 loss 中减去即熵奖励）
-        entropy = dist.entropy().mean()           # 策略熵 S[π_θ]
-
-        # --- 策略损失 (裁剪) ---
-        ratio = torch.exp(new_log_probs - old_lp) # r = π_θ / π_old，重要性采样权重
-        surr1 = ratio * adv                        # 未裁剪的替代项 r·Â
-        # 将 r 限制在 [1-ε,1+ε] 再乘 Â，过大偏离时梯度被截断，隐式信任区域
-        surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * adv
-        # 取 min 再取负：对优化器而言是最大化悲观下界，防止过度乐观的重要性加权
-        policy_loss = -torch.min(surr1, surr2).mean()
-
-        # --- 价值损失 ---
-        value_loss = F.mse_loss(values, ret)
-
-        # --- 总损失: L^CLIP - c₁·L^VF + c₂·S ---
-        # 策略项 + 价值回归 − 熵奖励（entropy 越大 loss 越小，等价鼓励高熵）
-        loss = policy_loss + vf_coef * value_loss - entropy_coef * entropy
-
-        # --- 反向传播 + 梯度裁剪 + 更新 (标准一阶优化!) ---
-        optimizer.zero_grad()
-        loss.backward()
-        # 全局梯度范数裁剪：抑制异常大更新，与大模型/深层网络训练常见做法一致
-        torch.nn.utils.clip_grad_norm_(
-            list(actor.parameters()) + list(critic.parameters()), max_norm=0.5
-        )
-        optimizer.step()
+# ============================================================
+# 真实的训练外层大循环
+# ============================================================
+state = env.reset()
+for global_step in range(total_training_steps):
+    
+    # ============================================================
+    # Step 1: 数据采集 (同 TRPO)
+    # ============================================================
+    buffer = []
+    for t in range(T):
+        with torch.no_grad():
+            dist = actor(state)       # 当前策略下动作分布
+            action = dist.sample()
+            log_prob = dist.log_prob(action)  # 采样时策略的 log π，用作 PPO 旧概率
+            value = critic(state)     # 同时记下 V，用于 GAE
+        next_state, reward, done = env.step(action)
+        buffer.append((state, action, reward, log_prob, value, done))  # 同时存 done
+        state = next_state if not done else env.reset()
+    
+    states, actions, rewards, old_log_probs, old_values, dones = collate(buffer)
+    
+    # ============================================================
+    # Step 2: 优势估计 (同 TRPO)
+    # ============================================================
+    with torch.no_grad():
+        advantages = compute_gae(rewards, old_values, gamma=0.99, lam=0.95, dones=dones)  # GAE 估计 Â，供裁剪目标使用
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)  # 优势标准化，稳定训练
+        returns = advantages + old_values  # Critic 的回归目标
+    
+    # ============================================================
+    # Step 3: 多 epoch 小批量更新 (PPO 核心 — 替代了 TRPO 的 Step 4~5)
+    # 同一批数据安全地复用 K 次, 每次用 clip 防止偏离过远
+    # ============================================================
+    for epoch in range(K_epochs):
+        for idx in minibatch_indices(len(states), batch_size):
+            s, a = states[idx], actions[idx]
+            old_lp, adv, ret = old_log_probs[idx], advantages[idx], returns[idx]
+    
+            # --- 前向传播 ---
+            dist = actor(s)                           # 新策略分布 π_θ(·|s)
+            new_log_probs = dist.log_prob(a)          # log π_θ(a|s)
+            values = critic(s).squeeze()              # V_φ(s)
+            # 策略熵的 batch 均值：鼓励探索，避免过早确定性策略（乘以系数后从 loss 中减去即熵奖励）
+            entropy = dist.entropy().mean()           # 策略熵 S[π_θ]
+    
+            # --- 策略损失 (裁剪) ---
+            ratio = torch.exp(new_log_probs - old_lp) # r = π_θ / π_old，重要性采样权重
+            surr1 = ratio * adv                        # 未裁剪的替代项 r·Â
+            # 将 r 限制在 [1-ε,1+ε] 再乘 Â，过大偏离时梯度被截断，隐式信任区域
+            surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * adv
+            # 取 min 再取负：对优化器而言是最大化悲观下界，防止过度乐观的重要性加权
+            policy_loss = -torch.min(surr1, surr2).mean()
+    
+            # --- 价值损失 ---
+            value_loss = F.mse_loss(values, ret)
+    
+            # --- 总损失: L^CLIP - c₁·L^VF + c₂·S ---
+            # 策略项 + 价值回归 − 熵奖励（entropy 越大 loss 越小，等价鼓励高熵）
+            loss = policy_loss + vf_coef * value_loss - entropy_coef * entropy
+    
+            # --- 反向传播 + 梯度裁剪 + 更新 (标准一阶优化!) ---
+            optimizer.zero_grad()
+            loss.backward()
+            # 全局梯度范数裁剪：抑制异常大更新，与大模型/深层网络训练常见做法一致
+            torch.nn.utils.clip_grad_norm_(
+                list(actor.parameters()) + list(critic.parameters()), max_norm=0.5
+            )
+            optimizer.step()
 ```
 
 **开源代码参考：** Vanilla PPO 在经典 RL（游戏、机器人控制等）中的主流实现是 **Stable-Baselines3** 库（`stable_baselines3.PPO`），其核心逻辑与上述代码一致。
@@ -512,13 +522,73 @@ for epoch in range(K_epochs):
 
 > **PPO clip 与 KL 惩罚的分工**：clip 管的是"每步别迈太大"（步长控制），KL 惩罚管的是"总体别跑太远"（分布正则化）。两者解决的是不同层面的问题。
 
-**RLHF-PPO 的奖励公式**因此需要对原始 RM 分数做 KL 修正：
-$$
-r_t = R_\psi(\text{prompt}, \text{response}) - \beta \cdot \text{KL}[\pi_\theta \| \pi_\text{ref}]
-$$
-其中 $\beta$ 控制 KL 惩罚的强度：$\beta$ 越大，Actor 越不敢偏离 Reference。
+**RLHF-PPO 的奖励公式**与 Vanilla PPO 存在巨大差异。由于语言生成是逐 Token 进行的，但奖励模型 RM 只能在句末给出一个整句的标量评分，我们需要将这个“大结算”拆分到每一个步骤中。具体的，第 $t$ 步（即生成第 $t$ 个 Token）的奖励 $r_t$ 构造如下：
 
-下面是 RLHF-PPO 的完整实现。对比上面的 vanilla 版本，核心差异在 Step 1（数据采集方式）和 Step 2（KL 惩罚修正奖励）。
+$$
+r_t = \begin{cases}
+-\beta \log \frac{\pi_\theta(a_t|s_t)}{\pi_{\text{ref}}(a_t|s_t)} & \text{如果 } t < T \text{ (非最后一个 Token)} \\
+R_\psi(\text{prompt}, \text{response}) - \beta \log \frac{\pi_\theta(a_t|s_t)}{\pi_{\text{ref}}(a_t|s_t)} & \text{如果 } t = T \text{ (最后一个 Token)}
+\end{cases}
+$$
+
+其中 $\beta$ 控制 KL 惩罚的强度：$\beta$ 越大，Actor 越不敢偏离 Reference 模型。
+
+有了逐步的奖励 $r_t$ 后，我们利用 GAE（Generalized Advantage Estimation）计算每个 Token 的优势 $\hat{A}_t$。与传统强化学习不同，在语言模型中我们通常将时间折扣因子 $\gamma$ 设为 1.0，因为长句子的第一个词和最后一个词同样重要：
+
+$$
+\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)
+$$
+$$
+\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l} \quad (\text{其中 } \gamma = 1.0)
+$$
+
+### Critic 的“地狱难度”与工业界解法
+
+仔细观察上面的公式，你会发现一个巨大的挑战：**Critic 模型 $V_\phi$ 必须在只看到前面几个词的时候，就准确预估出整句话最终在句末能拿多少分**。这就是经典的“长序列信用分配（Credit Assignment）”难题。如果 Critic 预测不准，算出来的 Advantage 就是纯噪音，训练会立刻崩溃。
+
+为了克服这个困难，工业界通常采用以下几种策略：
+
+1. **用奖励模型初始化 Critic**：Critic 绝对不能从随机权重开始训练。通常直接复制 RM 的权重作为 Critic 的初始化，因为它本来就具备极强的“看前半句猜全句得分”的能力。
+2. **过程奖励模型（PRM）**：像 OpenAI 的 Let's Verify Step by Step 中，把单纯的句末打分改成了每个推理步骤结束时都打分，给 Critic 提供更密集的中间监督信号。
+3. **彻底抛弃 Critic（GRPO 路线）**：由于预测长序列的未来回报太难，而且 Critic 还要吃掉一倍的显存，2024年以后的新范式（如 DeepSeek-R1 使用的 GRPO 算法）直接抛弃了 Critic。它通过“对同一问题生成多条回答，句末打分后在组内计算 z-score”来替代 GAE 的优势估计，既解决了预测难的问题，又省下了一半的显存开销。
+
+### RLHF-PPO 的总损失函数
+
+在完成了上面的优势估计后，RLHF-PPO 的优化目标由三部分组成：策略损失（带裁剪）、价值网络损失（回归长期回报）和熵正则项：
+
+$$
+\mathcal{L}^{\text{PPO}}(\theta, \phi) = \underbrace{\mathcal{L}^{\text{CLIP}}(\theta)}_{\text{第一项：策略损失}} - c_1 \underbrace{\mathbb{E}\left[(V_\phi(s_t) - V_t^{\text{target}})^2\right]}_{\text{第二项：价值损失}} + c_2 \underbrace{S[\pi_\theta]}_{\text{第三项：熵奖励}}
+$$
+
+下面逐项展开：
+
+**第一项：裁剪策略损失 $\mathcal{L}^{\text{CLIP}}(\theta)$**——与 Vanilla PPO 完全相同，只是代入公式的 $\hat{A}_t$ 是基于 KL 修正后的奖励计算而来的：
+
+$$
+\mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[\min\!\left(\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}\,\hat{A}_t,\;\text{clip}\!\left(\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)},\,1-\epsilon,\,1+\epsilon\right)\hat{A}_t\right)\right]
+$$
+
+裁剪比率 $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)}$ 被限制在 $[1-\epsilon, 1+\epsilon]$ 内。注意这里的 $a_t$ 在 LLM 场景下就是第 $t$ 个生成的 Token，$s_t$ 则是 Prompt + 前 $t-1$ 个已生成 Token 构成的上下文。
+
+**第二项：价值损失 $\mathcal{L}^{\text{VF}}(\phi)$**——Critic 网络的学习目标，用均方误差让 Critic 的预测值逼近真实回报：
+
+$$
+\mathcal{L}^{\text{VF}}(\phi) = \mathbb{E}_t \left[\left(V_\phi(s_t) - V_t^{\text{target}}\right)^2\right]
+$$
+
+其中回归目标 $V_t^{\text{target}} = \hat{A}_t + V_{\phi_\text{old}}(s_t)$（GAE 估计的优势 + 旧 Critic 的预测值）。直觉上：$V_{\phi_\text{old}}(s_t)$ 是 Critic 上一轮对这个状态的估值，$\hat{A}_t$ 是 "实际表现比估值好（或差）了多少"，两者加起来就是 "实际应该值多少"。通过最小化该项，Critic 学会更准确地预估每个 Token 位置的长期收益，进而为 Actor 提供更低方差的优势估计。系数 $c_1$（通常 0.5）控制其在总损失中的权重。
+
+**第三项：熵奖励 $S[\pi_\theta]$**——鼓励策略保持探索性：
+
+$$
+S[\pi_\theta](s_t) = -\sum_{a \in \mathcal{V}} \pi_\theta(a \mid s_t) \log \pi_\theta(a \mid s_t)
+$$
+
+其中 $\mathcal{V}$ 是整个词表（vocabulary），$|\mathcal{V}|$ 通常为 3\~13 万。熵越大表示策略越"犹豫"（分布越均匀），熵越小表示策略越"确定"（集中在少数 Token 上）。在总损失中以 $+c_2 S$ 出现（正号），因为我们最小化 loss 时正号等价于**最大化熵**——防止策略过早坍缩到确定性行为，保持探索空间。系数 $c_2$（通常 0.01）确保探索激励不会盖过策略优化信号。
+
+**三项合在一起的直觉**：第一项让 Actor "做得更好"（强化好动作、抑制坏动作）；第二项让 Critic "看得更准"（准确估值）；第三项让策略 "别太武断"（保持多样性）。三者协同，构成了 RLHF-PPO 的完整优化目标。
+
+下面是 RLHF-PPO 的完整代码实现。对比上一节的 Vanilla 版本，核心差异就在于上述的奖励构造（Step 2）以及免采样的 Teacher Forcing 前向传播。
 
 **代码结构差异——为什么 RLHF 没有 `dist.sample()`？** Vanilla PPO 是**单步决策**：`dist = actor(s)` 返回一个分布对象，然后 `dist.sample()` 采一个动作、`dist.log_prob()` 算概率、`dist.entropy()` 算熵——一个 `dist` 对象就搞定一切。但语言模型生成回答是**逐 token 自回归**的：生成 $T$ 个 token 需要循环 $T$ 次，每一步的分布都依赖上一步的采样结果，不存在一个 `dist` 能代表整个回答。因此 RLHF 将采样封装在 `actor.generate()` 内部，训练时使用 **teacher forcing** 一次前向传播同时得到所有位置的 log_prob 和 entropy。
 
@@ -536,6 +606,8 @@ $$
 > 每个位置只能 attend 到**自己和之前的位置**（通过 attention 中的三角遮罩矩阵实现），所以位置 2 的输出和"只输入 `[你, 好, 吗]`"时完全相同——不会因为后面还有 `我` 而"偷看"未来信息。这 4 个位置的预测是**并行计算**的。这就是为什么**生成时必须逐步循环**（因为下一个 token 还不知道），但**训练时可以一次性并行**（所有 token 都已知，因果遮罩保证不作弊）。
 
 代码中 `generate()`、`log_probs()` 和 `compute_entropy()` 的实现都展示在下方：
+
+下面用 PyTorch 风格的伪代码展示大模型 RLHF 中 PPO 的完整训练流程。这段代码展示了**一个完整的 PPO 训练循环**，包括外层的全局迭代（数据采样）和内层的多次小批量参数更新。
 
 ```python
 import torch
@@ -555,30 +627,16 @@ optimizer = torch.optim.Adam(list(actor.parameters()) + list(critic.parameters()
 
 clip_range = 0.2
 kl_coef = 0.1      # β, KL 惩罚系数
+K_epochs = 4
+batch_size = 64
+total_training_steps = 10000
 
-# ============================================================
-# Step 1: 数据采集 — "环境"是: prompt → 生成回答 → 奖励模型打分
-# ============================================================
-prompts = sample_prompts(dataset)          # [B, L]  B 个 prompt，每个长度 L
-with torch.no_grad():
-    # 自回归生成完整回答，并记录采样时策略的 log π_θ（供 PPO 比率与 KL 项）
-    # generate() 内部逐 token 循环：logits → softmax → 采样 → 拼接，共 T 步
-    responses, old_log_probs = actor.generate(prompts, return_log_probs=True)
-    # responses: [B, T]        T 个生成 token
-    # old_log_probs: [B, T]    每个 token 位置的 log π_θ_old
-    old_values = critic(prompts, responses)  # [B, T] 每个生成位置的价值估计
-    # 参考策略在相同 (prompt, response) 上的 log π_ref，用于逐 token KL
-    ref_log_probs = ref_model.log_probs(prompts, responses)  # [B, T] π_ref 的对数概率
-    scores = reward_model(prompts, responses)                 # [B]    RM 整句打分（序列级标量）
-
-# ============================================================
-# Step 2: 计算 KL 惩罚修正后的奖励 (vanilla PPO 没有这一步!)
-# r = R_ψ - β·(log π_θ - log π_ref)
-# ============================================================
-# β·(log π_θ − log π_ref) 近似逐 token KL 惩罚，拉大与参考模型差异则扣分
-kl_penalty = kl_coef * (old_log_probs - ref_log_probs)      # [B, T] 逐 token KL 惩罚
-# 将序列级 RM 分数与逐 token 惩罚合成 token 级奖励
-adjusted_rewards = compute_token_rewards(scores, kl_penalty)  # [B, T] 逐 token 奖励
+# 辅助函数：生成小批量索引
+def minibatch_indices(total, batch_size):
+    """将 [0, total) 随机打乱后按 batch_size 切分，yield 每个小批次的索引"""
+    perm = torch.randperm(total)
+    for start in range(0, total, batch_size):
+        yield perm[start : start + batch_size]
 
 # ------ compute_token_rewards 的实现 ------
 # RM 给的是整句分数（一个标量），但 GAE 需要逐 token 的奖励。
@@ -594,89 +652,73 @@ def compute_token_rewards(scores, kl_penalty):
     rewards[:, -1] += scores                    # 最后一个 token：叠加 RM 整句分数（句末结算）
     return rewards
 
-# ------ actor.generate() 的内部实现 ------
-# Vanilla PPO 是单步决策：dist = actor(s) → action = dist.sample()，一步完成。
-# 而语言模型生成回答是逐 token 自回归的——每个位置产生一个分布，
-# 后一个位置依赖前一个位置的采样结果，因此不存在一个 dist 对象能概括整个回答。
-# generate() 将采样循环封装在内部：
-def generate(self, prompts, return_log_probs=True, max_new_tokens=256):
-    """
-    prompts: [B, L]
-    return:  responses [B, T], log_probs [B, T]
-    """
-    tokens, log_probs_list = [], []
-    input_ids = prompts                                     # [B, L]
-    for t in range(max_new_tokens):
-        logits = self.forward(input_ids).logits[:, -1, :]   # 取最后位置 → [B, V]
-        probs = torch.softmax(logits, dim=-1)               # [B, V]
-        token = torch.multinomial(probs, num_samples=1)     # 采样 → [B, 1]
-        lp = torch.log_softmax(logits, dim=-1)              # [B, V]
-        token_lp = lp.gather(dim=-1, index=token)           # 取对应 token → [B, 1]
-        tokens.append(token)
-        log_probs_list.append(token_lp)
-        input_ids = torch.cat([input_ids, token], dim=-1)   # 自回归拼接
-    return torch.cat(tokens, dim=-1), torch.cat(log_probs_list, dim=-1)
-
-# ------ compute_entropy() 的实现 ------
-# 策略熵 S[π_θ](s) = −Σ_a π_θ(a|s) log π_θ(a|s)，衡量策略在当前状态下的"不确定性"。
-# 熵越大 → 策略越随机（均匀分布时熵最大）；熵越小 → 策略越确定（概率集中在一个 token）。
-# 在 PPO 损失中以负号出现（- entropy_coef * entropy），等价于鼓励策略保持多样性。
-# Vanilla PPO 直接调用 dist.entropy()；RLHF 中因为动作空间是整个词表（3~13万 token），
-# 需要从 logits 手动计算。
-def compute_entropy(actor, prompts, responses):
-    """
-    计算策略在 response 部分、所有生成位置上的平均熵
-
-    actor:     语言模型 π_θ
-    prompts:   [B, L]     prompt token ids —— 必须传入，因为 response 位置的概率分布
-                          取决于 prompt 提供的上下文（prompt 就是 RL 中的"状态 s"）
-    responses: [B, T]     response token ids
-    return:    标量，response 区域所有 batch × token 位置的平均熵
-    """
-    # prompt 和 response 拼接后一起输入：prompt 提供条件，response 提供预测目标
-    input_ids = torch.cat([prompts, responses], dim=-1)  # [B, L+T] 拼接完整序列
-    logits = actor(input_ids).logits                     # [B, L+T, V]  V = 词表大小
-    # 只取 response 部分的 logits（teacher forcing：位置 L-1 到 L+T-2 的输出预测位置 L 到 L+T-1 的 token）
-    resp_logits = logits[:, prompts.size(1)-1:-1, :]     # [B, T, V]
-    probs = torch.softmax(resp_logits, dim=-1)           # [B, T, V]
-    log_probs = torch.log_softmax(resp_logits, dim=-1)   # [B, T, V]  数值稳定版 log
-    token_entropy = -(probs * log_probs).sum(dim=-1)     # [B, T]  逐位置: −Σ_v p(v) log p(v)
-    return token_entropy.mean()                          # 标量
-
 # ============================================================
-# Step 3: 优势估计 (同 vanilla PPO)
+# 真实的训练外层大循环
 # ============================================================
-with torch.no_grad():
-    # γ=1：序列短、主要关心整句质量时通常不做时间折扣，与未来 token 权重一致
-    # 不传 dones：每个 prompt→response 就是一个完整回合，无中途终止
-    advantages = compute_gae(adjusted_rewards, old_values, gamma=1.0, lam=0.95)
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-    returns = advantages + old_values
-
-# ============================================================
-# Step 4: 多 epoch 小批量更新 (同 vanilla PPO)
-# ============================================================
-for epoch in range(K_epochs):
-    for idx in minibatch_indices(len(prompts), batch_size):
-        new_log_probs = actor.log_probs(prompts[idx], responses[idx])  # 更新后策略对已生成 token 的 log π
-        values = critic(prompts[idx], responses[idx])  # 当前 Critic 对同一前缀的价值预测
-        entropy = compute_entropy(actor, prompts[idx], responses[idx])  # 策略熵，鼓励多样性
-
-        ratio = torch.exp(new_log_probs - old_log_probs[idx])  # 与 vanilla PPO 相同的重要性权重 r
-        surr1 = ratio * advantages[idx]  # 未裁剪替代项
-        surr2 = torch.clamp(ratio, 1 - clip_range, 1 + clip_range) * advantages[idx]  # 裁剪后的悲观项
-        policy_loss = -torch.min(surr1, surr2).mean()  # PPO-Clip 策略损失
-
-        value_loss = F.mse_loss(values, returns[idx])  # Critic 回归 adjusted return
-        loss = policy_loss + vf_coef * value_loss - entropy_coef * entropy  # 与 vanilla 相同的三项组合
-
-        optimizer.zero_grad()
-        loss.backward()
-        # 防止 RLHF 长序列梯度爆炸，限制 Actor+Critic 总梯度范数
-        torch.nn.utils.clip_grad_norm_(
-            list(actor.parameters()) + list(critic.parameters()), max_norm=1.0
-        )
-        optimizer.step()
+for global_step in range(total_training_steps):
+    
+    # ============================================================
+    # Step 1: 数据采集 — "环境"是: prompt → 生成回答 → 奖励模型打分
+    # ============================================================
+    prompts = sample_prompts(dataset)          # [B, L]  B 个 prompt，每个长度 L
+    with torch.no_grad():
+        # 自回归生成完整回答，并记录采样时策略的 log π_θ（供 PPO 比率与 KL 项）
+        # generate() 内部逐 token 循环：logits → softmax → 采样 → 拼接，共 T 步
+        responses, old_log_probs = actor.generate(prompts, return_log_probs=True)
+        # responses: [B, T]        T 个生成 token
+        # old_log_probs: [B, T]    每个 token 位置的 log π_θ_old
+        old_values = critic(prompts, responses)  # [B, T] 每个生成位置的价值估计
+        
+        # 注意：这里的 ref_log_probs 和 old_log_probs 在第一轮（Step 0）时是相等的，
+        # 因为此时 actor 刚刚从 ref_model 初始化。
+        # 但从第二轮（Step 1）开始，actor 被更新过，而 ref_model 被冻结，两者就不再相等了。
+        # old_log_probs 用于限制单次更新步长（PPO Clip），ref_log_probs 用于防止模型偏离初始状态（KL 惩罚）。
+        ref_log_probs = ref_model.log_probs(prompts, responses)  # [B, T] π_ref 的对数概率
+        scores = reward_model(prompts, responses)                 # [B]    RM 整句打分（序列级标量）
+    
+    # ============================================================
+    # Step 2: 计算 KL 惩罚修正后的奖励 (vanilla PPO 没有这一步!)
+    # r = R_ψ - β·(log π_θ - log π_ref)
+    # ============================================================
+    # β·(log π_θ − log π_ref) 近似逐 token KL 惩罚，拉大与参考模型差异则扣分
+    kl_penalty = kl_coef * (old_log_probs - ref_log_probs)      # [B, T] 逐 token KL 惩罚
+    # 将序列级 RM 分数与逐 token 惩罚合成 token 级奖励
+    adjusted_rewards = compute_token_rewards(scores, kl_penalty)  # [B, T] 逐 token 奖励
+    
+    # ============================================================
+    # Step 3: 优势估计 (同 vanilla PPO)
+    # ============================================================
+    with torch.no_grad():
+        # γ=1：序列短、主要关心整句质量时通常不做时间折扣，与未来 token 权重一致
+        # 不传 dones：每个 prompt→response 就是一个完整回合，无中途终止
+        advantages = compute_gae(adjusted_rewards, old_values, gamma=1.0, lam=0.95)
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        returns = advantages + old_values
+    
+    # ============================================================
+    # Step 4: 多 epoch 小批量更新 (同 vanilla PPO)
+    # ============================================================
+    for epoch in range(K_epochs):
+        for idx in minibatch_indices(len(prompts), batch_size):
+            new_log_probs = actor.log_probs(prompts[idx], responses[idx])  # 更新后策略对已生成 token 的 log π
+            values = critic(prompts[idx], responses[idx])  # 当前 Critic 对同一前缀的价值预测
+            entropy = compute_entropy(actor, prompts[idx], responses[idx])  # 策略熵，鼓励多样性
+    
+            ratio = torch.exp(new_log_probs - old_log_probs[idx])  # 与 vanilla PPO 相同的重要性权重 r
+            surr1 = ratio * advantages[idx]  # 未裁剪替代项
+            surr2 = torch.clamp(ratio, 1 - clip_range, 1 + clip_range) * advantages[idx]  # 裁剪后的悲观项
+            policy_loss = -torch.min(surr1, surr2).mean()  # PPO-Clip 策略损失
+    
+            value_loss = F.mse_loss(values, returns[idx])  # Critic 回归 adjusted return
+            loss = policy_loss + vf_coef * value_loss - entropy_coef * entropy  # 与 vanilla 相同的三项组合
+    
+            optimizer.zero_grad()
+            loss.backward()
+            # 防止 RLHF 长序列梯度爆炸，限制 Actor+Critic 总梯度范数
+            torch.nn.utils.clip_grad_norm_(
+                list(actor.parameters()) + list(critic.parameters()), max_norm=1.0
+            )
+            optimizer.step()
 ```
 
 **开源代码参考：** 上述伪代码的生产级实现可参考 **[TRL](https://github.com/huggingface/trl)**（Hugging Face）和 **[OpenRLHF](https://github.com/OpenRLHF/OpenRLHF)**，两者都采用 prompt+response 拼接后一起前向传播、再通过 mask 提取 response 部分的方式计算 log_prob 和 entropy。

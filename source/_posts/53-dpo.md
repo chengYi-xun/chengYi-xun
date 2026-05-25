@@ -62,33 +62,27 @@ series: Diffusion Models theory
 
 **先看例子**：在推导之前，先用直觉理解 DPO 损失函数的含义。
 
-对于上面的排序函数例子，DPO 计算的核心信号是：
+对于上面的排序函数例子，DPO 损失函数内部的核心量是**隐式奖励边距（implicit reward margin）**——直白地说，就是模型区分好坏答案的"信心分数"：
 
-$$\text{信号} = \beta \left( \log \frac{\pi_\theta(y_w|x)}{\pi_\text{ref}(y_w|x)} - \log \frac{\pi_\theta(y_l|x)}{\pi_\text{ref}(y_l|x)} \right)$$
+$$\hat{r}_\theta(x, y_w) - \hat{r}_\theta(x, y_l) = \beta \left( \log \frac{\pi_\theta(y_w|x)}{\pi_\text{ref}(y_w|x)} - \log \frac{\pi_\theta(y_l|x)}{\pi_\text{ref}(y_l|x)} \right)$$
 
-- $\log \frac{\pi_\theta(y_w|x)}{\pi_\text{ref}(y_w|x)}$：当前模型相比参考模型，有多"偏爱"好答案 $y_w$。
-- $\log \frac{\pi_\theta(y_l|x)}{\pi_\text{ref}(y_l|x)}$：当前模型相比参考模型，有多"偏爱"坏答案 $y_l$。
-- 两者之差越大，说明模型越能区分好坏——DPO 的目标就是**最大化这个差值**。
+其中 $\hat{r}_\theta(x, y) = \beta \log \frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)}$ 是由当前策略 $\pi_\theta$ 和参考策略 $\pi_\text{ref}$ 隐式定义的**奖励函数**（原论文称 *the reward implicitly defined by the language model*）。
 
-假设训练前，当前模型就是参考模型（$\pi_\theta = \pi_\text{ref}$），那么两项都是 0，信号也是 0——模型还没学会区分好坏。训练之后，模型应该增大 $\pi_\theta(y_w|x)$、减小 $\pi_\theta(y_l|x)$，使信号变大。
+拆开来看：
+
+- $\hat{r}_\theta(x, y_w) = \beta \log \frac{\pi_\theta(y_w|x)}{\pi_\text{ref}(y_w|x)}$：当前模型相比参考模型，有多"偏爱"好答案 $y_w$（即好答案的隐式奖励）。
+- $\hat{r}_\theta(x, y_l) = \beta \log \frac{\pi_\theta(y_l|x)}{\pi_\text{ref}(y_l|x)}$：当前模型相比参考模型，有多"偏爱"坏答案 $y_l$（即坏答案的隐式奖励）。
+- 两者之差（边距）越大，说明模型越能区分好坏——DPO 的目标就是**最大化这个边距**。
+
+> **注意**：隐式奖励边距本身不是损失函数。完整的 DPO 损失函数还在边距外面套了 $-\log\sigma(\cdot)$，即 $\mathcal{L}_\text{DPO} = -\mathbb{E}[\log\sigma(\hat{r}_\theta(x, y_w) - \hat{r}_\theta(x, y_l))]$。这里先建立直觉，后面会完整推导。
+
+假设训练前，当前模型就是参考模型（$\pi_\theta = \pi_\text{ref}$），那么两个隐式奖励都是 0，边距也是 0——模型还没学会区分好坏。训练之后，模型应该增大 $\pi_\theta(y_w|x)$、减小 $\pi_\theta(y_l|x)$，使边距变大。
 
 **一般化的数学推导：**
 
 ### Step 1：RLHF 的 KL 约束优化目标
 
-先约定符号：
-
-| 符号 | 含义 |
-|:---:|:---|
-| $x$ | 用户的提示词（Prompt），例如"用 Python 写一个排序函数" |
-| $y$ | 模型生成的回答（Response），例如一段代码 |
-| $\mathcal{D}$ | 提示词数据集，所有训练用的用户问题集合 |
-| $\pi(y \mid x)$ | 当前策略（即正在训练的语言模型），表示给定 $x$ 时生成 $y$ 的概率 |
-| $\pi_{\text{ref}}(y \mid x)$ | 参考模型（冻结的 SFT 模型），用来"拴住"当前模型，防止它学偏 |
-| $r(x, y)$ | 奖励函数，衡量回答 $y$ 对于问题 $x$ 的质量 |
-| $\beta$ | KL 惩罚系数，控制当前模型偏离参考模型的程度，$\beta$ 越大约束越强 |
-
-在传统的 RLHF 中（上一篇 PPO 的四模型架构），我们的目标可以用一句话概括：**让模型回答得尽量好，但又不能跑偏太远**。数学上写成：
+在传统的 RLHF 中（上一篇 PPO 的四模型架构），我们的目标可以用一句话概括：**让模型回答得尽量好，但又不能跑偏太远**。记 $x$ 为用户问题（Prompt），$y$ 为模型回答（Response），$\pi(y|x)$ 为当前正在训练的策略，$\pi_{\text{ref}}(y|x)$ 为冻结的参考模型（SFT 模型，用来"拴住"当前模型防止学偏），$r(x,y)$ 为奖励函数，$\beta$ 为 KL 惩罚系数（越大约束越强）。数学上写成：
 
 $$
 \max_{\pi} \underbrace{\mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right]}_{\text{让回答质量尽量高}} - \underbrace{\beta \cdot D_{\text{KL}}(\pi \| \pi_{\text{ref}})}_{\text{别偏离参考模型太远}}
