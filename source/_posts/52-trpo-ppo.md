@@ -533,14 +533,21 @@ $$
 
 其中 $\beta$ 控制 KL 惩罚的强度：$\beta$ 越大，Actor 越不敢偏离 Reference 模型。
 
-有了逐步的奖励 $r_t$ 后，我们利用 GAE（Generalized Advantage Estimation）计算每个 Token 的优势 $\hat{A}_t$。与传统强化学习不同，在语言模型中我们通常将时间折扣因子 $\gamma$ 设为 1.0，因为长句子的第一个词和最后一个词同样重要：
+有了逐步的奖励 $r_t$ 后，我们利用 GAE（Generalized Advantage Estimation）计算每个 Token 的优势 $\hat{A}_t$。
+
+回顾第一篇文章中的定义：**优势函数 $A(s_t, a_t) = Q(s_t, a_t) - V(s_t)$**——"执行这个特定动作 $a_t$"比"随便选一个动作的平均水平"好了多少。但 $Q(s_t, a_t)$ 本身也是未知的，我们用**一步自举（bootstrap）**来近似它：$Q(s_t, a_t) \approx r_t + \gamma V_\phi(s_{t+1})$（这一步的即时奖励 + 折扣后的下一个状态的价值）。代入优势的定义，就得到了**时间差分残差（TD 残差）**$\delta_t$：
 
 $$
-\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)
+\delta_t = \underbrace{r_t + \gamma V_\phi(s_{t+1})}_{\approx\, Q(s_t, a_t)\text{（一步估计）}} - V_\phi(s_t)
 $$
+
+单步的 $\delta_t$ 方差低但偏差高（因为 $V_\phi$ 本身是 Critic 估计的，不完全准确）。GAE 通过指数衰减地叠加未来多步的 $\delta$，在偏差和方差之间取折中（$\lambda=0$ 退化为纯单步 TD 估计，低方差高偏差；$\lambda=1$ 退化为蒙特卡洛估计，高方差零偏差）：
+
 $$
-\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l} \quad (\text{其中 } \gamma = 1.0)
+\hat{A}_t = \delta_t + (\gamma\lambda)\delta_{t+1} + (\gamma\lambda)^2\delta_{t+2} + \cdots = \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l}
 $$
+
+与传统强化学习不同，在语言模型中我们通常将时间折扣因子 $\gamma$ 设为 **1.0**——因为长句子的第一个词和最后一个词对整句质量同样重要，不应该因为位置靠后就被打折。
 
 ### Critic 的“地狱难度”与工业界解法
 
@@ -554,10 +561,30 @@ $$
 
 ### RLHF-PPO 的总损失函数
 
-在完成了上面的优势估计后，RLHF-PPO 的优化目标由三部分组成：策略损失（带裁剪）、价值网络损失（回归长期回报）和熵正则项：
+#### 高层目标与 PPO 实现的关系
+
+读者在看到 PPO 的损失函数时，可能会产生一个疑问：DPO 那篇文章中写的 RLHF 高层目标是：
 
 $$
-\mathcal{L}^{\text{PPO}}(\theta, \phi) = \underbrace{\mathcal{L}^{\text{CLIP}}(\theta)}_{\text{第一项：策略损失}} - c_1 \underbrace{\mathbb{E}\left[(V_\phi(s_t) - V_t^{\text{target}})^2\right]}_{\text{第二项：价值损失}} + c_2 \underbrace{S[\pi_\theta]}_{\text{第三项：熵奖励}}
+\max_{\pi} \underbrace{\mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} \left[ r(x, y) \right]}_{\text{让回答质量尽量高}} - \underbrace{\beta \cdot D_{\text{KL}}(\pi \| \pi_{\text{ref}})}_{\text{别偏离参考模型太远}}
+$$
+
+为什么 PPO 的损失函数 $\mathcal{L}^{\text{PPO}}$ 看起来和这个完全不一样？
+
+**答案是：PPO 损失函数正是这个高层目标的具体实现方式，两者是等价的，只是展开层级不同。** 高层目标描述的是"我们最终想要什么"，PPO 损失函数描述的是"我们具体怎么优化"。两者之间的桥梁就在于上面 Step 2 的**奖励构造**：
+
+$$
+r_t = \underbrace{R_\psi(\text{prompt}, \text{response})}_{\text{对应高层目标第一项}} - \underbrace{\beta \log \frac{\pi_\theta(a_t|s_t)}{\pi_{\text{ref}}(a_t|s_t)}}_{\text{对应高层目标第二项}}
+$$
+
+也就是说，KL 惩罚已经被**折叠进了每一步的奖励**里。当 PPO 用 $\mathcal{L}^{\text{CLIP}}$ 去最大化基于这些 KL 修正后奖励算出的优势 $\hat{A}_t$ 时，它**等价于**在最大化"期望奖励减去 KL 惩罚"这个高层目标。打个比方：高层目标是"考试总分要高，但不能作弊"；PPO 的做法是把"作弊扣分"直接算进每道题的得分里，然后只管"让每道题的（扣分后的）成绩尽量好"——最终效果是一样的。
+
+#### 三部分展开
+
+在完成了上面的优势估计后，PPO 的实际优化目标由三部分组成：
+
+$$
+\mathcal{L}^{\text{PPO}}(\theta, \phi) = \underbrace{\mathcal{L}^{\text{CLIP}}(\theta)}_{\text{第一项：策略损失}} - c_1 \underbrace{\mathcal{L}^{\text{VF}}(\phi)}_{\text{第二项：价值损失}} + c_2 \underbrace{S[\pi_\theta]}_{\text{第三项：熵奖励}}
 $$
 
 下面逐项展开：
@@ -570,13 +597,35 @@ $$
 
 裁剪比率 $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)}$ 被限制在 $[1-\epsilon, 1+\epsilon]$ 内。注意这里的 $a_t$ 在 LLM 场景下就是第 $t$ 个生成的 Token，$s_t$ 则是 Prompt + 前 $t-1$ 个已生成 Token 构成的上下文。
 
-**第二项：价值损失 $\mathcal{L}^{\text{VF}}(\phi)$**——Critic 网络的学习目标，用均方误差让 Critic 的预测值逼近真实回报：
+**第二项：价值损失 $\mathcal{L}^{\text{VF}}(\phi)$**——这一项是专门训练 Critic 网络的。Critic 的任务是当一个"预言家"：**在模型生成到第 $t$ 个 Token 时，预测从这个位置开始到句末为止，剩余所有 Token 能获得的累积奖励总和（即回报 $G_t$）**。
+
+用例子来理解：假设模型正在生成一段代码回答，已经写了前 5 个 Token `def sort(arr):`，Critic 要预测的是："从这个冒号之后，后续生成的 Token（函数体部分）平均能在句末从 RM 拿到多少分？"——假设 Critic 预测为 $V_{\phi_\text{old}}(s_t) = 6.0$ 分。
+
+那 Critic 的"正确答案"是什么呢？回忆上面 GAE 优势的含义——$\hat{A}_t$ 是对 $Q(s_t, a_t) - V(s_t)$ 的估计，即"实际回报与预测之差"。因此：
 
 $$
-\mathcal{L}^{\text{VF}}(\phi) = \mathbb{E}_t \left[\left(V_\phi(s_t) - V_t^{\text{target}}\right)^2\right]
+\hat{A}_t \approx G_t - V_{\phi_\text{old}}(s_t)
 $$
 
-其中回归目标 $V_t^{\text{target}} = \hat{A}_t + V_{\phi_\text{old}}(s_t)$（GAE 估计的优势 + 旧 Critic 的预测值）。直觉上：$V_{\phi_\text{old}}(s_t)$ 是 Critic 上一轮对这个状态的估值，$\hat{A}_t$ 是 "实际表现比估值好（或差）了多少"，两者加起来就是 "实际应该值多少"。通过最小化该项，Critic 学会更准确地预估每个 Token 位置的长期收益，进而为 Actor 提供更低方差的优势估计。系数 $c_1$（通常 0.5）控制其在总损失中的权重。
+移项后就得到了**真实回报**——即 Critic 应该预测的"正确答案"：
+
+$$
+V_t^{\text{target}} = G_t \approx \hat{A}_t + V_{\phi_\text{old}}(s_t)
+$$
+
+**这就是代码中 `returns = advantages + old_values` 的含义：回报 = 优势 + 旧的价值估计。** 用刚才的例子来说：
+
+- $V_{\phi_\text{old}}(s_t) = 6.0$：Critic **上一轮**对这个位置的估值（"我以为后面能拿 6.0 分"）
+- $\hat{A}_t = +1.5$：GAE 算出来的优势（"实际表现比我以为的好了 1.5 分"）
+- $V_t^{\text{target}} = 6.0 + 1.5 = 7.5$：事后看来，**真实回报应该是 7.5 分**
+
+所以 Critic 的损失就是让预测值逼近这个事后算出的"正确答案"：
+
+$$
+\mathcal{L}^{\text{VF}}(\phi) = \mathbb{E}_t \left[\left(\underbrace{V_\phi(s_t)}_{\text{Critic 当前的预测}} - \underbrace{V_t^{\text{target}}}_{\text{事后算出的真实回报}}\right)^2\right]
+$$
+
+系数 $c_1$（通常 0.5）控制 Critic 学习速度相对于 Actor 的比例。如果 Critic 学得太快，它会过拟合当前这批数据上的噪声；学得太慢，又会导致优势估计不准、Actor 更新方向不可靠。
 
 **第三项：熵奖励 $S[\pi_\theta]$**——鼓励策略保持探索性：
 
@@ -586,7 +635,7 @@ $$
 
 其中 $\mathcal{V}$ 是整个词表（vocabulary），$|\mathcal{V}|$ 通常为 3\~13 万。熵越大表示策略越"犹豫"（分布越均匀），熵越小表示策略越"确定"（集中在少数 Token 上）。在总损失中以 $+c_2 S$ 出现（正号），因为我们最小化 loss 时正号等价于**最大化熵**——防止策略过早坍缩到确定性行为，保持探索空间。系数 $c_2$（通常 0.01）确保探索激励不会盖过策略优化信号。
 
-**三项合在一起的直觉**：第一项让 Actor "做得更好"（强化好动作、抑制坏动作）；第二项让 Critic "看得更准"（准确估值）；第三项让策略 "别太武断"（保持多样性）。三者协同，构成了 RLHF-PPO 的完整优化目标。
+**三项合在一起的直觉**：第一项让 Actor "做得更好"（强化好动作、抑制坏动作）；第二项让 Critic "看得更准"（准确估值，为下一轮提供更低方差的优势）；第三项让策略 "别太武断"（保持多样性）。三者协同，构成了 RLHF-PPO 的完整优化目标。
 
 下面是 RLHF-PPO 的完整代码实现。对比上一节的 Vanilla 版本，核心差异就在于上述的奖励构造（Step 2）以及免采样的 Teacher Forcing 前向传播。
 
