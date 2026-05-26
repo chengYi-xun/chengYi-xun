@@ -60,6 +60,68 @@ series: Diffusion Models theory
 
 ## DPO 的数学推导
 
+### 完整推导
+
+> **推导目的**：证明下面这个纯监督损失函数（只需偏好对 + 前向传播）的最优解，**恰好等价于** RLHF 的 KL 约束奖励最大化的最优解——不需要奖励模型、不需要在线 RL，就能达到与 PPO 相同的理论最优策略。
+>
+> **为什么能推导**：KL 约束 + 线性奖励的特殊结构使得最优策略有 Boltzmann 形式的闭式解（统计力学 / 变分推断中早已知晓）。DPO 的关键洞察是：Bradley-Terry 偏好模型只关心奖励**之差**，做差时不可计算的配分函数 $Z(x)$ 自动消去，使最终损失只依赖于策略概率比——完全不含 $r$。
+>
+> **为什么之前不用**：闭式解 $\pi^*=\frac{1}{Z}\pi_{\text{ref}}e^{r/\beta}$ 早已知晓，但直接计算它需要先有 $r$（训练奖励模型）和 $Z$（不可计算）——所以之前仍走 PPO 路线。DPO (2023) 发现 BT 配对比较让 $r$ 和 $Z$ 同时消去，使得无需显式学习奖励就能直接优化策略。
+>
+> 约定：$\pi$ 为策略，$\pi_{\text{ref}}$ 为冻结参考策略，$r(x,y)$ 为奖励，$\beta>0$ 为 KL 系数，$Z(x)=\sum_y \pi_{\text{ref}}(y|x)\exp\!\bigl(r(x,y)/\beta\bigr)$。
+
+$$
+\max_{\pi}\; \mathbb{E}_{x,\,y\sim\pi}\!\left[ r(x,y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right]
+$$
+
+$\Longrightarrow$ 除以 $\beta$，变号：
+
+$$
+\min_{\pi}\; \mathbb{E}_{y\sim\pi}\!\left[ \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)\exp\!\bigl(r(x,y)/\beta\bigr)} \right]
+$$
+
+$\Longrightarrow$ 分母除以 $Z(x)$ 归一化，定义 $\pi^*(y|x)\triangleq\frac{1}{Z(x)}\pi_{\text{ref}}(y|x)\exp\!\bigl(r(x,y)/\beta\bigr)$：
+
+$$
+\min_{\pi}\; D_{\text{KL}}(\pi \| \pi^*) - \log Z(x)
+$$
+
+$\Longrightarrow$ $D_{\text{KL}}\geq 0$，取等当且仅当 $\pi=\pi^*$，故最优策略为：
+
+$$
+\pi^*(y|x) = \frac{1}{Z(x)}\,\pi_{\text{ref}}(y|x)\,\exp\!\left(\frac{r(x,y)}{\beta}\right)
+$$
+
+$\Longrightarrow$ 两边取 $\log$，解出 $r$：
+
+$$
+r(x,y) = \beta\log\frac{\pi^*(y|x)}{\pi_{\text{ref}}(y|x)} + \beta\log Z(x)
+$$
+
+$\Longrightarrow$ 代入 Bradley-Terry 模型 $p(y_w\!\succ\!y_l|x)=\sigma(r_w-r_l)$，做差消去 $\beta\log Z(x)$：
+
+$$
+p(y_w\!\succ\!y_l|x) = \sigma\!\left(\beta\log\frac{\pi^*(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta\log\frac{\pi^*(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right)
+$$
+
+$\Longrightarrow$ 若要直接计算 $\pi^*$ 就必须先有显式的 $r$（回到 PPO 路线），但上式已不含 $r$——只有策略概率比。因此用可训练的 $\pi_\theta$ 替代 $\pi^*$，构造负对数似然作为损失（最小值恰在 $\pi_\theta=\pi^*$ 时取到），完全绕过奖励模型：
+
+$$
+\boxed{\;\mathcal{L}_{\text{DPO}}(\theta) = -\mathbb{E}_{(x,y_w,y_l)}\!\left[\log\sigma\!\left(\beta\log\frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta\log\frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right)\right]\;}
+$$
+
+梯度：
+
+$$
+\nabla_\theta\mathcal{L} = -\beta\,\mathbb{E}\!\left[\sigma(-\hat{r}_\theta)\left(\nabla_\theta\log\pi_\theta(y_w|x) - \nabla_\theta\log\pi_\theta(y_l|x)\right)\right]
+$$
+
+其中 $\hat{r}_\theta = \beta\left(\log\frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \log\frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right)$，权重 $\sigma(-\hat{r}_\theta)$ 自动聚焦于未学好的样本。
+
+---
+
+### 分步详解
+
 **先看例子**：在推导之前，先用直觉理解 DPO 损失函数的含义。
 
 对于上面的排序函数例子，DPO 损失函数内部的核心量是**隐式奖励边距（implicit reward margin）**——直白地说，就是模型区分好坏答案的"信心分数"：
