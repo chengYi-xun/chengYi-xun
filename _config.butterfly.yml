@@ -670,7 +670,7 @@ CDN:
   third_party_provider: jsdelivr
 
   # Add version number to url, true or false
-  version: false
+  version: true
 
   # Custom format
   # For example: https://cdn.staticfile.org/${cdnjs_name}/${version}/${min_cdnjs_file}

@@ -108,45 +108,9 @@ $$
 | $r(o_i)$ | 第 $i$ 个回答的奖励 |
 | $\mu_R$ | 组内均值，$V(s)$ 的蒙特卡洛估计 |
 
-**为什么这行得通？** 三条理论保障：
+**为什么这行得通？** 道理很朴素：想知道一个班的平均成绩，随机抽几个同学算平均分就是一个合理的估计——抽的人越多越准。$G$ 个回答的均值 $\mu_R$ 就是对真实平均奖励 $V(s)$ 的这种"抽样估计"，$G = 8 \sim 16$ 在实践中足够准确。
 
-**1. 无偏性：采样均值的期望 = 真实期望**
-
-$$
-\mathbb{E}[\mu_R] = \mathbb{E}\left[\frac{1}{G}\sum_{i=1}^G r(o_i)\right]
-$$
-
-逐步拆解等号：
-
-- **第 1 步**：期望是线性运算，$\frac{1}{G}$ 是常数可以提出来，$\sum$ 可以拆成逐项期望：
-
-$$\mathbb{E}\left[\frac{1}{G}\sum_{i=1}^G r(o_i)\right] = \frac{1}{G}\sum_{i=1}^G \mathbb{E}[r(o_i)]$$
-
-- **第 2 步**：每个 $o_i$ 都是从**同一个分布** $\pi_\theta(\cdot|s)$ 独立采样的，所以每项的期望相同：
-
-$$\mathbb{E}[r(o_1)] = \mathbb{E}[r(o_2)] = \cdots = \mathbb{E}[r(o_G)] = \mathbb{E}_{o \sim \pi_\theta}[r(o)]$$
-
-- **第 3 步**：$G$ 个相同的值求和再除以 $G$，结果就是它本身：
-
-$$\frac{1}{G} \cdot G \cdot \mathbb{E}[r(o)] = \mathbb{E}[r(o)] = V(s)$$
-
-**结论**：$\mathbb{E}[\mu_R] = V(s)$——采样均值不会系统性地偏高或偏低，这就是"无偏"的含义。
-
-**2. 收敛性：采样越多，估计越准**
-
-方差衡量的是"每次估计偏离真实值多远"。对于 $G$ 个独立同分布样本的均值：
-
-$$\text{Var}(\mu_R) = \text{Var}\left(\frac{1}{G}\sum_{i=1}^G r(o_i)\right)$$
-
-- **独立性**：$o_1, \dots, o_G$ 相互独立，独立随机变量之和的方差 = 各自方差之和：
-
-$$= \frac{1}{G^2} \sum_{i=1}^G \text{Var}(r(o_i)) = \frac{1}{G^2} \cdot G \cdot \text{Var}(r) = \frac{\text{Var}(r)}{G}$$
-
-**物理意义**：方差随 $G$ 线性下降。$G=1$ 时方差最大（只看一个回答的分数来猜平均分，很不靠谱）；$G=16$ 时方差缩小到 $\frac{1}{16}$（16 个回答取平均，估计精度大幅提升）。当 $G \to \infty$，方差 $\to 0$，大数定律保证 $\mu_R$ 精确收敛到 $V(s)$。
-
-实践中 $G = 8 \sim 16$ 是一个好的折中——采样成本可控，估计精度足够。
-
-**3. 标准化稳定梯度**
+**标准化稳定梯度**
 
 除以 $\sigma_R$ 后得到 $\hat{A}_i = \frac{r_i - \mu_R}{\sigma_R + \varepsilon}$。这一步的作用是**消除奖励尺度的影响**。
 
@@ -166,17 +130,7 @@ RLOO（REINFORCE Leave-One-Out）是另一种去 Critic 的基线方案。两种
 | $r_i$ 是否参与基线计算 | **是**（$r_i$ 在求和里） | **否**（排除了 $r_i$） |
 | $r_i$ 与基线的关系 | 正相关（$\text{Cov} > 0$） | 独立（$\text{Cov} = 0$） |
 
-**GRPO 的"自我包含"效应**：由于 $r_i$ 同时出现在被减数和减数中，GRPO 的优势估计会被系统性压缩。展开 $\mu_R$：
-
-$$\mu_R = \frac{1}{G}\bigl(r_i + (G{-}1)\bar{r}_{-i}\bigr), \quad \bar{r}_{-i} = \frac{1}{G{-}1}\sum_{j \neq i} r_j \;\text{（除第 } i \text{ 个之外的均值，即 RLOO 的基线）}$$
-
-$$r_i - \mu_R = r_i - \frac{r_i + (G{-}1)\bar{r}_{-i}}{G} = \frac{G{-}1}{G}\bigl(r_i - \bar{r}_{-i}\bigr)$$
-
-相比 RLOO 直接算出的 $r_i - \bar{r}_{-i}$，GRPO 的结果多了一个 $\frac{G-1}{G}$ 的缩放因子（$G=8$ 时为 $87.5\%$）。这意味着好坏回答之间的区分度被削弱了约 $\frac{1}{G}$，梯度信号略弱。
-
-**从方差公式看**：$\text{Var}(r_i - b_i) = \text{Var}(r_i) + \text{Var}(b_i) - 2\text{Cov}(r_i, b_i)$。GRPO 的正协方差确实让 $r_i - \mu_R$ 的数值波动更小，但这种"稳定"来自信号被压缩而非噪声被消除——**数值方差小不等于估计质量高**。RLOO 的基线与 $r_i$ 独立，梯度信号保持原始尺度，信噪比更优。
-
-**实践中差距不大**：$G=8$ 时压缩仅 $12.5\%$，且 GRPO 的除以 $\sigma_R$ 标准化会部分补偿这个缩放。GRPO 因实现更简单（一次求均值即可）而被广泛使用。
+**GRPO 的"自我包含"效应**：展开可得 $r_i - \mu_R = \frac{G-1}{G}(r_i - \bar{r}_{-i})$（其中 $\bar{r}_{-i}$ 即 RLOO 的基线），相比 RLOO 多了 $\frac{G-1}{G}$ 的缩放（$G=8$ 时为 $87.5\%$），梯度信号被轻微压缩。但实践中差距不大，且 GRPO 的 $\sigma_R$ 标准化会部分补偿这个缩放，加上实现更简单（一次求均值即可），因此被广泛使用。
 
 ---
 
@@ -214,81 +168,41 @@ $$
 
 ## 2. KL 散度正则化：为什么用这个特殊形式？
 
-为了防止策略"钻空子"（Reward Hacking）或丧失语言连贯性，需要约束 $\pi_\theta$ 不偏离参考策略 $\pi_{\text{ref}}$ 太远。
-
-标准的 KL 散度定义为：
+为了防止策略"钻空子"（Reward Hacking）或丧失语言连贯性，需要约束 $\pi_\theta$ 不偏离参考策略 $\pi_{\text{ref}}$ 太远。直觉上我们需要一个"距离度量"来衡量两个策略有多不同，标准 KL 散度是最自然的选择：
 
 $$
 D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \mathbb{E}_{o \sim \pi_\theta}\left[\log \frac{\pi_\theta(o|s)}{\pi_{\text{ref}}(o|s)}\right]
 $$
 
-它需要对 $\pi_\theta$ 的完整分布求期望，但我们手头只有来自 $\pi_{\theta_{\text{old}}}$ 的有限采样。直接用采样估计 $D_{\text{KL}}$ 会引入较大方差。GRPO 转而使用一种基于 **$f$-散度** 的替代量。
+但它有两个实操困难：
 
-### 什么是 $f$-散度（$f$-divergence）？
+1. **期望无法直接算**：$D_{\text{KL}}$ 要求对 $\pi_\theta$ 分布下所有可能输出求期望，而我们手头只有从旧策略 $\pi_{\theta_{\text{old}}}$ 采出来的有限样本——分布不匹配，直接用这些样本估计 $D_{\text{KL}}$ 偏差大。
 
-$f$-散度是一族衡量"两个概率分布有多不同"的度量，统一公式为：
+2. **逐样本值可正可负**：对单个样本 $o$，$\log \frac{\pi_\theta(o)}{\pi_{\text{ref}}(o)}$ 可正可负（虽然取期望后 $D_{\text{KL}} \geq 0$）。回顾最终目标函数的结构：$J = \text{奖励项} - \beta \cdot \hat{D}_{\text{KL}}$，KL 项被**减去**以惩罚偏离。如果 $\hat{D}_{\text{KL}}$ 对某些 token 取负值，$-\beta \cdot (\text{负数}) = \text{正数}$，反而**增加**了目标函数——策略在这些 token 上偏离参考模型竟然获得了奖励，与"惩罚偏离"的设计意图相悖。
 
-$$D_f(P \| Q) = \mathbb{E}_{x \sim Q}\left[f\!\left(\frac{P(x)}{Q(x)}\right)\right]$$
-
-| 符号 | 含义 |
-|:---|:---|
-| $P, Q$ | 两个概率分布 |
-| $\frac{P(x)}{Q(x)}$ | **似然比**：$P$ 和 $Q$ 在同一个 $x$ 上的概率之比 |
-| $f(\cdot)$ | 一个凸函数，满足 $f(1) = 0$（当 $P = Q$ 时散度为零） |
-
-不同的 $f$ 对应不同的经典散度：
-
-| 选择的 $f(u)$ | 对应的散度 |
-|:---|:---|
-| $u \log u$ | 正向 KL 散度 $D_{\text{KL}}(P \| Q)$ |
-| $-\log u$ | 反向 KL 散度 $D_{\text{KL}}(Q \| P)$ |
-| $(\sqrt{u} - 1)^2$ | Hellinger 距离 |
-| $(u-1)^2$ | $\chi^2$ 散度 |
-| $u - \log u - 1$ | **GRPO 使用的形式**（下面推导） |
-
-**关键优势**：$f$-散度的期望是在 $Q$（即 $\pi_\theta$）下取的——而我们**正好有来自 $\pi_\theta$（或 $\pi_{\theta_{\text{old}}}$）的采样**，可以直接用样本估计，不需要对整个分布积分。
-
-### GRPO 的 $f$-散度选择
-
-取 $f(u) = u - \log u - 1$，令 $P = \pi_{\text{ref}}$、$Q = \pi_\theta$、$u = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}$，单样本估计量为：
+GRPO 转而采用 Schulman (2020) 提出的一种 KL 近似估计量。令 $u = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}$，定义：
 
 $$
-\hat{D}_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \underbrace{\frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}}_{u} - \underbrace{\log \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}}_{\log u} - 1
+\hat{D}_{\text{KL}} = u - \log u - 1 = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - \log \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)} - 1
 $$
 
-**为什么选 $f(u) = u - \log u - 1$？**
+这个估计量具有两个关键性质，恰好解决了上述问题：
 
-- $f(1) = 1 - 0 - 1 = 0$：当 $\pi_\theta = \pi_{\text{ref}}$ 时（$u = 1$），惩罚为零。
+- **逐样本非负**：由不等式 $e^x \geq x + 1$（即 $u - \log u - 1 \geq 0$，$\forall u > 0$），等号当且仅当 $u = 1$（$\pi_\theta = \pi_{\text{ref}}$）时成立。这保证了**每个 token 的惩罚都 $\geq 0$**，不会出现"偏离反获奖励"的问题。
 
-- $f''(u) = 1/u^2 > 0$：严格凸，$u = 1$ 是唯一最小值点。
+- **双侧惩罚**：当 $\pi_\theta$ 塌缩（某 token 概率远小于 $\pi_{\text{ref}}$，$u \gg 1$）时惩罚以 $u$ 线性增长；当 $\pi_\theta$ 膨胀（概率远大于 $\pi_{\text{ref}}$，$u \to 0$）时惩罚以 $-\log u$ 对数增长。两个方向的偏离都被约束。
 
-- **双侧惩罚**：当 $\pi_\theta \ll \pi_{\text{ref}}$（$u \gg 1$）时 $f(u) \approx u$（线性增长），当 $\pi_\theta \gg \pi_{\text{ref}}$（$u \to 0$）时 $f(u) \approx -\log u$（对数增长）。两个方向的偏离都会被惩罚，防止概率塌缩或异常膨胀。
+> **数学注**：$u - \log u - 1$ 在 $u = 1$ 附近做泰勒展开得 $\frac{1}{2}(u-1)^2 + O((u-1)^3)$，与标准 KL 的局部行为一致（二者共享同一 Fisher 信息矩阵），因此在策略变化不大时，两者给出的惩罚几乎相同。
 
-> **与 PPO 的 KL 惩罚对比**：PPO 使用 $\beta \cdot (\log \pi_\theta - \log \pi_{\text{ref}})$ 逐 token 加到奖励上（见上一篇的 `kl_penalty`）。GRPO 将 KL 惩罚直接作为损失的一部分，并使用 $f$-散度形式，对概率塌缩更敏感。
+### Token 级别的计算
 
-### Token 级别的操作：从序列到单 token
-
-上面 $\hat{D}_{\text{KL}}$ 中的 $u = \frac{\pi_{\text{ref}}(o_i|s)}{\pi_\theta(o_i|s)}$ 和下面最终目标函数中的重要性比率 $\rho_i = \frac{\pi_\theta(o_i|s)}{\pi_{\theta_{\text{old}}}(o_i|s)}$ 都涉及**整条回答的概率**。但语言模型是自回归的——逐 token 生成。所以需要说明这些"序列级"的量如何从"token 级"构造出来。
-
-**序列概率 = 各 token 条件概率的乘积**（链式法则）：
+上面公式中 $\pi_\theta(o_i|s)$ 是**整条回答的概率**，但语言模型逐 token 生成。由链式法则，序列概率等于各 token 条件概率的乘积：
 
 $$
 \pi_\theta(o_i|s) = \prod_{t=1}^{T} \pi_\theta(o_i^t | s, o_i^{<t})
 $$
 
-取对数后乘积变为求和（计算更稳定）：
-
-$$
-\log \pi_\theta(o_i|s) = \sum_{t=1}^{T} \log \pi_\theta(o_i^t | s, o_i^{<t})
-$$
-
-**重要性比率**（用于 PPO 裁剪）利用 $\log$ 相减等价于概率相除：
-
-$$
-\rho_i(\theta) = \frac{\pi_\theta(o_i|s)}{\pi_{\theta_{\text{old}}}(o_i|s)} = \exp\left(\sum_{t=1}^{T} \left[\log \pi_\theta(o_i^t | s, o_i^{<t}) - \log \pi_{\theta_{\text{old}}}(o_i^t | s, o_i^{<t})\right]\right)
-$$
-
-KL 散度中的 $u = \frac{\pi_{\text{ref}}}{\pi_\theta}$ 同理构造。上式给出的是**序列级**似然比 $\rho_i = \prod_t \rho_{i,t}$，它等于各 token 比率的乘积。但实际实现中**不**计算这个乘积（长序列会导致数值溢出或下溢），而是在每个 token 位置 $t$ 独立计算 $\rho_{i,t}$ 并直接用于 PPO 的逐 token 裁剪代理目标（即对每个 $t$ 分别做 $\min(\rho_{i,t} \hat{A}_i, \text{clip}(\rho_{i,t}) \hat{A}_i)$），然后对 $t$ 求平均。这意味着裁剪在 **token 级** 逐位执行，而非对序列级 $\rho_i$ 做单次裁剪。
+据此，重要性比率 $\rho_{i} = \pi_\theta(o_i|s) / \pi_{\theta_{\text{old}}}(o_i|s) = \prod_t \rho_{i,t}$ 和 KL 中的 $u = \pi_{\text{ref}} / \pi_\theta$ 都可以分解为 token 级的乘积。但实际实现中**不计算序列级乘积**（长序列会数值溢出），而是在每个 token 位置 $t$ 独立计算 $\rho_{i,t}$，逐 token 执行 PPO 裁剪和 KL 惩罚，最后对所有 token 求平均。
 
 ## 3. GRPO 最终目标函数
 
