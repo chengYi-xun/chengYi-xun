@@ -118,68 +118,11 @@ $$x_{t-\Delta t} = \underbrace{(x_t - \Delta t \cdot v_\theta)}_{\text{逆向 OD
 第一项是原始 ODE 的确定性去噪；第三项是为 RL 注入的随机噪声；第二项就是 Score 纠偏——它的方向指向数据高密度区域，恰好抵消噪声带来的分布偏移。
 
 {% note warning no-icon %}
-**关键问题：Score 纠偏和随机噪声之间是什么关系？**
+**分布等价性保证（第二步：保持分布不变）**
 
-直觉上会产生一个疑问：噪声 $\epsilon$ 是随机的（每个样本不同），那纠偏是否也应该依赖于具体加了什么噪声？答案是：**Score 不纠正某个具体的 $\epsilon$，而是提供一个位置相关的"恢复力场"。**
+Score 不纠正某个具体的噪声 $\epsilon$，而是提供一个**位置相关的恢复力场**——它只取决于当前位置 $x_t$，不关心噪声的具体方向。通过 Fokker-Planck 方程可以严格证明：Score 纠偏项（$\frac{1}{2}g^2 \nabla\log p_t$）与噪声扩散效应（方差 $g^2\Delta t$）在分布演化方程中**逐项精确对消**，使 SDE 与纯 ODE 在**每一步**都保持相同的边缘分布 $p_t(x)$。这就是 Score 系数恰好取 $\frac{1}{2}g^2$ 的原因。
 
-类比：想象一群粒子在山谷中随机游走。噪声 = 每个粒子随机晃动的方向（每人不同）；Score = 山谷壁给的重力（只取决于你站在哪里，不关心你怎么晃过来的）。山谷壁不需要知道你具体往哪个方向晃了——它只需要把所有偏离谷底的人往回拉。
-
-但"山谷的形状"必须正确——Score $\nabla\log p_t(x_t)$ 依赖于当前步的正确分布 $p_t$。如果中间分布偏了（山谷形状变了），Score 给出的纠偏方向也会错，后续所有步骤的错误就会累积。所以我们需要证明 SDE 在**每一步**都保持和 ODE 相同的中间分布 $p_t(x)$，而不仅仅是最终输出一致。
-
-数学上，通过 **Fokker-Planck 方程（福克-普朗克方程，又称 Kolmogorov Forward Equation）**可以严格证明这一点。
-
-**预备知识：Fokker-Planck 方程（福克-普朗克方程）是什么？**
-
-一句话：**SDE 描述的是单个粒子怎么走，FP 方程描述的是一大群粒子的概率密度怎么变。** 它把"随机轨迹"的问题翻译成了"确定性的偏微分方程"问题，从而可以用分析工具来研究。
-
-想象你同时释放 100 万个粒子，每个都独立遵循相同的 SDE $dx = \mu\,d\tau + \sigma\,dW$。在任意时刻 $\tau$，这些粒子散布在空间中形成一团"概率云"。$p(x, \tau)$ 就是这个云的密度——描述在位置 $x$ 附近找到粒子的概率。
-
-Fokker-Planck 方程告诉我们这个密度如何随时间演化，它由两个物理效应叠加而成：
-
-$$\frac{\partial p}{\partial \tau} = \underbrace{-\nabla\cdot(\mu\, p)}_{\text{漂移搬运概率（连续性方程）}} + \underbrace{\frac{1}{2}\sigma^2\nabla^2 p}_{\text{噪声摊平概率（热方程）}}$$
-
-- **第一项**来自确定性漂移 $\mu$：如同流体力学中的质量守恒，$\mu \cdot p$ 是"概率流"，$\nabla\cdot(\mu p)$ 是某处的净流出量。流出多于流入 → 密度下降 → 需要负号。
-- **第二项**来自随机噪声 $\sigma\,dW$：噪声让粒子扩散（从密集处散开），其效果等价于热传导——热量从高温（高密度）流向低温（低密度）。$\nabla^2 p$ 度量局部密度的"凹凸程度"。系数中的 $\frac{1}{2}$ 来自**伊藤引理（Itô's Lemma）中 Taylor 展开的二阶项系数** $\frac{1}{2!}$：普通微积分中 $(dx)^2$ 是高阶无穷小可以丢弃，但维纳过程满足 $(dW)^2 = d\tau$（不为零），因此二阶项 $\frac{1}{2}\sigma^2\frac{\partial^2}{\partial x^2}$ 必须保留，$\frac{1}{2}$ 便随之进入 FP 方程。
-
-**若没有噪声**（$\sigma = 0$），FP 方程退化为纯漂移的 Liouville 方程 $\partial_\tau p = -\nabla\cdot(\mu\,p)$。
-
-以下是利用 FP 方程的完整证明。**为什么要证这个？** 因为我们刚刚把 ODE 改成了 SDE（加了噪声 + score 纠偏）。读者的合理疑问是：你这么一改，生成出来的图还正常吗？以下证明回答：**正常，改造前后每一步的概率密度 $p_t(x)$ 完全一致。** （第二步：保持分布不变）
-
-**目标**：证明 SDE 采样与 ODE 采样产生相同的边缘分布 $p_t(x)$。
-
-**Step 1. 写出两者的分布演化方程。** 设反向时间变量 $\tau$（$\tau$ 递增时实际时间 $t$ 递减）。
-
-纯 ODE（$x_{\text{new}} = x - v_\theta \Delta t$）的 Liouville 方程（FP 方程中 $\sigma=0$ 的特例）：
-
-$$\frac{\partial p}{\partial \tau} = \nabla \cdot (v_\theta \cdot p)$$
-
-SDE（漂移 $\mu = -v_\theta + \frac{1}{2}g^2\nabla\log p_t$，扩散 $\sigma = g$）的 Fokker-Planck 方程：
-
-$$\frac{\partial p}{\partial \tau} = -\nabla\cdot(\mu\, p) + \frac{1}{2}\sigma^2\nabla^2 p$$
-
-**Step 2. 展开 SDE 的 Fokker-Planck 方程：**
-
-$$= -\nabla\cdot\left[\left(-v_\theta + \tfrac{1}{2}g^2\nabla\log p_t\right)p\right] + \tfrac{1}{2}g^2\nabla^2 p$$
-
-$$= \underbrace{\nabla\cdot(v_\theta\, p)}_{\text{ODE 贡献}} \;-\; \underbrace{\tfrac{1}{2}g^2\nabla\cdot\left[(\nabla\log p_t)\,p\right]}_{\text{Score 项贡献}} \;+\; \underbrace{\tfrac{1}{2}g^2\nabla^2 p}_{\text{噪声扩散贡献}}$$
-
-**Step 3. 利用恒等式 $(\nabla\log p_t)\cdot p_t = \nabla p_t$**（因为 $\nabla\log p = \nabla p / p$）：
-
-$$\tfrac{1}{2}g^2\nabla\cdot[(\nabla\log p_t)\,p_t] = \tfrac{1}{2}g^2\nabla\cdot(\nabla p_t) = \tfrac{1}{2}g^2\nabla^2 p_t$$
-
-**Step 4. Score 项与噪声项精确抵消：**
-
-$$\frac{\partial p}{\partial \tau} = \nabla\cdot(v_\theta p) - \cancel{\tfrac{1}{2}g^2\nabla^2 p_t} + \cancel{\tfrac{1}{2}g^2\nabla^2 p_t} = \nabla\cdot(v_\theta\, p)$$
-
-这与纯 ODE 的 Liouville 方程完全相同。$\blacksquare$
-
-**结论**：Score 纠偏项（$\frac{1}{2}g^2 \nabla\log p_t$）与噪声扩散效应（方差 $g^2\Delta t$）在 Fokker-Planck 方程中逐项对消，使 SDE 的分布演化等价于纯 ODE。这就是为什么 Score 系数恰好是 $\frac{1}{2}g^2$：它精确匹配噪声的统计效应。
-
-这个等价是**逐步成立**的——FP 方程在任意时刻 $t$ 都一样，所以不只是最终生成图 $p_0(x)$ 一致，而是**每一步中间分布 $p_t(x)$ 都一致**。这一点至关重要，因为 score 纠偏项本身依赖当前步的 $\nabla\log p_t$：如果某一步的中间分布 $p_t$ 偏了，那该步的 score 就会算错，错误会向后续步骤累积——就像导航基于错误位置给出的指引只会让你越走越偏。逐步等价保证了这条因果链不会断裂。
-
-- 个体样本：轨迹因 $\epsilon$ 不同而各异（这正是 RL "探索"的意义）
-- 统计分布：所有样本构成的整体分布**在每一步**都与 ODE 保持一致（"边缘分布不变"）
-
+因此：个体样本的轨迹因 $\epsilon$ 不同而各异（RL 探索），但统计分布在每一步都与 ODE 一致（生成质量不变）。
 {% endnote %}
 
 **回到主线（第三步：提取对数概率）**：现在我们已经证明了 SDE 不会破坏分布。这意味着我们可以放心地使用 SDE 的高斯转移核来计算 $\log\pi_\theta$——因为每一步 $x_{t-\Delta t} | x_t$ 都是一个高斯分布，其对数概率可以直接写出来。我们将在后续代码解析中看到这一步的具体实现。
@@ -189,44 +132,49 @@ $$\frac{\partial p}{\partial \tau} = \nabla\cdot(v_\theta p) - \cancel{\tfrac{1}
 Tweedie 公式是一个适用于指数族分布的广义定理，在各向同性高斯扰动核的特例下，它证明了一个深刻的结论：**Score 可以通过贝叶斯后验均值 $\mathbb{E}[x_0 \mid x_t]$（即模型预测的 $\hat{x}_0$）来反向精确表达。** 
 
 其核心数学公式为：
-$$ \mathbb{E}[\mu_{x_t} \mid x_t] = x_t + \sigma_t^2 \nabla_{x_t} \log p_t(x_t) $$
+$$ \underbrace{\mathbb{E}[\mu_{x_t} \mid x_t]}_{\text{对真实信号的最优估计}} = \underbrace{x_t}_{\text{带噪观测}} + \underbrace{\sigma_t^2 \nabla_{x_t} \log p_t(x_t)}_{\text{噪声方差 × 密度上升方向}} $$
+
+**各项的物理意义**：
+
+- **$x_t$**（带噪观测）：你当前看到的"含噪图像"，它是真实信号 $\mu_{x_t}$ 加上高斯噪声的结果。
+- **$\nabla_{x_t}\log p_t(x_t)$**（Score）：指向数据分布密度增大的方向——直觉上就是"图像变得更真实"的方向。
+- **$\sigma_t^2$**（噪声方差）：噪声越大（$\sigma_t^2$ 越大），你对当前观测 $x_t$ 的信任度越低，修正力度就越大；噪声越小，$x_t$ 本身已经接近真实信号，修正幅度也越小。
+
+整个公式的含义：**对含噪观测的最优去噪 = 原始观测 + 沿密度上升方向的修正**，修正幅度由噪声水平自适应调节。这在统计学中被称为"收缩估计"（Shrinkage Estimation）——将噪声观测"收缩"向数据分布的中心。
+
 经过移项，即可得到 Score 的表达式：
 $$ \nabla_{x_t} \log p_t(x_t) = -\frac{x_t - \mathbb{E}[\mu_{x_t} \mid x_t]}{\sigma_t^2} $$
 *(注：对于 Rectified Flow，$\mu_{x_t} = (1-\sigma)x_0$，因此 $\mathbb{E}[\mu_{x_t} \mid x_t] = (1-\sigma)\mathbb{E}[x_0 \mid x_t]$)*
 
 这使得神经网络无需直接拟合 Score，而是可以通过预测干净图像 $x_0$ 间接得到。
 
-具体推导如下：
+**以下推导的目标**：将上述通用的 Tweedie 公式落实到 Rectified Flow 中，推导出 Score 的可计算表达式——即如何从模型预测的 $v_\theta$ 直接算出 $\nabla_{x_t}\log p_t(x_t)$。
 
-**第一步：确定 $x_t$ 的条件分布**
-在 Rectified Flow 中，前向加噪过程是干净图像 $x_0$ 和纯噪声 $x_1 \sim \mathcal{N}(0, I)$ 的直线插值：
-$$x_t = (1-\sigma)x_0 + \sigma x_1$$
-由于 $x_1$ 是标准高斯噪声，所以给定 $x_0$ 时，$x_t$ 的条件分布 $p(x_t | x_0)$ 自然也是一个高斯分布：
+**推导**：在 Rectified Flow 中，$x_t = (1-\sigma)x_0 + \sigma \epsilon$（$\epsilon \sim \mathcal{N}(0,I)$），因此条件分布为 $p(x_t | x_0) = \mathcal{N}((1-\sigma)x_0,\; \sigma^2 I)$。对高斯对数密度求梯度，条件 Score 为：
 
-- 均值 $\mu_t = (1-\sigma)x_0$
-- 方差 $\sigma_t^2 = \sigma^2 I$
-
-**第二步：写出高斯分布的概率密度函数（PDF）并取对数**
-多维高斯分布的概率密度函数为：
-$$p(x_t | x_0) = \frac{1}{(2\pi \sigma^2)^{d/2}} \exp\left( -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} \right)$$
-我们在两边同时取自然对数 $\log$：
-$$\log p(x_t | x_0) = -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} - \frac{d}{2}\log(2\pi\sigma^2)$$
-
-**第三步：对 $x_t$ 求梯度（即计算 Score）**
-Score Function 的定义就是对数概率密度对 $x_t$ 的偏导数（梯度）。
-因为后面的 $-\frac{d}{2}\log(2\pi\sigma^2)$ 是常数，求导后为 0。我们只需要对前面的二次项求导：
-$$\nabla_{x_t} \log p(x_t | x_0) = \nabla_{x_t} \left( -\frac{\|x_t - \mu_t\|^2}{2\sigma^2} \right)$$
-根据向量求导法则 $\nabla_x \|x - \mu\|^2 = 2(x - \mu)$，代入上式得到：
-$$\nabla_{x_t} \log p(x_t | x_0) = -\frac{2(x_t - \mu_t)}{2\sigma^2} = -\frac{x_t - \mu_t}{\sigma^2}$$
-
-**第四步：代入均值 $\mu_t$ 与模型预测**
-将 $\mu_t = (1-\sigma)x_0$ 代入，得到：
 $$\nabla_{x_t} \log p(x_t | x_0) = -\frac{x_t - (1-\sigma)x_0}{\sigma^2}$$
-在实际生成时，我们并不知道真实的 $x_0$ 是什么，但根据特威迪公式，我们可以用模型当前预测的 $\hat{x}_0$ 来近似替代真实的 $x_0$。
-而根据直线运动公式（起点 = 当前位置 - 速度 × 时间），我们可以用模型预测的速度场 $v_\theta$ 反推 $\hat{x}_0$：
-$$\hat{x}_0 = x_t - \sigma \cdot v_\theta$$
 
-把模型预测的 $\hat{x}_0$ 代入 Score 公式，就能在代码中直接计算出纠偏所需的“指南针”了。
+但上式是**给定 $x_0$** 的条件 Score，而我们需要的是**不知道 $x_0$ 时**的边缘 Score $\nabla_{x_t}\log p_t(x_t)$。从边缘分布的定义出发逐步推导：
+
+$$
+\begin{aligned}
+\nabla_{x_t}\log p_t(x_t)
+&= \frac{\nabla_{x_t} p_t(x_t)}{p_t(x_t)} & \text{（Score 的定义）}\\[6pt]
+&= \frac{\nabla_{x_t} \int p(x_t|x_0)\,p(x_0)\,dx_0}{p_t(x_t)} & \text{（边缘分布 = 对所有 $x_0$ 积分）}\\[6pt]
+&= \frac{\int \nabla_{x_t} p(x_t|x_0)\,p(x_0)\,dx_0}{p_t(x_t)} & \text{（交换梯度与积分）}\\[6pt]
+&= \int \frac{p(x_t|x_0)\,p(x_0)}{p_t(x_t)} \cdot \nabla_{x_t}\log p(x_t|x_0)\,dx_0 & \text{（利用 $\nabla f = f \cdot \nabla\log f$）}\\[6pt]
+&= \int p(x_0|x_t) \cdot \nabla_{x_t}\log p(x_t|x_0)\,dx_0 & \text{（贝叶斯公式：$\frac{p(x_t|x_0)p(x_0)}{p_t(x_t)} = p(x_0|x_t)$）}\\[6pt]
+&= \mathbb{E}_{p(x_0|x_t)}\!\left[\nabla_{x_t}\log p(x_t|x_0)\right] & \text{（写成期望形式）}
+\end{aligned}
+$$
+
+即：**边缘 Score = 条件 Score 在后验分布下的期望**。代入条件 Score 公式并将常数项提到期望外面：
+
+$$
+\nabla_{x_t}\log p_t(x_t) = \mathbb{E}_{p(x_0|x_t)}\!\left[-\frac{x_t - (1-\sigma)x_0}{\sigma^2}\right] = -\frac{x_t - (1-\sigma)\,\mathbb{E}[x_0|x_t]}{\sigma^2}
+$$
+
+这就是 Tweedie 公式在 Rectified Flow 中的具体形式——Score 完全由后验均值 $\mathbb{E}[x_0|x_t]$ 决定。实际生成时，我们用模型速度场反推 $\hat{x}_0 = x_t - \sigma \cdot v_\theta$ 来近似 $\mathbb{E}[x_0|x_t]$。
 
 ### 2. SDE 离散化公式链
 
@@ -257,7 +205,13 @@ $$\mu = \underbrace{(x_t + v_\theta \Delta\sigma)}_{\text{ODE 漂移}} - \underb
 将公式 ② 中的 Score 代入上述一般式，即可得到合并后的均值：
 $$\mu = \underbrace{(x_t + v_\theta \Delta\sigma)}_{\text{ODE 漂移}} + \underbrace{\tfrac{1}{2} \frac{g^2}{\sigma} \cdot (x_t + (1-\sigma)v_\theta) \cdot \Delta\sigma}_{\text{Score 纠偏}} \tag{③}$$
 
-**为什么需要 Score 纠偏？** 如果仅在 ODE 落点上叠加噪声（跳过修正项），噪声会使 $x_{t-\Delta t}$ 的分布相对于真实 $p_{t-\Delta t}$ 发生额外膨胀。随步数累积，分布偏移导致图像崩坏。Score 纠偏沿 Score 方向预补偿噪声引起的分布膨胀，确保加噪后的采样仍落在正确的边缘分布内。若 $g=0$，修正项为零，退化为纯 ODE。
+**为什么需要 Score 纠偏？** 设真实的下一步分布 $p_{t-\Delta t}$ 具有某个特定的方差 $\Sigma_{\text{true}}$。如果仅在 ODE 落点上直接叠加噪声（跳过 Score 修正项），采样结果的分布为 $\mathcal{N}(\mu_{\text{ODE}},\; g^2\Delta t \cdot I)$。这里的方差 $g^2\Delta t$ 是我们额外注入的，它**叠加**在真实分布的不确定性之上，使得样本的整体散布范围比 $p_{t-\Delta t}$ 更宽——这就是**分布膨胀**（即协方差矩阵被人为增大）。随步数累积，这种逐步膨胀的分布会越来越远离真实流形，最终导致图像崩坏。Score 纠偏的作用是：在加噪声之前，先沿数据高密度方向（$\nabla\log p_t$）微调均值，精确补偿噪声带来的方差增量，使得加完噪声后的样本分布恰好等于目标分布 $p_{t-\Delta t}$。若 $g=0$，修正项为零，退化为纯 ODE。
+
+**均值收缩与方差膨胀的对冲**：Score 纠偏并不是在"消除"噪声增加的方差——单步的方差确实增大了 $g^2\Delta t$。它的机制是**均值收缩**：Score $\nabla\log p_t$ 对不同位置的样本施加不同强度的"向内拉力"——分布边缘的样本受力大（Score 大），分布中心的样本几乎不动（Score 接近零）。这使得所有样本的均值分布变得更集中（补偿了噪声的扩散）。从整体来看：
+
+$$\underbrace{\text{均值收缩带来的"聚拢"效应}}_{\text{Score 修正项}} + \underbrace{\text{噪声带来的"扩散"效应}}_{\text{$g\sqrt{\Delta t}\cdot\epsilon$}} = \text{互相抵消}$$
+
+Fokker-Planck 方程严格证明了这一点：漂移项的聚拢效应 $-\nabla\cdot(\mu\,p)$ 与扩散项 $\frac{1}{2}g^2\nabla^2 p$ 在 Score 系数恰好取 $\frac{1}{2}g^2$ 时逐项完美对消，使 SDE 的分布演化方程退化为与纯 ODE 完全相同的 Liouville 方程。
 
 **公式 ④：SDE 采样**
 
@@ -269,9 +223,15 @@ $$x_{t-\Delta t} = \mu + g\sqrt{\Delta t} \cdot \epsilon, \quad \epsilon \sim \m
 
 **公式 ⑤：单步对数概率（单维度）**
 
-严格的多元高斯对数似然应对所有维度 $d$ 求和。为与代码对应，这里给出**单维度（或单像素）**的对数似然公式：
+由公式 ③④ 可知，$x_{t-\Delta t} \mid x_t$ 服从均值为 $\mu$、方差为 $g^2\Delta t$ 的高斯分布。对一维高斯 $\mathcal{N}(\mu, \sigma^2)$ 取对数：
+
+$$\log p(x) = \log\left[\frac{1}{\sqrt{2\pi}\,\sigma}\exp\!\left(-\frac{(x-\mu)^2}{2\sigma^2}\right)\right] = -\frac{(x-\mu)^2}{2\sigma^2} - \log\sigma - \tfrac{1}{2}\log(2\pi)$$
+
+代入 $\sigma^2 = g^2\Delta t$（即 $\sigma = g\sqrt{\Delta t}$），即可得到：
 
 $$\log p_\theta(x_{t-\Delta t} \mid x_t, c) = -\frac{(x_{t-\Delta t} - \mu)^2}{2\,g^2\,\Delta t} - \log(g\sqrt{\Delta t}) - \tfrac{1}{2}\log(2\pi) \tag{⑤}$$
+
+严格的多元高斯对数似然应对所有维度 $d$ 求和，上式为单维度（单像素）形式。
 
 后两项（归一化常数）仅依赖 $g$ 和 $\Delta t$，不含策略参数 $\theta$。因为它们是时间步相关的常数项，在计算 GRPO 的 importance ratio 所需的新旧策略对数概率之差（$\log\pi_\theta^{\text{new}} - \log\pi_\theta^{\text{old}}$）时会直接相减抵消，对梯度无贡献，但代码实现时通常会保留它们以便于数值验证与调试。
 
@@ -279,7 +239,12 @@ $$\log p_\theta(x_{t-\Delta t} \mid x_t, c) = -\frac{(x_{t-\Delta t} - \mu)^2}{2
 **理论与代码的缩放关系**：在真实的 $d$ 维空间中（$d \sim 65536$），严谨的对数概率应是各维度之和。而官方代码中使用了 `log_prob.mean(dim=...)`，即在空间维度上取了**均值**而非求和。在数学上，这等价于将 Importance Ratio 从 $r_t = \exp(\Delta \log \pi_\text{sum})$ 变为了 $\hat{r}_t = \exp(\frac{1}{d} \Delta \log \pi_\text{sum}) = (r_t)^{1/d}$。
 这并非简单的 Loss 缩放！在图像的极高维空间中，严谨的 $\Delta \log \pi_\text{sum}$ 的绝对值会非常大，直接取指数会导致 $r_t$ 数值溢出或下溢为 0。通过取均值（即对概率比开 $d$ 次方），使得 $\hat{r}_t$ 能够保持在合理的数值范围内，从而让 PPO 的梯度能够正常反传。这是高维连续空间 RL 中不可或缺的工程处理。
 
-**值得注意的是**：高斯对数概率的固有数学性质导致 importance ratio 的分布**系统性左偏**（均值 < 1）。如果不做 mean（直接 sum），这个偏移会被放大到"数值崩溃级"（ratio ≈ 0，训练完全无法进行）。mean 操作将其压缩到了"可观察可修复级"（ratio ≈ 0.9x），使训练成为可能。但残留的偏移仍会导致 PPO clipping 机制对正样本失效，引发隐式过优化——proxy reward 上升而图像质量下降。这个残留问题正是后文 GRPO-Guard 章节要解决的核心问题。
+**值得注意的是**：高斯分布下，log-ratio 的期望恒为负（后文 GRPO-Guard 章节会推导出 $\mathbb{E}[\log r_t] = -\frac{\|\delta\|^2}{2\sigma_t^2}$，其中 $\delta$ 为策略更新导致的均值偏移）。因此 importance ratio $r_t = \exp(\log r_t)$ 的典型值系统性地小于 1。
+
+- **直接 sum**：$\log r_t = \sum_{d=1}^{D} \log r_t^{(d)}$，$D \sim 65536$ 个负数相加 → $\log r_t$ 为一个很大的负数 → $r_t = e^{\text{大负数}} \approx 0$（数值下溢，训练崩溃）。
+- **取 mean**：$\frac{1}{D}\sum \log r_t^{(d)}$，相当于对 $r_t$ 开 $D$ 次方 → $\hat{r}_t = (r_t)^{1/D}$，将极端值压缩到合理范围（如 $\hat{r}_t \approx 0.9$\~$1.0$），训练得以进行。
+
+理论上 $\mathbb{E}[r_t] = 1$（对数正态分布的性质），但在 $D \sim 65536$ 的高维空间中，$r_t$ 的分布极度右偏：绝大多数样本的 $r_t \ll 1$，仅有极少数极端值 $r_t \gg 1$ 来拉平均值。mean 操作缓解了数值问题，但残留的偏移仍会导致 PPO clipping 机制对正样本失效，引发隐式过优化（proxy reward 上升而图像质量下降）。这个残留问题正是后文 GRPO-Guard 章节要解决的核心问题。
 {% endnote %}
 
 **公式 ⑥：整条轨迹对数概率**
@@ -288,81 +253,98 @@ $$\log \pi_\theta(\text{trajectory} \mid c) = \sum_{k=1}^{T} \log p_\theta(x_{t_
 
 与 LLM 中 token 级对数概率求和形式完全对应，至此 GRPO 框架可无缝迁移到图像生成。
 
-### 3. 漂移均值（Drift Mean）更新公式推导
+### 3. DanceGRPO：显式分解法（直观实现）
 
-本节详细推导两种实现中“统一 SDE 框架”下单步去噪漂移均值（Drift Mean）更新公式的演变过程。我们的目标是从基础的 SDE 转移均值公式（公式 ③）出发，推导出代码中融合了 $x_t$ 和 $v_\theta$ 的多项式形式。
+DanceGRPO 的实现忠实还原了公式 ①②③ 的逐步分解结构，每一行代码都能与数学公式一一对应，便于理解原理。
 
-**Step 1：转换时间步长与符号**
+**实现公式**（直接对应前文的公式链）：
 
-公式 ③ 是以正向时间步 $\Delta t$ 编写的，包含 ODE 漂移项和 Score 纠偏项（即 Langevin 修正）：
-$$ \mu = \underbrace{(x_t - \Delta t \cdot v_\theta)}_{\text{ODE 漂移}} + \underbrace{\frac{1}{2}g^2 \cdot \nabla_{x_t}\log p_t \cdot \Delta t}_{\text{Score 纠偏}} $$
+- **公式 ① → Tweedie 预估**：$\hat{x}_0 = x_t - \sigma v_\theta$
+- **公式 ② → Score 预估**：$\nabla_{x_t}\log p_t = -\frac{x_t - (1-\sigma)\hat{x}_0}{\sigma^2}$
+- **公式 ③ → 均值更新**：$\mu = \underbrace{(x_t + v_\theta \Delta\sigma)}_{\text{ODE 漂移}} - \underbrace{\frac{1}{2}\eta^2 \nabla_{x_t}\log p_t \cdot \Delta\sigma}_{\text{Score 纠偏}}$
+- **公式 ④ → 采样**：$x_{t-\Delta t} = \mu + \eta\sqrt{-\Delta\sigma}\cdot\epsilon$
+- **公式 ⑤ → 对数概率**：$\log p = -\frac{(x_{t-\Delta t} - \mu)^2}{2\,\eta^2(-\Delta\sigma)}$（省略常数项）
 
-在实际代码中，去噪过程的 $\sigma$ 是逐渐减小的，即 $\Delta\sigma = \sigma_{\text{next}} - \sigma < 0$。它们的关系是：
-$$ \Delta t = -\Delta\sigma $$
+```python
+import math
+import torch
+from typing import Optional
 
-将代码符号替换进去，ODE 漂移项变成加号，Score 纠偏项因为 $\Delta t$ 的替换变成减号：
-$$ \mu = (x_t + v_\theta \Delta\sigma) - \frac{1}{2}g^2 \cdot \nabla_{x_t}\log p_t \cdot \Delta\sigma $$
+def dance_grpo_step(
+    model_output: torch.Tensor,  # v_θ
+    latents: torch.Tensor,       # x_t
+    eta: float,                  # 噪声强度（恒定 g = η）
+    sigmas: torch.Tensor,        # σ 调度表
+    index: int,                  # 当前步索引
+    prev_sample: torch.Tensor,   # 外部已采样则传入，否则 None
+    grpo: bool,                  # True=返回 log_prob
+    sde_solver: bool,            # True=SDE；False=ODE
+):
+    device = latents.device
+    sigma = sigmas[index].to(device)
+    sigma_prev = sigmas[index + 1].to(device)
+    dsigma = sigma_prev - sigma   # < 0（去噪方向）
+    delta_t = sigma - sigma_prev  # > 0
 
-**Step 2：展开 Score 函数 $\nabla_{x_t}\log p_t$**
+    # 【公式 ①】Tweedie 反推: x̂_0 = x_t - σ·v_θ
+    pred_original_sample = latents - sigma * model_output
 
-在 Flow Matching 的设定下，通过预测的干净图像 $\hat{x}_0$ 反推 Score 的简化公式为：
-$$ \nabla_{x_t}\log p_t = - \frac{x_t - (1-\sigma)\hat{x}_0}{\sigma} $$
+    # ── ODE 漂移: μ = x_t + v_θ·Δσ ──
+    prev_sample_mean = latents + dsigma * model_output
 
-根据代码中的直线轨迹定义 $\hat{x}_0 = x_t - \sigma v_\theta$，我们将其代入：
-$$
-\begin{aligned}
-\nabla_{x_t}\log p_t &= - \frac{x_t - (1-\sigma)(x_t - \sigma v_\theta)}{\sigma} \\
-&= - \frac{x_t - (x_t - \sigma x_t - \sigma v_\theta + \sigma^2 v_\theta)}{\sigma} \\
-&= - \frac{\sigma x_t + \sigma(1-\sigma)v_\theta}{\sigma}
-\end{aligned}
-$$
+    # 单步标准差: std = η·√(Δt)
+    std_dev_t = eta * torch.sqrt(delta_t)
 
-约掉分子分母的 $\sigma$，得到极其简化的 Score 形式：
-$$ \nabla_{x_t}\log p_t = - (x_t + (1-\sigma)v_\theta) $$
+    if sde_solver:
+        # 【公式 ②】Score 估计: -(x_t - (1-σ)x̂_0) / σ²
+        score_estimate = -(latents - pred_original_sample * (1 - sigma)) / sigma**2
 
-**Step 3：将 Score 代回原公式**
+        # 【公式 ③】SDE 均值: μ += -½·η²·Score·Δσ
+        prev_sample_mean = prev_sample_mean + (-0.5 * eta**2 * score_estimate) * dsigma
 
-把化简后的 Score 代入 Step 1 的 $\mu$ 公式（注意负负得正）：
-$$ \mu = x_t + v_\theta \Delta\sigma + \frac{1}{2\sigma} g^2 (x_t + (1-\sigma)v_\theta) \Delta\sigma $$
+    # 【公式 ④】SDE 采样: x_next = μ + std·ε
+    if grpo and prev_sample is None:
+        prev_sample = (prev_sample_mean + torch.randn_like(prev_sample_mean) * std_dev_t
+                       if sde_solver else prev_sample_mean)
 
-*(注：为匹配特定 SDE 设定的方差缩放，这里系数显式提取了一个 $\frac{1}{\sigma}$)*
+    # 【公式 ⑤】对数概率: -(x-μ)²/(2σ²)（省略常数项）
+    if grpo:
+        log_prob = -((prev_sample.detach().float() - prev_sample_mean.float()) ** 2
+                     ) / (2 * std_dev_t**2)
+        log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+        return prev_sample, pred_original_sample, log_prob
+    return prev_sample_mean, pred_original_sample
+```
 
-**Step 4：代入 Flow-GRPO 特有的自适应噪声系数 $g^2$**
+**工程缺陷**：虽然直观，但 DanceGRPO 的恒定噪声 $g = \eta$ 存在两个问题：(1) Score 中直接除以 `sigma**2`，当 $\sigma \to 0$ 时极易导致 NaN；(2) 需要显式分配 `pred_original_sample` 和 `score_estimate` 等中间 Tensor，增加显存开销。
 
-值得重点明确的是，**“自适应噪声”是 Flow-GRPO 针对此框架做出的核心设计与更改**（相比之下，同期的 DanceGRPO 采用的是恒定噪声）。虽然**无论采用何种噪声调度，我们都可以在代数上对均值进行同类项合并**，但 Flow-GRPO 设计的自适应有效噪声方差 $g^2 = \frac{\sigma \eta^2}{1-\sigma}$ 在数学化简上展现出了极佳的优雅性与数值稳定性。
+### 4. Flow-GRPO：算子融合与自适应噪声（工程优化）
 
-将其代入前面的系数 $\frac{g^2}{2\sigma}$ 中，分子里的 $\sigma$ 刚好与分母消掉：
-$$ \frac{g^2}{2\sigma} = \frac{1}{2\sigma} \cdot \frac{\sigma \eta^2}{1-\sigma} = \frac{\eta^2}{2(1-\sigma)} $$
+Flow-GRPO 在数学上与 DanceGRPO 完全等价，但通过两个关键改进大幅提升了数值稳定性和计算效率：
 
-试想，如果像 DanceGRPO 那样采用恒定噪声，分母中的 $2\sigma$ 将会被保留；当生成末期 $\sigma \to 0$ 时，该系数将趋于无穷大，带来严重的数值崩溃风险。而 Flow-GRPO 的自适应设计完美避开了这一除以极小值的问题。
+**改进一：自适应噪声 $g^2 = \frac{\sigma \eta^2}{1-\sigma}$**
 
-现在公式变成了：
-$$ \mu = x_t + v_\theta \Delta\sigma + \frac{\eta^2}{2(1-\sigma)} (x_t + (1-\sigma)v_\theta) \Delta\sigma $$
+代入公式 ③ 中 Score 纠偏项的系数 $\frac{g^2}{2\sigma}$，$\sigma$ 恰好消去：
 
-**Step 5：展开并合并同类项**
+$$\frac{g^2}{2\sigma} = \frac{1}{2\sigma} \cdot \frac{\sigma \eta^2}{1-\sigma} = \frac{\eta^2}{2(1-\sigma)}$$
 
-我们把大括号完全拆开，分为含有 $x_t$ 的项和含有 $v_\theta$ 的项：
-$$
-\begin{aligned}
-\mu &= x_t + v_\theta \Delta\sigma + \left( \frac{\eta^2}{2(1-\sigma)} x_t \right) \Delta\sigma + \left( \frac{\eta^2(1-\sigma)}{2(1-\sigma)} v_\theta \right) \Delta\sigma \\
-&= x_t + v_\theta \Delta\sigma + \frac{\eta^2}{2(1-\sigma)} x_t \Delta\sigma + \frac{\eta^2}{2} v_\theta \Delta\sigma
-\end{aligned}
-$$
+避免了 $\sigma \to 0$ 时除以极小值的数值崩溃风险。
 
-最后，提取 $x_t$ 和 $v_\theta$ 的公因式：
+**改进二：算子融合（消除中间变量）**
 
-对于 $x_t$ 的系数：
-$$ x_t + \frac{\eta^2}{2(1-\sigma)} x_t \Delta\sigma = x_t \left( 1 + \frac{\eta^2}{2(1-\sigma)} \Delta\sigma \right) $$
+将 Score 和 $\hat{x}_0$ 全部代数消去，只保留 $x_t$ 和 $v_\theta$ 的标量系数：
 
-对于 $v_\theta$ 的系数：
-$$ v_\theta \Delta\sigma + \frac{\eta^2}{2} v_\theta \Delta\sigma = v_\theta \left( 1 + \frac{\eta^2}{2} \right) \Delta\sigma $$
+$$\mu = x_t + v_\theta \Delta\sigma + \frac{\eta^2}{2(1-\sigma)}(x_t + (1-\sigma)v_\theta)\Delta\sigma$$
 
-把这两部分加起来，就完美得到了 Flow-GRPO 代码中所写的最终合并公式（即公式 ③'）：
-$$ \mu = x_t \left( 1 + \frac{\eta^2}{2(1-\sigma)} \Delta\sigma \right) + v_\theta \left( 1 + \frac{\eta^2}{2} \right) \Delta\sigma \tag{③'} $$
+合并同类项后得到算子融合形式：
 
-### 4. Flow-GRPO：算子融合与自适应噪声（核心实现）
+$$\mu = x_t\left(1 + \frac{\eta^2}{2(1-\sigma)}\Delta\sigma\right) + v_\theta\left(1 + \frac{\eta^2}{2}\right)\Delta\sigma \tag{③'}$$
 
-在代码库中，真正采用了自适应噪声 $g^2 = \frac{\sigma \eta^2}{1-\sigma}$ 并应用了我们上述最终推导结果（公式 ③'）的，是 Flow-GRPO 的实现 `flow_grpo_step`。
+无需计算 $\hat{x}_0$ 和 Score，直接用标量乘法完成更新。
+
+
+
+以下是 Flow-GRPO 的核心代码实现，直接使用上述公式 ③'：
 
 **目标**：给定当前状态 $x_t$ 和速度 $v_\theta$，计算下一步的采样值 $x_{t-\Delta t}$ 以及该步转移的高斯对数概率 $\log p(x_{t-\Delta t} \mid x_t)$。
 **实现公式**：
@@ -375,10 +357,6 @@ $$ \mu = x_t \left( 1 + \frac{\eta^2}{2(1-\sigma)} \Delta\sigma \right) + v_\the
 import math
 import torch
 from typing import Optional
-
-# 假设环境中有 randn_tensor 函数，这里提供一个简单的替身以便代码完整
-def randn_tensor(shape, generator=None, device=None, dtype=None):
-    return torch.randn(shape, generator=generator, device=device, dtype=dtype)
 
 # 从1->0  是噪声到清晰图像
 def flow_grpo_step(
@@ -451,11 +429,9 @@ def flow_grpo_step(
 
         # 【公式 ④】SDE 采样：x_{next} = μ + g(σ)·√(-Δσ)·ε
         if prev_sample is None:
-            variance_noise = randn_tensor(
-                model_output.shape,
-                generator=generator,
-                device=device,
-                dtype=model_output.dtype,
+            variance_noise = torch.randn(
+                model_output.shape, generator=generator,
+                device=device, dtype=model_output.dtype,
             )
             prev_sample = (
                 prev_sample_mean + std_dev_t * torch.sqrt(-1 * dt) * variance_noise
@@ -499,108 +475,18 @@ def flow_grpo_step(
 2. **数值稳定性（Robustness）**：通过 `torch.where` 防护罩，消除了 $\sigma \to 1$ 时的分母溢出问题。
 3. **策略梯度完备性**：其产生的 `log_prob` 包含了完整的马氏距离和方差惩罚项，确保了 REINFORCE 优化的梯度严谨性。
 
-### 5. DanceGRPO：显式分解法（基础拆解实现）
+### 5. 与 DanceGRPO 的对比
 
-相比之下，DanceGRPO 的 `dance_grpo_step` 保留了更加“原始但粗糙”的数学结构，忠实还原了未化简的推导**Step 1 到 Step 3**的分解形态（即直接使用公式 ③），且未采用自适应噪声设定。
+同期的 DanceGRPO 采用了与 Flow-GRPO 相同的 ODE→SDE 改造思路，但在工程实现上有两个关键差异：
 
-**目标**：给定当前状态 $x_t$ 和速度 $v_\theta$，计算下一步的采样值 $x_{t-\Delta t}$ 以及该步转移的高斯对数概率 $\log p(x_{t-\Delta t} \mid x_t)$。
-**实现公式**：
+| 维度 | Flow-GRPO | DanceGRPO |
+|:---:|:---|:---|
+| **噪声系数** | 自适应 $g(\sigma) = \sqrt{\sigma/(1-\sigma)} \cdot \eta$ | 恒定 $g = \eta$ |
+| **实现风格** | 算子融合：直接用标量系数乘以 $x_t$ 和 $v_\theta$ | 显式分解：逐步计算 $\hat{x}_0$ → Score → 均值 |
+| **数值稳定性** | `torch.where` 防护 $\sigma \to 0$ | 直接除以 $\sigma^2$，末期有崩溃风险 |
 
-- **Tweedie 预估**：$\hat{x}_0 = x_t - \sigma v_\theta$
-- **Score 预估**：$\nabla_{x_t}\log p_t = -\frac{x_t - (1-\sigma)\hat{x}_0}{\sigma^2}$
-- **均值更新**：$\mu = (x_t + v_\theta \Delta\sigma) - \frac{1}{2}\eta^2 \nabla_{x_t}\log p_t \cdot \Delta\sigma$
-- **采样计算**：$x_{t-\Delta t} = \mu + \eta\sqrt{-\Delta\sigma}\cdot\epsilon$
-- **对数概率**：$\log p = -\frac{(x_{t-\Delta t} - \mu)^2}{2\,\eta^2(-\Delta\sigma)}$ （注：DanceGRPO 代码为追求性能，舍弃了后两项常数项）
+DanceGRPO 的真正价值在于将 GRPO 框架推广到了视频生成和 Diffusion 范式，详见 [DanceGRPO 与 MixGRPO 专题](/chengYi-xun/posts/59-dance-mix-grpo/)。
 
-```python
-def dance_grpo_step(
-    model_output: torch.Tensor,  # 模型速度输出 v_θ
-    latents: torch.Tensor,  # 当前 x_t
-    eta: float,  # 噪声强度
-    sigmas: torch.Tensor,  # σ 调度表
-    index: int,  # 当前步索引
-    prev_sample: torch.Tensor,  # 外部已采样则传入，否则 None
-    grpo: bool,  # True=返回 log_prob；False=仅返回均值
-    sde_solver: bool,  # True=SDE（加噪）；False=ODE（确定性）
-    sde_type: str = "sde",  # "sde" 或 "cps"
-    noise_level: Optional[float] = None,  # 覆盖 eta
-):
-    """DanceGRPO 单步更新：与 flow_grpo_step 类似但噪声注入公式不同。
-
-    做什么：用模型速度 v 更新 latent，SDE 模式下含 score 修正项。
-    怎么做：
-      1. 基础 ODE 均值：μ = x + dsigma·v（dsigma < 0）
-      2. SDE 模式额外加 score 修正：μ += -0.5·η²·score·dsigma
-      3. 采样 x_{next} ~ N(μ, η²·Δt)，计算 log_prob
-    返回：grpo=True → (x_{next}, x̂_0, log_prob)；grpo=False → (μ, x̂_0)
-    """
-    device = latents.device
-    sigma = (
-        sigmas[index].to(device) if sigmas[index].device != device else sigmas[index]
-    )
-    sigma_prev = (
-        sigmas[index + 1].to(device)
-        if sigmas[index + 1].device != device
-        else sigmas[index + 1]
-    )
-    dsigma = sigma_prev - sigma  # < 0，去噪方向步长 Δσ
-    delta_t = sigma - sigma_prev # > 0，正向时间增量 Δt = -Δσ
-    
-    # 【公式 ①】Tweedie 反推干净样本: x̂_0 = x_t - σ·v_θ
-    pred_original_sample = latents - sigma * model_output
-
-    if sde_type == "sde":
-        _noise_level = eta if noise_level is None else noise_level
-        
-        # ── ODE 漂移项：x_t + v_θ·Δσ ──
-        prev_sample_mean = latents + dsigma * model_output
-        
-        # 对应 SDE 的方差系数 g(σ) = _noise_level，以及单步标准差 std_dev_t = g·√(Δt)
-        std_dev_t = _noise_level * torch.sqrt(delta_t)
-
-        if sde_solver:
-            # 【公式 ②】Score 估计: ∇_{x_t} log p_t = -(x_t - (1-σ)x̂_0) / σ²
-            score_estimate = -(latents - pred_original_sample * (1 - sigma)) / sigma**2
-            
-            # 【公式 ③】SDE 转移均值: μ = ODE 漂移 - ½·g²·Score·Δσ
-            # (注意：因为 Δt = -Δσ，所以 -½·g²·Score·Δσ 就等于 +½·g²·Score·Δt，与理论一致)
-            log_term = -0.5 * _noise_level**2 * score_estimate
-            prev_sample_mean = prev_sample_mean + log_term * dsigma
-
-        # 【公式 ④】SDE 采样: x_{next} = μ + std_dev_t · ε
-        if grpo and prev_sample is None:
-            if sde_solver:
-                prev_sample = (
-                    prev_sample_mean
-                    + torch.randn_like(prev_sample_mean, device=device) * std_dev_t
-                )
-            else:
-                prev_sample = prev_sample_mean
-
-        # 【公式 ⑤】计算单步对数概率: -(x - μ)² / (2σ²)
-        # （注：原代码为追求速度省略了与参数 θ 无关的常数项）
-        if grpo:
-            log_prob = -(
-                (
-                    prev_sample.detach().to(torch.float32)
-                    - prev_sample_mean.to(torch.float32)
-                )
-                ** 2
-            ) / (2 * (std_dev_t**2))
-            log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-            return prev_sample, pred_original_sample, log_prob
-        else:
-            return prev_sample_mean, pred_original_sample
-
-    else:
-        raise ValueError(f"Unsupported sde_type: {sde_type}. Must be 'sde'.")
-
-```
-
-**工程缺陷：**
-
-1. **极值崩溃风险**：最致命的问题在于直接除以 `sigma**2`。当生成到达末期（$\sigma \to 0$）时，由于缺乏极小值截断（像 Flow-GRPO 那样的 `torch.where` 保护），极易导致梯度爆炸和数值不稳定（NaN）。这也是我们在前文理论推导 Step 4 中强调的、DanceGRPO 恒定噪声带来的固有数值问题。
-2. **多余的显存与计算开销**：由于没有进行算子融合，需要显式分配 `pred_original_sample` 和 `score_estimate` 等多个与原图等大的中间 Tensor。虽然单看一次调用开销不大，但在大批次、高分辨率视频生成的训练循环中，这些额外的读写和显存占用会累积拖慢 GPU 效率。
 
 ### 6. 整体框架回顾：与 LLM GRPO 的异同
 
@@ -652,6 +538,243 @@ def dance_grpo_step(
 
 ---
 
+## 训练主循环：完整 Pipeline 解析
+
+前面我们已经逐一解析了 SDE 单步更新（公式 ①-⑥）和 log_prob 的计算方法。现在让我们跳出单步视角，审视**整个训练流程是如何将这些组件串联起来**的。以下代码基于 [flow_grpo](https://github.com/yifan123/flow_grpo) 的 `train_sd3_GRPO_Guard.py` 和 [MixGRPO](https://github.com/Tencent-Hunyuan/MixGRPO) 的 `train_grpo_flux.py` 两个官方实现，提取出核心主循环逻辑。
+
+**整体架构**：Flow-GRPO 的训练遵循经典的 **On-Policy RL 范式**——"采样 → 评估 → 更新"的循环迭代。以下是核心实现代码（整合了两个仓库的实现，保留关键逻辑并加注释）：
+
+```python
+import torch
+import numpy as np
+from collections import defaultdict
+from torch.utils.data import DataLoader
+
+# ═══════════════════════════════════════════════════════════
+# 训练主循环（基于 flow_grpo 和 MixGRPO 的统一伪代码）
+# ═══════════════════════════════════════════════════════════
+
+def flow_grpo_training_loop(
+    pipeline,         # 包含 Transformer + VAE + Scheduler 的 Pipeline
+    reward_fn,        # 奖励模型（如 HPSv2, ImageReward, PickScore）
+    train_dataloader, # Prompt 数据集的 DataLoader
+    optimizer,        # AdamW 优化器
+    config,           # 训练超参数
+):
+    """Flow-GRPO 完整训练流程。
+
+    算法流程（对应论文 Algorithm 1）:
+      1. 外层循环：逐 epoch 迭代
+      2. Phase 1 (采样)：冻结策略，生成 G 张图并记录轨迹
+      3. Phase 2 (评估)：RM 打分 + 组内优势标准化
+      4. Phase 3 (更新)：PPO clipped loss 反向传播
+    """
+    num_train_timesteps = int(config.num_steps * config.timestep_fraction)
+    epoch = 0
+    global_step = 0
+    train_iter = iter(train_dataloader)
+
+    while global_step < config.max_train_steps:
+
+        # ══════════════════════════════════════════════════════════
+        # Phase 1: 组采样（Group Sampling）—— 冻结策略，生成轨迹
+        # ══════════════════════════════════════════════════════════
+        pipeline.transformer.eval()
+        samples = []
+
+        for batch_idx in range(config.num_batches_per_epoch):
+            prompts, metadata = next(train_iter)
+            prompt_embeds = encode_prompts(prompts)  # 文本编码
+
+            with torch.no_grad():
+                # pipeline_with_logprob: 
+                #   对每个 Prompt 生成 G 张图像（通过 SDE 注入不同噪声实现分裂）
+                #   同时沿轨迹记录每步的 (x_t, x_{t-Δt}, log_prob)
+                images, latents_trajectory, log_probs = pipeline_with_logprob(
+                    pipeline,
+                    prompt_embeds=prompt_embeds,
+                    num_inference_steps=config.num_steps,
+                    guidance_scale=config.guidance_scale,
+                    noise_level=config.noise_level,  # SDE 噪声强度 η
+                )
+                # latents_trajectory: (B, T+1, C, H, W) — 整条轨迹的 latent 状态
+                # log_probs: (B, T) — 每步 SDE 转移的 log N(x_{t-Δ}; μ, σ²)
+
+            # 异步提交奖励计算（RM 推理与 GPU 采样并行）
+            rewards_future = executor.submit(reward_fn, images, prompts, metadata)
+
+            samples.append({
+                "latents": latents_trajectory[:, :-1],      # x_t (当前步状态)
+                "next_latents": latents_trajectory[:, 1:],  # x_{t-Δ} (下一步状态)
+                "log_probs": log_probs,                     # π_θ_old 的 log_prob
+                "timesteps": pipeline.scheduler.timesteps,
+                "rewards_future": rewards_future,
+            })
+
+        # ══════════════════════════════════════════════════════════
+        # Phase 2: 奖励计算 & 优势估计
+        # ══════════════════════════════════════════════════════════
+
+        # 等待所有异步奖励计算完成
+        for sample in samples:
+            rewards = sample.pop("rewards_future").result()
+            sample["rewards"] = rewards  # shape: (B,)
+
+        # 合并所有 batch 的样本
+        all_samples = concatenate_samples(samples)
+
+        # 跨 GPU 收集奖励（分布式训练需要全局视角）
+        gathered_rewards = accelerator.gather(all_samples["rewards"])
+
+        # 组内优势标准化（GRPO 的核心：无需 Critic 网络）
+        # 对于同一 Prompt 生成的 G 张图，计算组内 z-score
+        advantages = compute_group_advantages(
+            gathered_rewards,
+            num_images_per_prompt=config.num_image_per_prompt,
+        )
+        # advantages shape: (B,) — 每张图对应一个标量优势
+        # 扩展到所有训练时间步（稀疏奖励：同一优势分配给整条轨迹）
+        all_samples["advantages"] = advantages.unsqueeze(1).repeat(1, num_train_timesteps)
+
+        # ══════════════════════════════════════════════════════════
+        # Phase 3: 策略更新（PPO Clipped Surrogate Loss）
+        # ══════════════════════════════════════════════════════════
+        for inner_epoch in range(config.num_inner_epochs):
+            # 打乱样本顺序（防止相关性偏差）
+            perm = torch.randperm(len(all_samples["latents"]))
+            all_samples = {k: v[perm] for k, v in all_samples.items()}
+
+            # 按 mini-batch 划分
+            batches = split_into_batches(all_samples, config.train_batch_size)
+
+            pipeline.transformer.train()
+            for sample_batch in batches:
+                # 逐时间步计算策略梯度
+                for t_idx in range(num_train_timesteps):
+                    with accelerator.accumulate(pipeline.transformer):
+                        # ── 用当前策略 π_θ 重新计算 log_prob ──
+                        v_theta = pipeline.transformer(
+                            hidden_states=sample_batch["latents"][:, t_idx],
+                            timestep=sample_batch["timesteps"][:, t_idx],
+                            encoder_hidden_states=sample_batch["prompt_embeds"],
+                        )
+
+                        # 调用前文的 flow_grpo_step，计算新的 log_prob
+                        _, _, log_prob_new, _, _ = flow_grpo_step(
+                            model_output=v_theta,
+                            latents=sample_batch["latents"][:, t_idx],
+                            eta=config.noise_level,
+                            sigmas=pipeline.scheduler.sigmas,
+                            index=t_idx,
+                            prev_sample=sample_batch["next_latents"][:, t_idx],
+                        )
+
+                        # ── PPO Clipped Surrogate Loss ──
+                        log_prob_old = sample_batch["log_probs"][:, t_idx]
+                        ratio = torch.exp(log_prob_new - log_prob_old)
+
+                        advantages_t = torch.clamp(
+                            sample_batch["advantages"][:, t_idx],
+                            -config.adv_clip_max,
+                            config.adv_clip_max,
+                        )
+
+                        # 裁剪策略损失（PPO 的核心约束机制）
+                        surr1 = -advantages_t * ratio
+                        surr2 = -advantages_t * torch.clamp(
+                            ratio, 1.0 - config.clip_range, 1.0 + config.clip_range
+                        )
+                        policy_loss = torch.mean(torch.maximum(surr1, surr2))
+
+                        # ── KL 散度惩罚（可选：防止策略偏移过大）──
+                        # 在 Flow Matching 中使用速度场 MSE 近似 KL
+                        if config.kl_coeff > 0:
+                            with torch.no_grad():
+                                v_ref = ref_transformer(...)  # 参考模型的速度场
+                            kl_loss = F.mse_loss(v_theta, v_ref)
+                            loss = policy_loss + config.kl_coeff * kl_loss
+                        else:
+                            loss = policy_loss
+
+                        # ── 反向传播 & 梯度更新 ──
+                        accelerator.backward(loss)
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(
+                                pipeline.transformer.parameters(),
+                                config.max_grad_norm,
+                            )
+                        optimizer.step()
+                        optimizer.zero_grad()
+
+                    if accelerator.sync_gradients:
+                        global_step += 1
+
+        epoch += 1
+
+
+def compute_group_advantages(rewards, num_images_per_prompt):
+    """GRPO 组内优势标准化：无需 Critic，用组统计量作基线。
+
+    对同一 Prompt 的 G 张图的奖励进行 z-score 标准化：
+        Â_i = (r_i - mean(r_1...r_G)) / std(r_1...r_G)
+    """
+    B = len(rewards)
+    num_groups = B // num_images_per_prompt
+    advantages = torch.zeros_like(rewards)
+
+    for g in range(num_groups):
+        start = g * num_images_per_prompt
+        end = (g + 1) * num_images_per_prompt
+        group_r = rewards[start:end]
+        mean_r = group_r.mean()
+        std_r = group_r.std() + 1e-8
+        advantages[start:end] = (group_r - mean_r) / std_r
+
+    return advantages
+```
+
+{% note info no-icon %}
+**代码结构对比：flow_grpo vs MixGRPO**
+
+两个仓库的训练主循环在**宏观结构上完全一致**（采样 → 奖励 → 更新），核心差异在于 Phase 1 的采样策略和 Phase 3 的训练时间步选择：
+
+| 维度 | flow_grpo（SD3/Flux） | MixGRPO（Flux） |
+|:---:|:---|:---|
+| **采样策略** | 全程 SDE 采样所有步 | Mixed ODE-SDE：仅窗口内 SDE |
+| **训练时间步** | `num_train_timesteps = T × timestep_fraction` | 仅训练滑动窗口 $W(l)$ 内的步 |
+| **分布式方案** | HuggingFace Accelerate | FSDP + Sequence Parallel |
+| **梯度累积** | `grad_accum × num_train_timesteps` | `grad_accum × len(window)` |
+| **奖励模型** | 单 RM（PickScore/GenEval） | 多 RM 加权融合（HPSv2 + ImageReward + PickScore） |
+| **优势计算** | Per-prompt stat tracking（滑动窗口统计） | 组内标准化 + Trimmed Mean（截尾均值） |
+
+MixGRPO 通过滑动窗口（`GRPOTrainingStates`）管理训练进度：
+```python
+# MixGRPO 的滑动窗口状态管理
+grpo_states = GRPOTrainingStates(
+    iters_per_group=20,      # 每个窗口位置训练多少步后滑动
+    group_size=4,            # 窗口大小 w = 4 步
+    max_timesteps=T-2,       # 最大可滑动到的时间步
+    sample_strategy="prog",  # 渐进式滑动策略
+)
+# 每个训练 step 获取当前窗口位置
+timesteps_train = grpo_states.get_current_timesteps()  # e.g., [3, 4, 5, 6]
+grpo_states.update_iteration()  # 若达到 iters_per_group，窗口右移
+```
+这使得 MixGRPO 在 Phase 1 中只需对窗口内步做 SDE（其余用 ODE 快速跳过），Phase 3 中也只对窗口内步反向传播，实现了约 50% 的训练时间削减。
+{% endnote %}
+
+{% note warning no-icon %}
+**关键工程细节：为什么采样和训练要分离？**
+
+观察主循环可以发现一个关键设计：**Phase 1 的采样是完全 `torch.no_grad()` 的**，而 Phase 3 的训练才启用梯度。这不是偶然的，而是在线 RL 的核心机制要求：
+
+1. **On-Policy 约束**：PPO 要求用于计算 ratio 的 `log_prob_old` 来自**采样时的策略 $\pi_{\theta_\text{old}}$**，而非当前正在优化的策略 $\pi_\theta$。因此必须先冻结策略采样，再解冻更新。
+2. **显存效率**：Flux 模型 12B 参数，一次前向传播就需 ~24GB 显存。如果采样时也保留计算图，生成 $T=50$ 步 × $G=4$ 张图的完整计算图将需要 ~4.8TB 显存——这显然不可能。分离后，采样只需前向推理的内存（~24GB），训练时只对单步做反向传播（~48GB with activation checkpointing）。
+3. **Importance Sampling 的数学保证**：Phase 3 中重新计算 `log_prob_new` 并与存储的 `log_prob_old` 做比值，本质是在做 Off-Policy 修正——允许策略在更新后仍然"重用"之前采样的数据。PPO 的 clipping 机制确保这种重用不会因策略偏移过大而失效（通常限制 inner_epochs ≤ 4）。
+{% endnote %}
+
+---
+
 # GRPO-Guard：缓解隐式过优化
 
 > 论文：[GRPO-Guard: Mitigating Implicit Over-Optimization in Flow Matching via Regulated Clipping](https://arxiv.org/abs/2510.22319)（同为 Flow-GRPO 团队，2025）
@@ -665,22 +788,11 @@ Flow-GRPO 和 DanceGRPO 在训练中使用 PPO-style clipping 来约束策略更
 2. **方差在不同去噪步之间差异极大**，对于对数比率 $\log r_t$，低噪声步的方差远大于高噪声步。
 
 {% note info no-icon %}
-**深度解析：为什么偏差是"负向"的？为什么方差随时间步变化？**
+**为什么偏差是"负向"的？**
 
-在 Flow Matching SDE 中，每一步的"策略"是一个高斯分布：$\pi_\theta(x_{t+1}|x_t) = \mathcal{N}(\mu_\theta, \sigma_t^2 I)$。设 $\delta = \mu_\theta - \mu_{\theta_\text{old}}$ 为策略更新导致的均值偏移，$e = x_{t+1} - \mu_{\theta_\text{old}} \sim \mathcal{N}(0, \sigma_t^2 I)$ 为采样噪声，则 log-ratio 可以精确展开为：
-
-$$\log r_t = \frac{e^T \delta}{\sigma_t^2} - \frac{\|\delta\|^2}{2\sigma_t^2}$$
-
-第一项 $\frac{e^T \delta}{\sigma_t^2}$ 是零均值的随机项（因为 $\mathbb{E}[e] = 0$），第二项 $-\frac{\|\delta\|^2}{2\sigma_t^2}$ 是一个**恒为负的常数偏置**。因此：
-
-$$\mathbb{E}[\log r_t] = -\frac{\|\delta\|^2}{2\sigma_t^2} < 0$$
-
-**1. 为什么偏差是负向的？**
-由于 $\|\delta\|^2 \geq 0$，这个偏置项恒为非正——这是高斯分布的固有数学性质，与策略更新的方向无关。只要 $\theta \neq \theta_\text{old}$（即策略发生了更新），$\log r_t$ 的均值就通常小于 0。虽然理论上 $\mathbb{E}[r_t] = 1$（对数正态分布的性质），但在图像 latent 的高维空间中（维度 $d \sim 16 \times 64 \times 64 = 65536$），$\|\delta\|^2$ 随维度 $d$ 缩放，导致 $\log r_t$ 的分布极度右偏：绝大多数样本的 $r_t \ll 1$，仅有极少数样本 $r_t \gg 1$ 来拉平均值。在有限样本下，这些极端值很难被观测到，因此经验均值通常远低于 1。
-
-**2. 为什么低噪声步的对数比率方差大、高噪声步方差小？**
-根据公式，$\log r_t$ 的方差为 $\text{Var}[\log r_t] = \frac{\|\delta\|^2}{\sigma_t^2}$。在低噪声步（$\sigma_t$ 小），由于分母较小，导致 $\log r_t$ 的方差极大。直观上，低噪声步时参考分布的高斯噪声 $\mathcal{N}(0, \sigma_t^2 I)$ 非常"尖锐"，因此策略模型的预测均值稍有偏移 $\|\delta\|$，对概率密度的影响就会被剧烈放大，使得 log-ratio 波动极大。相反，在高噪声步（$\sigma_t$ 大），分布宽而平坦，相同的偏移引起的概率变化较小，$\log r_t$ 的方差也相对较小。这种方差的不一致，进一步破坏了 PPO clipping 机制在各个时间步上的对称性和有效性。
+设策略更新导致的均值偏移为 $\delta = \mu_\theta - \mu_{\theta_\text{old}}$，则 log-ratio 可展开为 $\log r_t = \frac{e^T \delta}{\sigma_t^2} - \frac{\|\delta\|^2}{2\sigma_t^2}$。第一项零均值，第二项恒为负，因此 $\mathbb{E}[\log r_t] < 0$。在高维 latent 空间中（$d \sim 65536$），这个偏移被放大，导致经验均值远低于 1。同时，$\text{Var}[\log r_t] = \|\delta\|^2 / \sigma_t^2$，使得低噪声步（$\sigma_t$ 小）的方差远大于高噪声步，进一步破坏 PPO clipping 的对称性。
 {% endnote %}
+
 
 这种偏差使得 PPO 的 clipping 区间 $[1-\varepsilon, 1+\varepsilon]$ 变得**不对称**。由于绝大多数样本的 $r_t$ 远小于 1，正样本（高奖励的好图）的 ratio 反而更容易落在 clipping 区间内部（不被截断），导致正样本的梯度更新不受约束，策略模型不断向这些样本偏移。
 
