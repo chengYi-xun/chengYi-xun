@@ -744,7 +744,7 @@ Flow-GRPO 和 DanceGRPO 在训练中使用 PPO-style clipping 来约束策略更
 1. **均值始终低于 1**，在低噪声步（如 SD3.5-M 的 step 8）偏差尤为显著。
 2. **方差在不同去噪步之间差异极大**，对于对数比率 $\log r_t$，低噪声步的方差远大于高噪声步。
 
-{% note info no-icon %}
+
 **为什么偏差是"负向"的？——完整推导**
 
 以下逐步推导 $\mathbb{E}[\log r_t] < 0$ 的数学成因。
@@ -755,14 +755,14 @@ $$\log \pi(x_t) = -\frac{\|x_t - \mu\|^2}{2\sigma_t^2} + \text{const}$$
 
 **第二步：写出对数 Importance Ratio。** 令 $\delta = \mu_\theta - \mu_{\theta_\text{old}}$（策略更新导致的均值偏移），对数重要性比为：
 
-$$\log r_t = \log\frac{\pi_\theta(x_t)}{\pi_{\theta_\text{old}}(x_t)} = -\frac{\|x_t - \mu_\theta\|^2}{2\sigma_t^2} + \frac{\|x_t - \mu_{\theta_\text{old}}}\|^2}{2\sigma_t^2}$$
+$$\log r_t = \log\frac{\pi_\theta(x_t)}{\pi_{\theta_\text{old}}(x_t)} = -\frac{\|x_t - \mu_\theta\|^2}{2\sigma_t^2} + \frac{\|x_t - \mu_{\theta_\text{old}}\|^2}{2\sigma_t^2}$$
 
 **第三步：展开范数平方（配方法）。** 将 $\mu_\theta = \mu_{\theta_\text{old}} + \delta$ 代入第一项：
 
 $$
 \begin{aligned}
 \|x_t - \mu_\theta\|^2 &= \|(x_t - \mu_{\theta_\text{old}}) - \delta\|^2 \\[4pt]
-&= \|x_t - \mu_{\theta_\text{old}}\|^2 - 2(x_t - \mu_{\theta_\text{old}}})^T\delta + \|\delta\|^2
+&= \|x_t - \mu_{\theta_\text{old}}\|^2 - 2(x_t - \mu_{\theta_\text{old}})^T\delta + \|\delta\|^2
 \end{aligned}
 $$
 
@@ -770,8 +770,8 @@ $$
 
 $$
 \begin{aligned}
-\log r_t &= \frac{2(x_t - \mu_{\theta_\text{old}}})^T\delta - \|\delta\|^2}{2\sigma_t^2} \\[6pt]
-&= \frac{(x_t - \mu_{\theta_\text{old}}})^T\delta}{\sigma_t^2} - \frac{\|\delta\|^2}{2\sigma_t^2}
+\log r_t &= \frac{2(x_t - \mu_{\theta_\text{old}})^T\delta - \|\delta\|^2}{2\sigma_t^2} \\[6pt]
+&= \frac{(x_t - \mu_{\theta_\text{old}})^T\delta}{\sigma_t^2} - \frac{\|\delta\|^2}{2\sigma_t^2}
 \end{aligned}
 $$
 
@@ -785,7 +785,6 @@ $$\boxed{\log r_t = \underbrace{\frac{e^T\delta}{\sigma_t^2}}_{\text{零均值�
 - **第二项** $-\frac{\|\delta\|^2}{2\sigma_t^2}$：来源于配方法展开中不可避免的交叉项 $\|\delta\|^2$，**总是非正的**。只要策略发生了任何更新（$\delta \neq 0$），该项就严格为负。
 
 因此 $\mathbb{E}[\log r_t] = -\frac{\|\delta\|^2}{2\sigma_t^2} < 0$，即**无论策略往哪个方向更新，对数比的期望都一定是负的**。在高维 latent 空间中（$d \sim 65536$），$\|\delta\|^2$ 随维度累积，导致 $\log r_t$ 取到很大的负值。由于 $r_t = e^{\log r_t}$，大负数的指数趋近于 0，使得经验均值 $\mathbb{E}[r_t]$ 远低于其理论值 1。同时，$\text{Var}[\log r_t] = \|\delta\|^2 / \sigma_t^2$ 在低噪声步（$\sigma_t$ 小）时极大，进一步破坏 PPO clipping 的对称性。
-{% endnote %}
 
 
 这种偏差使得 PPO 的 clipping 区间 $[1-\varepsilon, 1+\varepsilon]$ 变得**不对称**。由于绝大多数样本的 $r_t$ 远小于 1，正样本（高奖励的好图）的 ratio 反而更容易落在 clipping 区间内部（不被截断），导致正样本的梯度更新不受约束，策略模型不断向这些样本偏移。
