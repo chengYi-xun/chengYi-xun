@@ -521,15 +521,43 @@ DanceGRPO 的真正价值在于将 GRPO 框架推广到了视频生成和 Diffus
 
 **为什么它能大幅加速？**
 因为 SDE 的对数概率计算和 PPO 梯度反传**仅仅发生在那 1~2 步 SDE 注入的阶段**。模型不需要对整条轨迹计算对数概率，大大节省了显存和反向传播的计算量。
-这其实也是后来 MixGRPO 提出的“滑动窗口（Mixed ODE-SDE）”机制的雏形！
+
+### Flow-GRPO-Fast 的局限性：为什么还需要 MixGRPO？
+
+虽然 Flow-GRPO-Fast 的加速思路极具启发性，但它存在三个严重的结构性缺陷，使得直接使用时性能显著下降（MixGRPO 论文 Figure 1 实验验证：随着训练步数减少，DanceGRPO/Flow-GRPO-Fast 的性能急剧退化）：
+
+**1. 随机注入点导致梯度信号极度稀疏且不稳定**
+
+Flow-GRPO-Fast 每次随机选择一个中间时间步 $t_\text{start}$ 注入 SDE。对于一条 25 步的去噪轨迹，仅有 1\~2 步（4%\~8%）接收梯度更新，剩余 92%\~96% 的时间步完全无法被优化。更关键的是，由于注入点是随机的，不同 iteration 的梯度可能作用在完全不同的时间区段上，导致优化方向高度随机、收敛极不稳定。
+
+**2. 无课程调度导致时间步覆盖不均匀**
+
+去噪过程中，不同时间步负责截然不同的语义信息：高噪声步（$\sigma$ 接近 1）决定全局构图和物体布局，低噪声步（$\sigma$ 接近 0）决定纹理细节和高频信息。Flow-GRPO-Fast 的随机选择无法保证所有时间段都被充分优化，某些关键区间可能长期被遗漏，导致训练后的模型在这些时间段的行为与原始模型无异。
+
+**3. 不支持后期高阶加速**
+
+由于 Flow-GRPO-Fast 的 SDE 注入点是随机的，后期 ODE 阶段的起始位置不确定，因此无法安全地引入 DPM-Solver++ 等高阶求解器进行加速（原因见下方提示框）。
+
+**MixGRPO 的系统性解决方案**（Li et al., arXiv:2507.21802）将 Flow-GRPO-Fast 的随机单步升级为系统性滑动窗口，从根本上解决了上述三个问题：
+
+| 问题 | Flow-GRPO-Fast | MixGRPO |
+|:---:|:---|:---|
+| 窗口位置 | 每次随机选择 $t_\text{start}$ | 固定窗口 $W(l)$，从高噪声逐步滑向低噪声 |
+| 窗口大小 | 1\~2 步 | $w = 4$ 步（实验验证的最优值） |
+| 覆盖策略 | 无保证（完全随机） | 渐进式课程学习：先优化全局结构，再精修细节 |
+| 后期加速 | 不可用 | MixGRPO-Flash：窗口后方 ODE 可用 DPM-Solver++ |
+| ref_model | 需要冻结参考模型计算 KL | 不需要，用推理时混合采样替代 |
+
+MixGRPO 的滑动窗口调度符合 RL 中从难到易的课程学习直觉：高噪声步的探索空间最大（t-SNE 可视化显示数据分布更离散），优先优化这些步可以更快锁定全局最优方向；随后逐步滑向低噪声步精修细节。最终，MixGRPO 仅用 4 步训练即可超越 DanceGRPO 全步优化的效果，训练时间削减 50%，MixGRPO-Flash 进一步削减 71%。
 
 {% note warning no-icon %}
-**为什么 MixGRPO 强调：在 SDE 之前绝对不能使用 DPM-Solver++ 等高阶求解器加速？**
+**为什么在 SDE 窗口之前绝对不能使用 DPM-Solver++ 等高阶求解器加速？**
 
 既然 Flow-GRPO-Fast 的前期和后期都是确定性的 ODE，我们能像推理阶段那样，用 DPM-Solver++ 用极少的步数跨越前期 ODE 阶段吗？
 **答案是：绝不可行！**
 
 高阶 ODE 求解器（如 DPM）为了用大步长跨越，不可避免地会引入微小的数值截断误差（Truncation Error）。
+
 - 如果这段带有误差的轨迹直接走到终点（无 SDE），这些微小误差在视觉上是难以察觉的。
 - 但如果在中途（如上述的 $t_{\text{start}}$）突然**接入了 SDE 强行注入随机高斯白噪声**，SDE 的剧烈扰动会与之前积累的数值误差发生非线性耦合，将原本的微小偏差**成倍放大**，最终导致整个生成流形崩溃。
 
@@ -542,235 +570,164 @@ DanceGRPO 的真正价值在于将 GRPO 框架推广到了视频生成和 Diffus
 
 前面我们已经逐一解析了 SDE 单步更新（公式 ①-⑥）和 log_prob 的计算方法。现在让我们跳出单步视角，审视**整个训练流程是如何将这些组件串联起来**的。以下代码基于 [flow_grpo](https://github.com/yifan123/flow_grpo) 的 `train_sd3_GRPO_Guard.py` 和 [MixGRPO](https://github.com/Tencent-Hunyuan/MixGRPO) 的 `train_grpo_flux.py` 两个官方实现，提取出核心主循环逻辑。
 
-**整体架构**：Flow-GRPO 的训练遵循经典的 **On-Policy RL 范式**——"采样 → 评估 → 更新"的循环迭代。以下是核心实现代码（整合了两个仓库的实现，保留关键逻辑并加注释）：
+**整体架构**：Flow-GRPO / MixGRPO 的训练遵循经典的 **On-Policy RL 范式**——"采样 → 评估 → 更新"的循环迭代：
 
 ```python
-import torch
-import numpy as np
-from collections import defaultdict
-from torch.utils.data import DataLoader
+"""
+Flow-GRPO / MixGRPO — 流匹配模型的组相对策略优化
+论文: Flow-GRPO (arXiv:2505.05470), MixGRPO (arXiv:2507.21802)
 
-# ═══════════════════════════════════════════════════════════
-# 训练主循环（基于 flow_grpo 和 MixGRPO 的统一伪代码）
-# ═══════════════════════════════════════════════════════════
+⚡ 相对文本 GRPO 的关键改动（共 5 处）:
+  1. 策略: 自回归 LM → Flow Transformer v_θ(x_t, t)
+  2. 动作: 离散 token → 连续去噪步 x_{t-Δ}
+  3. log_prob: log_softmax+gather → log N(x; μ_θ, σ²I)
+  4. 采样: 全程 SDE → 混合 ODE+SDE（MixGRPO，只在训练窗口走 SDE）
+  5. KL: f-散度+ref_model → 推理时混合采样（MixGRPO，省一半显存）
 
-def flow_grpo_training_loop(
-    pipeline,         # 包含 Transformer + VAE + Scheduler 的 Pipeline
-    reward_fn,        # 奖励模型（如 HPSv2, ImageReward, PickScore）
-    train_dataloader, # Prompt 数据集的 DataLoader
-    optimizer,        # AdamW 优化器
-    config,           # 训练超参数
-):
-    """Flow-GRPO 完整训练流程。
+分布式架构（MixGRPO 默认: 4节点×8卡=32 GPU）:
+  每卡: 1 prompt → 串行生成 G=12 张图 → 组内 z-score → backward
+  多卡: 32 卡处理 32 个不同 prompt（数据并行）
+  累积: grad_accum=3 → 等效 batch = 32×3 = 96 prompt
+"""
 
-    算法流程（对应论文 Algorithm 1）:
-      1. 外层循环：逐 epoch 迭代
-      2. Phase 1 (采样)：冻结策略，生成 G 张图并记录轨迹
-      3. Phase 2 (评估)：RM 打分 + 组内优势标准化
-      4. Phase 3 (更新)：PPO clipped loss 反向传播
-    """
-    num_train_timesteps = int(config.num_steps * config.timestep_fraction)
-    epoch = 0
-    global_step = 0
-    train_iter = iter(train_dataloader)
+import torch, math
 
-    while global_step < config.max_train_steps:
+# ── 初始化 ────────────────────────────────────────────
+transformer = FlowTransformer(...)             # 速度场模型 v_θ(x, t)
+vae = VAE(...)                                 # latent ↔ 图像
+reward_fn = ImageRewardModel(...)
+optimizer = AdamW(transformer.parameters(), lr=1e-6)
 
-        # ══════════════════════════════════════════════════════════
-        # Phase 1: 组采样（Group Sampling）—— 冻结策略，生成轨迹
-        # ══════════════════════════════════════════════════════════
-        pipeline.transformer.eval()
-        samples = []
+# ── 超参数 ────────────────────────────────────────────
+G             = 12       # 每 prompt 采样 G 张图
+clip_range    = 1e-4     # PPO ratio 裁剪
+adv_clip      = 5.0      # 优势截断
+eta           = 0.7      # SDE 噪声强度
+num_steps     = 25       # 去噪步数
+window_size   = 4        # 滑动窗口宽度
+iters_per_win = 25       # 窗口停留步数
+grad_accum    = 3        # 梯度累积
+kl_coeff      = 0.0      # Flow-GRPO: 0.004; MixGRPO: 0.0
+ref_transformer = None   # kl_coeff>0 时需要冻结的参考模型
 
-        for batch_idx in range(config.num_batches_per_epoch):
-            prompts, metadata = next(train_iter)
-            prompt_embeds = encode_prompts(prompts)  # 文本编码
+# σ 调度: [1→0]，经 SD3 time shift 变换
+#   σ' = shift·σ / (1 + (shift-1)·σ)
+sigmas = sd3_time_shift(3.0, linspace(1, 0, num_steps+1))
 
-            with torch.no_grad():
-                # pipeline_with_logprob: 
-                #   对每个 Prompt 生成 G 张图像（通过 SDE 注入不同噪声实现分裂）
-                #   同时沿轨迹记录每步的 (x_t, x_{t-Δt}, log_prob)
-                images, latents_trajectory, log_probs = pipeline_with_logprob(
-                    pipeline,
-                    prompt_embeds=prompt_embeds,
-                    num_inference_steps=config.num_steps,
-                    guidance_scale=config.guidance_scale,
-                    noise_level=config.noise_level,  # SDE 噪声强度 η
-                )
-                # latents_trajectory: (B, T+1, C, H, W) — 整条轨迹的 latent 状态
-                # log_probs: (B, T) — 每步 SDE 转移的 log N(x_{t-Δ}; μ, σ²)
+# ── 训练循环 ──────────────────────────────────────────
+win_start = 0
 
-            # 异步提交奖励计算（RM 推理与 GPU 采样并行）
-            rewards_future = executor.submit(reward_fn, images, prompts, metadata)
+for step in range(50000):
 
-            samples.append({
-                "latents": latents_trajectory[:, :-1],      # x_t (当前步状态)
-                "next_latents": latents_trajectory[:, 1:],  # x_{t-Δ} (下一步状态)
-                "log_probs": log_probs,                     # π_θ_old 的 log_prob
-                "timesteps": pipeline.scheduler.timesteps,
-                "rewards_future": rewards_future,
-            })
+    # === Phase 1: 组采样（冻结策略，生成轨迹）===
+    transformer.eval()
+    prompt = next(dataloader)
+    win = range(win_start, min(win_start + window_size, num_steps))
 
-        # ══════════════════════════════════════════════════════════
-        # Phase 2: 奖励计算 & 优势估计
-        # ══════════════════════════════════════════════════════════
+    with no_grad():
+        x0 = randn(1, C, H, W)                            # 组内共享初始噪声
+        all_x = []                                          # 存 G 条完整轨迹
+        all_lp = []                                         # 存 G 条 log_prob 序列
 
-        # 等待所有异步奖励计算完成
-        for sample in samples:
-            rewards = sample.pop("rewards_future").result()
-            sample["rewards"] = rewards  # shape: (B,)
+        for g in range(G):                                  # 串行 G 张图
+            x = x0.clone()
+            x_traj = [x]                                    # 第 g 张图的轨迹
+            lp_traj = []                                    # 第 g 张图的 log_prob
 
-        # 合并所有 batch 的样本
-        all_samples = concatenate_samples(samples)
+            for i in range(num_steps):
+                v = transformer(x, t=sigmas[i])
 
-        # 跨 GPU 收集奖励（分布式训练需要全局视角）
-        gathered_rewards = accelerator.gather(all_samples["rewards"])
+                if i in win:                                # 窗口内: SDE（有随机性）
+                    x, lp = sde_step(v, x, sigmas[i], sigmas[i+1], eta)
+                else:                                       # 窗口外: ODE（确定性）
+                    x = x + (sigmas[i+1] - sigmas[i]) * v   # Euler ODE
+                    lp = 0
 
-        # 组内优势标准化（GRPO 的核心：无需 Critic 网络）
-        # 对于同一 Prompt 生成的 G 张图，计算组内 z-score
-        advantages = compute_group_advantages(
-            gathered_rewards,
-            num_images_per_prompt=config.num_image_per_prompt,
-        )
-        # advantages shape: (B,) — 每张图对应一个标量优势
-        # 扩展到所有训练时间步（稀疏奖励：同一优势分配给整条轨迹）
-        all_samples["advantages"] = advantages.unsqueeze(1).repeat(1, num_train_timesteps)
+                x_traj.append(x)
+                lp_traj.append(lp)
 
-        # ══════════════════════════════════════════════════════════
-        # Phase 3: 策略更新（PPO Clipped Surrogate Loss）
-        # ══════════════════════════════════════════════════════════
-        for inner_epoch in range(config.num_inner_epochs):
-            # 打乱样本顺序（防止相关性偏差）
-            perm = torch.randperm(len(all_samples["latents"]))
-            all_samples = {k: v[perm] for k, v in all_samples.items()}
+            all_x.append(stack(x_traj))                     # (T+1, C, H, W)
+            all_lp.append(stack(lp_traj))                   # (T,)
 
-            # 按 mini-batch 划分
-            batches = split_into_batches(all_samples, config.train_batch_size)
+        all_x = stack(all_x)                                # (G, T+1, C, H, W)
+        all_lp = stack(all_lp)                              # (G, T)
 
-            pipeline.transformer.train()
-            for sample_batch in batches:
-                # 逐时间步计算策略梯度
-                for t_idx in range(num_train_timesteps):
-                    with accelerator.accumulate(pipeline.transformer):
-                        # ── 用当前策略 π_θ 重新计算 log_prob ──
-                        v_theta = pipeline.transformer(
-                            hidden_states=sample_batch["latents"][:, t_idx],
-                            timestep=sample_batch["timesteps"][:, t_idx],
-                            encoder_hidden_states=sample_batch["prompt_embeds"],
-                        )
+        images = vae.decode(all_x[:, -1])                   # 解码最终 latent → 图像
+        scores = reward_fn(images, prompt)                   # (G,)
 
-                        # 调用前文的 flow_grpo_step，计算新的 log_prob
-                        _, _, log_prob_new, _, _ = flow_grpo_step(
-                            model_output=v_theta,
-                            latents=sample_batch["latents"][:, t_idx],
-                            eta=config.noise_level,
-                            sigmas=pipeline.scheduler.sigmas,
-                            index=t_idx,
-                            prev_sample=sample_batch["next_latents"][:, t_idx],
-                        )
+    # === Phase 2: 优势估计（与文本 GRPO 完全相同）===
+    # Â_i = (r_i - μ_R) / (σ_R + ε)
+    advantages = group_zscore(scores, G)                    # (G,)
 
-                        # ── PPO Clipped Surrogate Loss ──
-                        log_prob_old = sample_batch["log_probs"][:, t_idx]
-                        ratio = torch.exp(log_prob_new - log_prob_old)
+    # === Phase 3: PPO 更新（只更新窗口内 timestep）===
+    transformer.train()
+    loss = 0
 
-                        advantages_t = torch.clamp(
-                            sample_batch["advantages"][:, t_idx],
-                            -config.adv_clip_max,
-                            config.adv_clip_max,
-                        )
+    for i in win:                                           # ← 只遍历训练窗口!
+        x_t    = all_x[:, i]                                # Phase 1 记录的第 i 步 latent
+        x_next = all_x[:, i+1]                              # Phase 1 记录的第 i+1 步（固定 action）
 
-                        # 裁剪策略损失（PPO 的核心约束机制）
-                        surr1 = -advantages_t * ratio
-                        surr2 = -advantages_t * torch.clamp(
-                            ratio, 1.0 - config.clip_range, 1.0 + config.clip_range
-                        )
-                        policy_loss = torch.mean(torch.maximum(surr1, surr2))
+        v_new = transformer(x_t, t=sigmas[i])               # 当前策略的速度场
 
-                        # ── KL 散度惩罚（可选：防止策略偏移过大）──
-                        # 在 Flow Matching 中使用速度场 MSE 近似 KL
-                        if config.kl_coeff > 0:
-                            with torch.no_grad():
-                                v_ref = ref_transformer(...)  # 参考模型的速度场
-                            kl_loss = F.mse_loss(v_theta, v_ref)
-                            loss = policy_loss + config.kl_coeff * kl_loss
-                        else:
-                            loss = policy_loss
+        # 用当前策略重算 μ_new，但 x_next 固定（off-policy correction）
+        log_prob_new = sde_log_prob(v_new, x_t, x_next, sigmas[i], sigmas[i+1], eta)
 
-                        # ── 反向传播 & 梯度更新 ──
-                        accelerator.backward(loss)
-                        if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(
-                                pipeline.transformer.parameters(),
-                                config.max_grad_norm,
-                            )
-                        optimizer.step()
-                        optimizer.zero_grad()
+        # PPO Clip（逐去噪步，对应文本 GRPO 的逐 token）
+        ratio = exp(log_prob_new - all_lp[:, i])
+        adv = clamp(advantages, -adv_clip, adv_clip)
+        loss += max(-adv * ratio,
+                    -adv * clamp(ratio, 1-clip_range, 1+clip_range)).mean()
 
-                    if accelerator.sync_gradients:
-                        global_step += 1
+        # KL 惩罚（Flow-GRPO 可选，MixGRPO 不需要）
+        if kl_coeff > 0:
+            with no_grad():
+                v_ref = ref_transformer(x_t, t=sigmas[i])
+            loss += kl_coeff * mse(v_new, v_ref)
 
-        epoch += 1
+    (loss / len(win) / grad_accum).backward()               # 累积梯度
 
+    if (step+1) % grad_accum == 0:                          # 多卡 FSDP 同步
+        clip_grad_norm_(transformer.parameters(), 1.0)
+        optimizer.step(); optimizer.zero_grad()
 
-def compute_group_advantages(rewards, num_images_per_prompt):
-    """GRPO 组内优势标准化：无需 Critic，用组统计量作基线。
-
-    对同一 Prompt 的 G 张图的奖励进行 z-score 标准化：
-        Â_i = (r_i - mean(r_1...r_G)) / std(r_1...r_G)
-    """
-    B = len(rewards)
-    num_groups = B // num_images_per_prompt
-    advantages = torch.zeros_like(rewards)
-
-    for g in range(num_groups):
-        start = g * num_images_per_prompt
-        end = (g + 1) * num_images_per_prompt
-        group_r = rewards[start:end]
-        mean_r = group_r.mean()
-        std_r = group_r.std() + 1e-8
-        advantages[start:end] = (group_r - mean_r) / std_r
-
-    return advantages
+    if step % iters_per_win == 0:                           # 窗口滑动
+        win_start = min(win_start + 1, num_steps - window_size)
 ```
 
-{% note info no-icon %}
-**代码结构对比：flow_grpo vs MixGRPO**
+对应的 SDE 步进和 log_prob 计算函数（即前文公式 ③'④⑤ 的精简实现）：
 
-两个仓库的训练主循环在**宏观结构上完全一致**（采样 → 奖励 → 更新），核心差异在于 Phase 1 的采样策略和 Phase 3 的训练时间步选择：
-
-| 维度 | flow_grpo（SD3/Flux） | MixGRPO（Flux） |
-|:---:|:---|:---|
-| **采样策略** | 全程 SDE 采样所有步 | Mixed ODE-SDE：仅窗口内 SDE |
-| **训练时间步** | `num_train_timesteps = T × timestep_fraction` | 仅训练滑动窗口 $W(l)$ 内的步 |
-| **分布式方案** | HuggingFace Accelerate | FSDP + Sequence Parallel |
-| **梯度累积** | `grad_accum × num_train_timesteps` | `grad_accum × len(window)` |
-| **奖励模型** | 单 RM（PickScore/GenEval） | 多 RM 加权融合（HPSv2 + ImageReward + PickScore） |
-| **优势计算** | Per-prompt stat tracking（滑动窗口统计） | 组内标准化 + Trimmed Mean（截尾均值） |
-
-MixGRPO 通过滑动窗口（`GRPOTrainingStates`）管理训练进度：
 ```python
-# MixGRPO 的滑动窗口状态管理
-grpo_states = GRPOTrainingStates(
-    iters_per_group=20,      # 每个窗口位置训练多少步后滑动
-    group_size=4,            # 窗口大小 w = 4 步
-    max_timesteps=T-2,       # 最大可滑动到的时间步
-    sample_strategy="prog",  # 渐进式滑动策略
-)
-# 每个训练 step 获取当前窗口位置
-timesteps_train = grpo_states.get_current_timesteps()  # e.g., [3, 4, 5, 6]
-grpo_states.update_iteration()  # 若达到 iters_per_group，窗口右移
+def sde_step(v, x, sigma, sigma_next, eta):
+    """采样时调用: 生成新样本 + 计算 log_prob"""
+    dt = sigma_next - sigma                                 # Δt < 0
+    sigma_noise = eta * sqrt(sigma / (1 - sigma))           # g(σ) = η·√(σ/(1-σ))
+    mu = x * (1 + sigma_noise**2 / (2*sigma) * dt) \
+       + v * (1 + sigma_noise**2 * (1-sigma) / (2*sigma)) * dt
+    std = sigma_noise * sqrt(-dt)
+    x_next = mu + std * randn_like(x)                       # x_next ~ N(μ, std²I)
+
+    # log N(x_next; μ, std²I)
+    log_prob = -((x_next - mu)**2 / (2 * std**2) + log(std) + 0.5*log(2*pi)).mean()
+    return x_next, log_prob
+
+def sde_log_prob(v, x, x_next, sigma, sigma_next, eta):
+    """更新时调用: x_next 固定，只重算 log_prob"""
+    dt = sigma_next - sigma
+    sigma_noise = eta * sqrt(sigma / (1 - sigma))
+    mu = x * (1 + sigma_noise**2 / (2*sigma) * dt) \
+       + v * (1 + sigma_noise**2 * (1-sigma) / (2*sigma)) * dt
+    std = sigma_noise * sqrt(-dt)
+    return -((x_next - mu)**2 / (2 * std**2) + log(std) + 0.5*log(2*pi)).mean()
 ```
-这使得 MixGRPO 在 Phase 1 中只需对窗口内步做 SDE（其余用 ODE 快速跳过），Phase 3 中也只对窗口内步反向传播，实现了约 50% 的训练时间削减。
-{% endnote %}
 
 {% note warning no-icon %}
 **关键工程细节：为什么采样和训练要分离？**
 
-观察主循环可以发现一个关键设计：**Phase 1 的采样是完全 `torch.no_grad()` 的**，而 Phase 3 的训练才启用梯度。这不是偶然的，而是在线 RL 的核心机制要求：
+观察主循环可以发现：**Phase 1 的采样是完全 `no_grad()` 的**，而 Phase 3 的训练才启用梯度。这不是偶然的，而是在线 RL 的核心机制要求：
 
 1. **On-Policy 约束**：PPO 要求用于计算 ratio 的 `log_prob_old` 来自**采样时的策略 $\pi_{\theta_\text{old}}$**，而非当前正在优化的策略 $\pi_\theta$。因此必须先冻结策略采样，再解冻更新。
-2. **显存效率**：Flux 模型 12B 参数，一次前向传播就需 ~24GB 显存。如果采样时也保留计算图，生成 $T=50$ 步 × $G=4$ 张图的完整计算图将需要 ~4.8TB 显存——这显然不可能。分离后，采样只需前向推理的内存（~24GB），训练时只对单步做反向传播（~48GB with activation checkpointing）。
-3. **Importance Sampling 的数学保证**：Phase 3 中重新计算 `log_prob_new` 并与存储的 `log_prob_old` 做比值，本质是在做 Off-Policy 修正——允许策略在更新后仍然"重用"之前采样的数据。PPO 的 clipping 机制确保这种重用不会因策略偏移过大而失效（通常限制 inner_epochs ≤ 4）。
+2. **显存效率**：Flux 模型 12B 参数，一次前向传播就需 ~24GB 显存。如果采样时也保留计算图，生成 $T=25$ 步 × $G=12$ 张图的完整计算图将需要 ~7.2TB 显存——这显然不可能。分离后，采样只需前向推理的内存（~24GB），训练时只对单步做反向传播（~48GB with activation checkpointing）。
+3. **Importance Sampling 的数学保证**：Phase 3 中重新计算 `log_prob_new` 并与存储的 `log_prob_old` 做比值，本质是在做 Off-Policy 修正——允许策略在更新后仍然"重用"之前采样的数据。PPO 的 clipping 机制确保这种重用不会因策略偏移过大而失效。
 {% endnote %}
 
 ---
