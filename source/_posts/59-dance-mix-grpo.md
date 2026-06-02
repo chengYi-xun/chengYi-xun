@@ -228,166 +228,119 @@ MixGRPO 将 DPM-Solver++ 适配到 Flow Matching 框架。**关键约束：只�
    由于强行加噪会让总方差变大（图像变糊），SDE 必须引入基于 Score Function 的**漂移修正项**。但 Score 靠 Tweedie 公式估算（$s_t \approx -(x_t - \hat{x}_0)/\sigma_t^2$），存在后验均值坍缩、模型低频偏好和大步长离散化误差，导致高频噪声残留→颗粒感伪影，进而**欺骗**对纹理敏感的代理 RM（Reward Hacking）。
 
 2. **CPS 的做法（系数守恒，重新分配）**：
-   **Flow-CPS** 借鉴 DDIM 的**待定系数法**，**绕开显式 Score 估算**，通过代数层面隐式修正分布发散。最终 CPS 采样公式为：
+   **Flow-CPS** 借鉴 DDIM 的待定系数法，绕开显式 Score 估算。
 
-   $$x_{t_{i-1}} = \underbrace{x_{t_i} - v_{t_i} \Delta t}_{\text{ODE 基础步}} + \underbrace{\left( \sqrt{t_{i-1}^2 - \sigma_{t_i}^2} - t_{i-1} \right) \hat{\epsilon}}_{\text{方差补偿项}} + \underbrace{\sigma_{t_i} \epsilon_i}_{\text{注入的随机噪声}}$$
+   **如何求出系数？**
+   在 Flow Matching 中，理论路径为 $x_t = (1-t)x_0 + t\epsilon$。假设下一步状态是当前状态 $x_{t_i}$、模型预测速度场 $v_{t_i}$ 和新注入噪声 $\epsilon_i$ 的线性组合：
+   $$x_{t_{i-1}} = A \cdot x_{t_i} + B \cdot v_{t_i} + C \cdot \epsilon_i$$
+   将 $x_{t_i}$ 和 $v_{t_i}$ 展开为 $x_0$ 和 $\epsilon$ 的形式并代回上述方程，强制要求生成的 $x_{t_{i-1}}$ 必须精确服从目标时刻的边缘分布 $x_{t_{i-1}} = (1-t_{i-1})x_0 + t_{i-1}\epsilon$。通过对比等式两边 $x_0$ 和 $\epsilon$ 的系数（设定 $C = \sigma_{t_i}$），我们可以解出严格保证均值和方差一致的系数 $A$ 和 $B$。
 
-   其中 $\hat{\epsilon} = x_{t_i} + (1-t_i)v_{t_i}$ 是模型预测的当前噪声。CPS 严格保持 Rectified Flow 的线性插值结构，确保均值和方差守恒，有效缓解 SDE 颗粒感伪影。
+   解出系数后，我们得到最终的 CPS 采样公式：
 
-**从公式到代码的推导**
+   $$x_{t_{i-1}} = (x_{t_i} - v_{t_i} \Delta t) + (\sqrt{t_{i-1}^2 - \sigma_{t_i}^2} - t_{i-1})\hat{\epsilon} + \sigma_{t_i} \epsilon_i$$
 
-在 Rectified Flow 中，路径是直线 $x_t = (1-t)x_0 + t\epsilon$，速度 $v_t = \epsilon - x_0$ 是常数。由此可以定义两个"锚点"：
+   **如何把这个公式变成代码？**
 
-- **预测干净图** $\hat{x}_0 = x_t - t \cdot v_t$。这里减去的是 $t \cdot v_t$（沿直线回到**起点**的完整距离），而非 $\Delta t \cdot v_t$（回到上一步的一小段）。展开验证：$x_t - t \cdot v_t = (1-t)x_0 + t\epsilon - t(\epsilon - x_0) = x_0$。
-- **预测噪声** $\hat{\epsilon} = x_t + (1-t)v_t$。展开：$(1-t)x_0 + t\epsilon + (1-t)(\epsilon - x_0) = \epsilon$。
+   为了方便在代码里计算，我们先定义出模型预测的两个"锚点"：
+   - 预测的干净图：$\hat{x}_0 = x_{t_i} - t_i \cdot v_{t_i}$
+   - 预测的噪声：$\hat{\epsilon} = x_{t_i} + (1-t_i) v_{t_i}$
 
-将公式中的前两项（ODE 基础步 + 方差补偿项）合并为均值 $\mu$，用 $\hat{x}_0$ 和 $\hat{\epsilon}$ 重写：
+   如果我们把上面长长的采样公式的**前两项**合并，经过简单的代数化简，它恰好等价于 $\hat{x}_0$ 和 $\hat{\epsilon}$ 的加权和：
+   $$(x_{t_i} - v_{t_i} \Delta t) + (\sqrt{t_{i-1}^2 - \sigma_{t_i}^2} - t_{i-1})\hat{\epsilon} = (1-t_{i-1})\hat{x}_0 + \sqrt{t_{i-1}^2 - \sigma_{t_i}^2} \cdot \hat{\epsilon}$$
 
-$$\mu = \underbrace{(x_t - v\Delta t)}_{\text{ODE 步}} + \underbrace{(\sqrt{t_{i-1}^2 - \sigma^2} - t_{i-1})\hat{\epsilon}}_{\text{补偿项}}$$
+   这就是我们在代码中需要计算的**均值 $\mu$**。
+   而公式最后一项 $\sigma_{t_i} \epsilon_i$，就是我们需要**加的噪声**。
 
-展开 ODE 步：$(1-t_i)x_0 + t_i\epsilon - (\epsilon - x_0)(t_i - t_{i-1}) = (1-t_{i-1})x_0 + t_{i-1}\epsilon$
+   所以，复杂的公式被拆解为了极简的两步：
+   $$x_{t_{i-1}} = \mu + \text{加的噪声}$$
 
-加上补偿项后，$\epsilon$ 系数从 $t_{i-1}$ 变为 $\sqrt{t_{i-1}^2 - \sigma^2}$：
+   这与底层的代码实现完全对应：
+   ```python
+   # 1. 计算 μ (即代码中的 prev_sample_mean)
+   # μ = (1 - sigma_prev) * x̂_0 + √(sigma_prev² - std²) * ε̂
+   prev_sample_mean = pred_original_sample * (1 - sigma_prev) + noise_estimate * math.sqrt(sigma_prev**2 - std_dev_t**2)
 
-$$\mu = (1-t_{i-1})\hat{x}_0 + \sqrt{t_{i-1}^2 - \sigma^2}\,\hat{\epsilon}$$
-
-最终的 CPS 采样是 $x_{t_{i-1}} = \underbrace{\mu}_{\text{均值}} + \underbrace{\sigma_{t_i} \epsilon_i}_{\text{新噪声}}$，与代码中的实现完全一致：
-
-```python
-# μ = (1-sigma_prev) * x̂_0 + √(sigma_prev² - std²) * ε̂
-prev_sample_mean = pred_original_sample * (1 - sigma_prev) + noise_estimate * sqrt(sigma_prev**2 - std_dev_t**2)
-# x_{t_{i-1}} = μ + σ * ε_new
-prev_sample = prev_sample_mean + std_dev_t * variance_noise
-```
+   # 2. 加上噪声 (即代码中的 μ + 加的噪声)
+   # x_next = μ + std * ε_new
+   prev_sample = prev_sample_mean + std_dev_t * variance_noise
+   ```
 
 ### MixGRPO 的实验成果
 
 ![MixGRPO 实验结果对比](/chengYi-xun/img/mixgrpo_experiment1.png)
 
-#### 同条件定量对比（HPDv2 数据集，4 奖励模型联合）
-
-| 方法 | NFE$_{\pi_{\theta_\text{old}}}$ | NFE$_{\pi_\theta}$ | 每轮时间 (s) | HPS-v2.1 | ImageReward |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| FLUX 基线 | — | — | — | 0.313 | 1.088 |
-| DanceGRPO（14步） | 25 | 14 | 291.3 | 0.356 | 1.436 |
-| DanceGRPO（4步） | 25 | 4 | 150.0 | 0.334 | 1.335 |
-| **MixGRPO** | **25** | **4** | **150.8** | **0.367** | **1.629** |
-| MixGRPO-Flash | 16 (Avg) | 4 | 112.4 | 0.358 | 1.528 |
-| MixGRPO-Flash\* | 8 | 4 | **83.3** | 0.357 | 1.624 |
-
-**同样只优化 4 步**，MixGRPO 的 ImageReward 比 DanceGRPO 高出 22%（1.629 vs 1.335）。MixGRPO-Flash\* 训练时间仅为 DanceGRPO 的 **29%**（83.3s vs 291.3s），性能仍然更优。
-
-#### CPS vs SDE 采样
-
-| 方法 | Pick Score | ImageReward | HPS-v2.1 |
-|:---|:---:|:---:|:---:|
-| MixGRPO-SDE | 0.234 | 1.590 | 0.365 |
-| MixGRPO-CPS | **0.238** | **1.645** | **0.369** |
-
-CPS 在所有指标上全面超越标准 SDE，且生成图像视觉上更干净。
-
-#### 视频生成（HunyuanVideo-1.5）
-
-MixGRPO 在 HunyuanVideo-1.5 的 T2V 任务上展现了更强的稳定性：Flow-GRPO 在视频高维空间中出现训练不稳定和指标退化，而 MixGRPO 在 HPSv3、VQ、MQ、TA 四个维度上均**稳定单调上升**。
+- **极致加速**：在同样只优化 4 步的条件下，MixGRPO 的核心奖励（ImageReward）比 DanceGRPO 高出 22%。若启用高阶加速（MixGRPO-Flash\*），训练时间可降至 DanceGRPO 的 **29%**（83s vs 291s），且性能依然更优。
+- **图像更干净**：使用 CPS 替代标准 SDE 后，所有评价指标均有提升，成功缓解了由于 Score 估算不准带来的颗粒感伪影。
+- **视频更稳定**：在 HunyuanVideo-1.5 的 T2V 任务上，相比 Flow-GRPO 在高维空间容易出现的指标退化，MixGRPO 在 VQ、MQ 等四个维度上均实现了稳定单调上升。
 
 ---
 
-## Part III: 核心代码实现
+## Part III: 核心伪代码实现
 
-SDE 单步去噪的代码实现见前一篇 [Flow-GRPO 笔记](/chengYi-xun/posts/55-flow-grpo/)。本节聚焦 CPS 采样、DanceGRPO 训练循环和 MixGRPO 混合采样的代码。
-
-### CPS 单步采样 + MixGRPO 混合采样循环
-
-下面的代码展示了**完整的一次 Rollout 流程**：外层是 MixGRPO 的滑动窗口逻辑（窗口内 SDE / 窗口外 ODE），内层的 SDE 步调用 CPS 采样。Flash 变体在窗口后启用 DPM-Solver++ 加速。
+### 1. 采样阶段 (Rollout)
 
 ```python
-# ═══════ 滑动窗口状态管理 ═══════
-class GRPOStates:
-    def get_current_timesteps(self):
-        return list(range(self.left, self.left + self.group_size))
+# 初始化滑动窗口 (MixGRPO)
+window = [t_start, t_end] 
 
-    def update_iteration(self):
-        self.current_iteration += 1
-        if self.current_iteration % self.iters_per_group == 0:
-            self.left = min(self.left + self.stride, self.total_steps - self.group_size)
-
-# ═══════ CPS 单步采样（替代标准 SDE） ═══════
-def cps_step_with_logprob(model_output, timestep, sample, noise_level=0.8,
-                          prev_sample=None, generator=None):
-    std_dev_t = sigma_prev * math.sin(noise_level * math.pi / 2)
-
-    pred_original_sample = sample - sigma * model_output       # x̂_0
-    noise_estimate = sample + model_output * (1 - sigma)       # ε̂
-
-    # 均值：(1-t_{i-1})·x̂_0 + √(t_{i-1}² - σ²)·ε̂
-    # 等价于公式中的 (x_t - v·Δt) + (√(t²_{i-1} - σ²) - t_{i-1})·ε̂
-    prev_sample_mean = (
-        pred_original_sample * (1 - sigma_prev)
-        + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
-    )
-
-    if prev_sample is None:
-        prev_sample = prev_sample_mean + std_dev_t * randn_tensor(model_output.shape, generator=generator)
-
-    log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
-    log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-    return prev_sample, log_prob, prev_sample_mean, std_dev_t
-
-# ═══════ MixGRPO 混合 ODE-SDE Rollout（含 Flash 加速） ═══════
-current_window = grpo_states.get_current_timesteps()
-window_end = max(current_window) + 1
-
-for i in range(total_steps):
-    model_output = model(latents, timestep)
-
-    if i in current_window:
-        # 窗口内：SDE 步进（CPS 或标准 SDE）
-        prev_sample, log_prob, _, _ = cps_step_with_logprob(
-            model_output, timestep, latents,
-            noise_level=args.noise_level
-        )
-    elif dpm_apply_strategy == "post" and i >= window_end:
-        # 窗口后（Flash 变体）：DPM-Solver++ 二阶加速
-        x0_pred = latents - sigma * model_output
-        D = (1 + h_i/(2*h_prev)) * x0_pred_prev - (h_i/(2*h_prev)) * x0_pred_prev2
-        prev_sample = (sigma_next/sigma) * latents - (1-sigma_next) * (exp(-h_i)-1) * D
+for t in reversed(range(T)):
+    # 模型预测速度场
+    v_t = model(x_t, t)
+    
+    if t in window:
+        # ─── 窗口内：SDE 探索 (使用 CPS 采样) ───
+        x_0_pred = x_t - t * v_t
+        eps_pred = x_t + (1 - t) * v_t
+        
+        # 1. 计算均值 μ (待定系数法的解)
+        μ = (1 - t_prev) * x_0_pred + sqrt(t_prev**2 - σ**2) * eps_pred
+        
+        # 2. 注入新噪声
+        x_prev = μ + σ * noise
+        
+        # 记录当前步动作概率 (用于后续 PPO)
+        log_probs[t] = calc_gaussian_logprob(x_prev, μ, σ)
+    
+    elif use_flash_acceleration and t < window[0]:
+        # ─── 窗口后 (接近 t=0)：高阶 ODE 加速 (MixGRPO-Flash) ───
+        # 利用历史速度场进行大步长跨越
+        x_prev = DPM_Solver_Step(x_t, v_t, history_v)
+        
     else:
-        # 窗口前或非 Flash 窗口外：ODE Euler 步进
-        prev_sample = latents + dsigma * model_output
+        # ─── 窗口外常规步：ODE 确定性步进 ───
+        x_prev = x_t - v_t * dt
+        
+    x_t = x_prev
 ```
 
-### DanceGRPO / MixGRPO 训练循环
-
-Rollout 完成后，进入 PPO 更新。DanceGRPO 打乱时间步并截取子集；MixGRPO 则只优化窗口内的步。两者都采用**单步独立反传**以极致省显存：
+### 2. 训练阶段 (PPO Update)
 
 ```python
-# ═══════ DanceGRPO：打乱 + 截取（适用于全轨迹 SDE） ═══════
-perms = torch.stack([torch.randperm(T) for _ in range(batch_size)]).to(device)
-for key in ["timesteps", "latents", "next_latents", "log_probs"]:
-    samples[key] = samples[key][torch.arange(batch_size)[:, None], perms]
-train_timesteps = int(T * args.timestep_fraction)   # 默认 0.6
+# 确定需要优化的时间步
+if is_DanceGRPO:
+    # 打乱全轨迹时间步，随机抽取 K 步 (易导致策略偏移)
+    train_steps = random_sample(all_steps, K)
+elif is_MixGRPO:
+    # 仅优化滑动窗口内的步 (定向课程学习)
+    train_steps = window
 
-# ═══════ MixGRPO：直接取窗口内的步 ═══════
-# train_timesteps = len(current_window)              # 仅窗口步，无需打乱
-
-# ═══════ 共用的 PPO 更新循环 ═══════
-for t in range(train_timesteps):
-    new_log_probs = grpo_one_step(...)
-    ratio = torch.exp(new_log_probs - old_log_probs[:, t])
-
-    # 分维度 PPO clip loss（视频任务的 VQ/MQ 独立裁剪 → 防止尺度淹没）
-    vq_loss = torch.mean(torch.maximum(
-        -vq_advantages * ratio,
-        -vq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-    )) / (gradient_accumulation_steps * train_timesteps)
-
-    mq_loss = torch.mean(torch.maximum(
-        -mq_advantages * ratio,
-        -mq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-    )) / (gradient_accumulation_steps * train_timesteps)
-
-    loss = vq_coef * vq_loss + mq_coef * mq_loss
-    loss.backward()   # 每步独立反传，立刻释放计算图
+for t in train_steps:
+    # 用最新策略重新计算动作概率
+    new_log_prob = current_model.calc_logprob(x_t, x_prev)
+    ratio = exp(new_log_prob - old_log_probs[t])
+    
+    # 视频生成的分维度 PPO 裁剪 (防止 VQ 和 MQ 尺度淹没)
+    loss_VQ = PPO_Clip(ratio, adv_VQ)
+    loss_MQ = PPO_Clip(ratio, adv_MQ)
+    
+    # 融合损失
+    loss = alpha * loss_VQ + beta * loss_MQ
+    
+    # 单步独立反向传播 (极致省显存！)
+    loss.backward()
+    
+# 随着训练进行，更新滑动窗口向高信噪比区域 (t=0) 滑动
+window = slide_window(window)
 ```
 
 ---
