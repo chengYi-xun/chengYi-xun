@@ -246,6 +246,8 @@ MixGRPO 将 DPM-Solver++ 适配到 Flow Matching 框架。**关键约束：只�
 
    **核心优势**：CPS 严格保持 Rectified Flow 的线性插值结构，在给定方差预算内自动调整权重，确保均值和方差守恒，有效缓解 SDE 颗粒感伪影。
 
+   > **公式与代码的等价性**：在实际代码中，CPS 均值常写成另一种等价形式 $\mu = (1-t_{i-1})\hat{x}_0 + \sqrt{t_{i-1}^2 - \sigma^2}\,\hat{\epsilon}$。两者等价的关键在于 Rectified Flow 中 $\hat{x}_0 = x_t - t \cdot v_t = x_0$，$\hat{\epsilon} = x_t + (1-t)v_t = \epsilon$。展开公式形式的 ODE 基础步：$x_t - v\Delta t = (1-t_i)x_0 + t_i\epsilon - (\epsilon - x_0)(t_i - t_{i-1}) = (1-t_{i-1})x_0 + t_{i-1}\epsilon$。加上补偿项 $(\sqrt{t_{i-1}^2 - \sigma^2} - t_{i-1})\epsilon$ 后，$\epsilon$ 系数合并为 $\sqrt{t_{i-1}^2 - \sigma^2}$——与代码形式完全一致。
+
 ### MixGRPO 的实验成果
 
 ![MixGRPO 实验结果对比](/chengYi-xun/img/mixgrpo_experiment1.png)
@@ -278,89 +280,16 @@ MixGRPO 在 HunyuanVideo-1.5 的 T2V 任务上展现了更强的稳定性：Flow
 
 ---
 
-## Part III: 采样与训练循环的核心代码实现
+## Part III: 核心代码实现
 
-在前一篇 [Flow-GRPO 笔记](/chengYi-xun/posts/55-flow-grpo/) 中，我们已经详细对比了 Flow-GRPO 与 DanceGRPO 在 **SDE 单步去噪（显式 Score vs 算子融合）**上的数学等价性与底层代码实现。
+SDE 单步去噪的代码实现见前一篇 [Flow-GRPO 笔记](/chengYi-xun/posts/55-flow-grpo/)。本节聚焦 CPS 采样、DanceGRPO 训练循环和 MixGRPO 混合采样的代码。
 
-本节我们将重点聚焦于本篇涉及的三大创新机制的代码落地：**Flow-CPS 的单步采样**、**DanceGRPO 的随机抽样训练循环**，以及 **MixGRPO 的混合 ODE-SDE 窗口与加速**。
+### CPS 单步采样 + MixGRPO 混合采样循环
 
-### 1. Flow-CPS 的单步采样实现
-
-如前文所述，Flow-CPS 利用待定系数法隐式保证了边缘分布的方差守恒，替代了依赖显式 Score 估算的标准 SDE。以下是开源仓库中集成的 CPS 采样分支代码：
+下面的代码展示了**完整的一次 Rollout 流程**：外层是 MixGRPO 的滑动窗口逻辑（窗口内 SDE / 窗口外 ODE），内层的 SDE 步调用 CPS 采样。Flash 变体在窗口后启用 DPM-Solver++ 加速。
 
 ```python
-def cps_step_with_logprob(model_output, timestep, sample, noise_level=0.8, prev_sample=None, generator=None):
-    # ── CPS (Coefficient-Preserving Sampling)：有界噪声，σ→1 时不爆炸 ──
-    # 噪声尺度：sin 映射保证 std_dev_t ∈ [0, σ_prev]（有上界，不爆方差）
-    std_dev_t = sigma_prev * math.sin(noise_level * math.pi / 2)
-
-    # x̂_0 和噪声估计 ε̂（两个方向的"锚点"）
-    pred_original_sample = sample - sigma * model_output
-    noise_estimate = sample + model_output * (1 - sigma)  # ε̂ = x + v·(1-σ)
-
-    # CPS 均值（与前文公式等价的另一种分解形式）：
-    # μ = (1-σ_prev)·x̂_0 + √(σ_prev² - std²)·ε̂
-    # 等价于公式中的 (x_t - v·Δt) + (√(t²_{i-1} - σ²) - t_{i-1})·ε̂
-    # 严格保证 μ 的范数不会因后续的噪声注入而膨胀
-    prev_sample_mean = (
-        pred_original_sample * (1 - sigma_prev)
-        + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
-    )
-
-    # CPS 采样：x_{next} = μ + std · ε
-    if prev_sample is None:
-        variance_noise = randn_tensor(model_output.shape, generator=generator)
-        prev_sample = prev_sample_mean + std_dev_t * variance_noise
-
-    # CPS log_prob（简化形式：由于方差守恒，常数项被抵消，仅保留核心的高斯指数衰减信号）
-    log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
-    log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-    
-    return prev_sample, log_prob, prev_sample_mean, std_dev_t
-```
-
-### 2. DanceGRPO 的训练循环：随机抽样优化
-
-DanceGRPO 在采样阶段生成了完整的 $T$ 步轨迹，但在 PPO 训练截断，为了优化极端的显存占用，它对时间步进行了打乱和随机截断采样（截取比例 $\tau$）：
-
-```python
-# ① 随机打乱时间步索引 (打破相邻时间步的梯度相关性)
-perms = torch.stack([torch.randperm(T) for _ in range(batch_size)]).to(device)
-for key in ["timesteps", "latents", "next_latents", "log_probs"]:
-    samples[key] = samples[key][torch.arange(batch_size)[:, None], perms]
-
-# ② 只取前 K 步训练 (缓解 OOM)
-train_timesteps = int(T * args.timestep_fraction)  # 默认 0.6
-
-for i, sample in enumerate(samples_batched_list):
-    for t in range(train_timesteps):
-        # 用当前策略重新计算 log_prob
-        new_log_probs = grpo_one_step(...)
-
-        # 重要性比率
-        ratio = torch.exp(new_log_probs - sample["log_probs"][:, t])
-
-        # 分维度 PPO clip loss（视频任务特有的 VQ 和 MQ 独立裁剪）
-        vq_loss = torch.mean(torch.maximum(
-            -vq_advantages * ratio,
-            -vq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-        )) / (gradient_accumulation_steps * train_timesteps)
-
-        mq_loss = torch.mean(torch.maximum(
-            -mq_advantages * ratio,
-            -mq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-        )) / (gradient_accumulation_steps * train_timesteps)
-
-        # 加权组合并反传（关键：每步独立 backward，立刻释放计算图，极致省显存！）
-        final_loss = vq_coef * vq_loss + mq_coef * mq_loss
-        final_loss.backward()
-```
-
-### 3. MixGRPO 的采样循环：混合 ODE-SDE
-
-MixGRPO 的核心创新在于**根据滑动窗口位置选择性地启用 SDE**。只有在窗口内才调用带噪声的 SDE 步，窗口外全部使用纯确定性的 ODE 步：
-
-```python
+# ═══════ 滑动窗口状态管理 ═══════
 class GRPOStates:
     def get_current_timesteps(self):
         return list(range(self.left, self.left + self.group_size))
@@ -368,44 +297,85 @@ class GRPOStates:
     def update_iteration(self):
         self.current_iteration += 1
         if self.current_iteration % self.iters_per_group == 0:
-            # 随训练进程，窗口向高 SNR（低噪声）区域滑动
             self.left = min(self.left + self.stride, self.total_steps - self.group_size)
 
+# ═══════ CPS 单步采样（替代标准 SDE） ═══════
+def cps_step_with_logprob(model_output, timestep, sample, noise_level=0.8,
+                          prev_sample=None, generator=None):
+    std_dev_t = sigma_prev * math.sin(noise_level * math.pi / 2)
+
+    pred_original_sample = sample - sigma * model_output       # x̂_0
+    noise_estimate = sample + model_output * (1 - sigma)       # ε̂
+
+    # 均值：(1-t_{i-1})·x̂_0 + √(t_{i-1}² - σ²)·ε̂
+    # 等价于公式中的 (x_t - v·Δt) + (√(t²_{i-1} - σ²) - t_{i-1})·ε̂
+    prev_sample_mean = (
+        pred_original_sample * (1 - sigma_prev)
+        + noise_estimate * torch.sqrt(sigma_prev**2 - std_dev_t**2)
+    )
+
+    if prev_sample is None:
+        prev_sample = prev_sample_mean + std_dev_t * randn_tensor(model_output.shape, generator=generator)
+
+    log_prob = -((prev_sample.detach() - prev_sample_mean) ** 2)
+    log_prob = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+    return prev_sample, log_prob, prev_sample_mean, std_dev_t
+
+# ═══════ MixGRPO 混合 ODE-SDE Rollout（含 Flash 加速） ═══════
 current_window = grpo_states.get_current_timesteps()
+window_end = max(current_window) + 1
 
 for i in range(total_steps):
-    deterministic = (i not in current_window)
+    model_output = model(latents, timestep)
 
-    if deterministic:
-        # 窗口外：ODE 纯 Euler 步进，无随机噪声注入
-        prev_sample = sample + dt * model_output
-    else:
-        # 窗口内：SDE 步进（注入噪声，支持标准 sde 或 cps）
-        prev_sample, log_prob, prev_sample_mean, std_dev_t = sde_step_with_logprob(
-            scheduler, model_output, timestep, sample,
-            noise_level=args.noise_level, sde_type=args.sde_type
+    if i in current_window:
+        # 窗口内：SDE 步进（CPS 或标准 SDE）
+        prev_sample, log_prob, _, _ = cps_step_with_logprob(
+            model_output, timestep, latents,
+            noise_level=args.noise_level
         )
+    elif dpm_apply_strategy == "post" and i >= window_end:
+        # 窗口后（Flash 变体）：DPM-Solver++ 二阶加速
+        x0_pred = latents - sigma * model_output
+        D = (1 + h_i/(2*h_prev)) * x0_pred_prev - (h_i/(2*h_prev)) * x0_pred_prev2
+        prev_sample = (sigma_next/sigma) * latents - (1-sigma_next) * (exp(-h_i)-1) * D
+    else:
+        # 窗口前或非 Flash 窗口外：ODE Euler 步进
+        prev_sample = latents + dsigma * model_output
 ```
 
-### 4. MixGRPO-Flash：DPM-Solver++ 加速 ODE 段
+### DanceGRPO / MixGRPO 训练循环
 
-MixGRPO-Flash 进一步利用高阶求解器对**窗口后面的 ODE 步**进行了加速压缩：
+Rollout 完成后，进入 PPO 更新。DanceGRPO 打乱时间步并截取子集；MixGRPO 则只优化窗口内的步。两者都采用**单步独立反传**以极致省显存：
 
 ```python
-# 判断当前步是否在窗口后，并应用 DPM-Solver++ 加速
-if dpm_apply_strategy == "post" and i >= window_end:
-    # 二阶 DPM-Solver++ 多步法
-    # 需要利用至少两个历史 x̂₀ 的预测值进行高阶多项式插值
-    x0_pred_current = latents - sigma * model_output  # 当前时刻的 x̂₀
-    
-    # 结合上一时刻的 x0_pred_prev 和更早的 x0_pred_prev2 计算高阶修正项 D
-    D = (1 + h_i/(2*h_prev)) * x0_pred_prev - (h_i/(2*h_prev)) * x0_pred_prev2
-    
-    # 大步长跨越，计算下一步的 latent
-    next_latent = (sigma_next/sigma) * latents - (1-sigma_next) * (exp(-h_i)-1) * D
-else:
-    # 窗口内 (SDE) 或窗口前 (ODE)：只能使用常规的一阶 Euler 步进
-    next_latent = latents + dsigma * model_output
+# ═══════ DanceGRPO：打乱 + 截取（适用于全轨迹 SDE） ═══════
+perms = torch.stack([torch.randperm(T) for _ in range(batch_size)]).to(device)
+for key in ["timesteps", "latents", "next_latents", "log_probs"]:
+    samples[key] = samples[key][torch.arange(batch_size)[:, None], perms]
+train_timesteps = int(T * args.timestep_fraction)   # 默认 0.6
+
+# ═══════ MixGRPO：直接取窗口内的步 ═══════
+# train_timesteps = len(current_window)              # 仅窗口步，无需打乱
+
+# ═══════ 共用的 PPO 更新循环 ═══════
+for t in range(train_timesteps):
+    new_log_probs = grpo_one_step(...)
+    ratio = torch.exp(new_log_probs - old_log_probs[:, t])
+
+    # 分维度 PPO clip loss（视频任务的 VQ/MQ 独立裁剪 → 防止尺度淹没）
+    vq_loss = torch.mean(torch.maximum(
+        -vq_advantages * ratio,
+        -vq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
+    )) / (gradient_accumulation_steps * train_timesteps)
+
+    mq_loss = torch.mean(torch.maximum(
+        -mq_advantages * ratio,
+        -mq_advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
+    )) / (gradient_accumulation_steps * train_timesteps)
+
+    loss = vq_coef * vq_loss + mq_coef * mq_loss
+    loss.backward()   # 每步独立反传，立刻释放计算图
 ```
 
 ---
