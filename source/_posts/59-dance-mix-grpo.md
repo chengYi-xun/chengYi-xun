@@ -271,7 +271,7 @@ MixGRPO 将 DPM-Solver++ 适配到 Flow Matching 框架。**关键约束：只�
 
 - **极致加速**：在同样只优化 4 步的条件下，MixGRPO 的核心奖励（ImageReward）比 DanceGRPO 高出 22%。若启用高阶加速（MixGRPO-Flash\*），训练时间可降至 DanceGRPO 的 **29%**（83s vs 291s），且性能依然更优。
 - **图像更干净**：使用 CPS 替代标准 SDE 后，所有评价指标均有提升，成功缓解了由于 Score 估算不准带来的颗粒感伪影。
-- **视频更稳定**：在 HunyuanVideo-1.5 的 T2V 任务上，相比 Flow-GRPO 在高维空间容易出现的指标退化，MixGRPO 在 VQ、MQ 等四个维度上均实现了稳定单调上升。
+- **视频更稳定**：在 HunyuanVideo-1.5 视频生成任务中，如果直接使用前代方法（Flow-GRPO），由于高维空间的随机性难以控制，训练会出现“指标越训越差”的**性能退化**。而 **MixGRPO** 成功克服了这一问题，在四个评价维度上均实现了稳定的单调上升（进步）。
 
 ---
 
