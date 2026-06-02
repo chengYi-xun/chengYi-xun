@@ -133,4 +133,4 @@ SuperFlow 之外，两个开源框架正在将图像/视频生成的 RL 训练�
 > 3. [GenRL: Scalable RL for Generative Models](https://github.com/ModelTC/GenRL)
 > 4. [Hugging Face TRL v1.0](https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/)
 
-> 下一篇：[笔记｜强化学习（九）：DanceGRPO——让视频生成模型"跳好舞"的强化学习框架](/chengYi-xun/posts/59-video-grpo/)
+> 下一篇：[笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](/chengYi-xun/posts/59-dance-mix-grpo/)
