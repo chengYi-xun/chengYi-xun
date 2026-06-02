@@ -76,18 +76,8 @@ $$dz_t = \underbrace{u_t dt}_{\text{直线速度场}} - \underbrace{\frac{1}{2}\
 
 - **物理意义**：与 Diffusion 类似，第一项 $u_t dt$ 是 Flow Matching 特有的直线速度场，直接指向目标图像。后面的项同样是注入随机噪声并用 Score 函数进行修正，以保证探索过程的合法性。
 
-**4. 统一的数学本质：Stochastic Interpolant（随机插值）**
-这两个 SDE 看起来长得不一样，但 DanceGRPO 借助 Stochastic Interpolant 框架证明了它们**在数学结构上是完全等价的**。
-Stochastic Interpolant 是 Albergo et al. (2023) 提出的一个广义数学框架，Flow Matching（Lipman et al., 2023）和 Rectified Flow（Liu et al., 2023）在数学本质上都可以视为它的等价特例。
-无论是 Diffusion 的弯曲路径 $z_t = \alpha_t x_0 + \sigma_t \epsilon$，还是 Rectified Flow 的直线路径 $z_t = (1-t)x_0 + t x_1$，它们本质上都是在对数据 $x_0$ 和噪声进行插值。只要对 Diffusion 的坐标系进行适当的缩放（除以 $\alpha_t$），并将时间轴映射为信噪比（$\sigma_t/\alpha_t$），这两种看似不同的物理过程就会坍缩成同一个极其优雅的公式：
-
-$$\tilde{z}_s = \tilde{z}_t + \text{网络输出} \cdot (\eta_s - \eta_t)$$
-
-- **物理意义**：在这个统一的变换空间里，无论是预测噪声（Diffusion）还是预测速度（Flow Matching），单步的去噪过程都变成了**当前状态加上网络输出乘以时间步长**。
-- 对 $\varepsilon$-prediction（Diffusion），变换后的坐标 $\tilde{z} = z/\alpha$，时间 $\eta = \sigma/\alpha$。
-- 对速度预测（Flow Matching / Rectified Flow），坐标无需变换 $\tilde{z} = z$，时间 $\eta = t$。
-
-**结论**：这个统一公式的伟大之处在于，**同一套 GRPO 算法代码逻辑，不需要做任何架构上的修改，就可以直接通吃两种范式**。DanceGRPO 也因此成为首个在 SD v1.4（Diffusion 代表）和 FLUX/HunyuanVideo（Flow Matching 代表）上统一验证成功的 GRPO 框架。
+**4. 统一的数学本质**
+这两个 SDE 看起来不同，但 DanceGRPO 借助 Stochastic Interpolant 框架（Albergo et al., 2023）证明它们**在数学结构上完全等价**：Diffusion 的弯曲路径 $z_t = \alpha_t x_0 + \sigma_t \epsilon$ 和 Rectified Flow 的直线路径 $z_t = (1-t)x_0 + tx_1$ 本质上都是对数据和噪声的插值。只要对 Diffusion 做坐标缩放（$\tilde{z} = z/\alpha$，$\eta = \sigma/\alpha$），两者就坍缩为同一个公式 $\tilde{z}_s = \tilde{z}_t + \text{网络输出} \cdot (\eta_s - \eta_t)$。这意味着**同一套 GRPO 代码可以直接通吃两种范式**，DanceGRPO 也因此成为首个在 SD v1.4（Diffusion）和 FLUX/HunyuanVideo（Flow Matching）上统一验证的 GRPO 框架。
 
 ### 关键贡献二：面向视频的多维奖励机制
 
