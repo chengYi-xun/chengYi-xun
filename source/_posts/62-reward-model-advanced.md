@@ -1,5 +1,5 @@
 ---
-title: 笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励
+title: 笔记｜强化学习（十一）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励
 date: 2026-04-05 19:00:00
 cover: false
 mathjax: true
@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 本篇是 [上一篇（奖励模型基础）](/chengYi-xun/posts/61-reward-model/) 的续篇。上一篇完成了代理裁判 $\hat{r}_\theta$ 的构建，本篇追问三个递进的问题：**(1)** 拼命优化一个不完美的裁判会怎样？**(2)** 如何让裁判更健壮？**(3)** 能否绕过裁判？
 >
-> ⬅️ 上一篇：[笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
+> ⬅️ 上一篇：[笔记｜强化学习（十）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
 
 ## 1 Reward Hacking：当优化器攻击裁判
 

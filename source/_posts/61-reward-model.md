@@ -1,5 +1,5 @@
 ---
-title: 笔记｜强化学习（十一）：奖励模型基础——从传统 RL 到大模型与视觉生成
+title: 笔记｜强化学习（十）：奖励模型基础——从传统 RL 到大模型与视觉生成
 date: 2026-04-05 18:00:00
 cover: false
 mathjax: true
@@ -14,9 +14,9 @@ series: Diffusion Models theory
 
 > 本篇为全文的第一部分：**基础与原理**。我们从「奖励模型是什么」出发，对比传统强化学习、大语言模型 RLHF 与视觉生成的奖励信号差异；给出 $r_\theta(x,y)$ 的一般数学范式与 Bradley–Terry 配对损失；梳理文本侧「骨干 + 标量头」架构、五步训练管线，以及序列级 / 结果级 / 过程级 / 可验证奖励的粒度谱系；最后落到图像与视频生成里常见的对齐分、美学分与人类偏好模型，并点出视频奖励的多维难点。
 >
-> ⬅️ 上一篇：[笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> ⬅️ 上一篇：[笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](/chengYi-xun/posts/59-dance-mix-grpo/)
 >
-> ➡️ 下一篇：[笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](/chengYi-xun/posts/62-reward-model-advanced/)
+> ➡️ 下一篇：[笔记｜强化学习（十一）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](/chengYi-xun/posts/62-reward-model-advanced/)
 
 ## 奖励模型是什么：从环境的客观标量到人类偏好的可微代理
 
@@ -271,4 +271,4 @@ $$
 > 10. Guo, D., et al. (2025). *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning*. arXiv:2501.12948.
 > 11. Shao, Z., et al. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models*. arXiv:2402.03300.
 
-> 下一篇：[笔记｜强化学习（十二）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](/chengYi-xun/posts/62-reward-model-advanced/)
+> 下一篇：[笔记｜强化学习（十一）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](/chengYi-xun/posts/62-reward-model-advanced/)

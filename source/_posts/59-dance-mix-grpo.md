@@ -19,7 +19,7 @@ series: Diffusion Models theory
 >
 > ⬅️ 上一篇：[笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](/chengYi-xun/posts/58-superflow/)
 >
-> ➡️ 下一篇：[笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> ➡️ 下一篇：[笔记｜强化学习（十）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
 >
 > 论文：
 > - [DanceGRPO: Unleashing GRPO on Visual Generation](https://arxiv.org/abs/2505.07818)（ByteDance, 2025）
@@ -382,7 +382,7 @@ DanceGRPO 和 MixGRPO 之后，2026 年初的研究聚焦**信用分配（Credit
 
 这两项工作彻底打通了“如何高效训练视觉大模型”的路径。然而，当模型训练完成并部署到线上时，如何在大规模并发请求下高效地“生成轨迹并打分”，则是另一个维度的挑战。
 
-> ➡️ 下一篇：[笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+> ➡️ 下一篇：[笔记｜强化学习（十）：奖励模型基础——从传统 RL 到大模型与视觉生成](/chengYi-xun/posts/61-reward-model/)
 
 ---
 

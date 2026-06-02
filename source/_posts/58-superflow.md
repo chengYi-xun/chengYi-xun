@@ -120,9 +120,7 @@ SuperFlow 之外，两个开源框架正在将图像/视频生成的 RL 训练�
 
 ---
 
-至此，从 REINFORCE 到 SuperFlow 的完整技术旅程告一段落。全部方法的横向对比请见独立总结篇：
-
-> [笔记｜强化学习（十）：LLM 对齐中的 RL 方法全景对比——从 PPO 到 SuperFlow](/chengYi-xun/posts/60-rl-alignment-comparison/)
+至此，从 REINFORCE 到 SuperFlow 的图像/视频生成技术旅程暂告一段落。
 
 ---
 
