@@ -20,7 +20,7 @@ mathjax: true
 >
 > ⬅️ 上一篇：[笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律](/chengYi-xun/posts/105-physics-world-model/)
 >
-> ➡️ 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/107-world-model-frontier/)
+> ➡️ 本系列完结。回到：[笔记｜世界模型（一）：世界模型全景综述](/chengYi-xun/posts/101-world-model-basics/)
 
 ## 0. 为什么自动驾驶特别需要世界模型？
 
@@ -350,4 +350,4 @@ $$
 > 4. Zheng, W., Chen, W., Huang, Y., Zhang, B., Duan, Y. & Lu, J. (2024). *OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving*. ECCV 2024.
 > 5. Pearl, J. (2009). *Causality: Models, Reasoning, and Inference*. Cambridge University Press.
 
-> 下一篇：[笔记｜世界模型（七）：前沿与统一视角——五条路线的收敛](/chengYi-xun/posts/107-world-model-frontier/)
+> 本系列完结。回到：[笔记｜世界模型（一）：世界模型全景综述](/chengYi-xun/posts/101-world-model-basics/)
