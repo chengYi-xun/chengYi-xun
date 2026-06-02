@@ -56,7 +56,6 @@ tags:
 58. [笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）](../58-superflow)
 59. [笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](../59-dance-mix-grpo)
 61. [笔记｜强化学习（十）：奖励模型基础——从传统 RL 到大模型与视觉生成](../61-reward-model)
-62. [笔记｜强化学习（十一）：奖励模型进阶——Reward Hacking、生成式奖励模型与可验证奖励](../62-reward-model-advanced)
 
 # 世界模型
 
