@@ -232,15 +232,33 @@ MixGRPO 将 DPM-Solver++ 适配到 Flow Matching 框架。**关键约束：只�
 
    $$x_{t_{i-1}} = \underbrace{x_{t_i} - v_{t_i} \Delta t}_{\text{ODE 基础步}} + \underbrace{\left( \sqrt{t_{i-1}^2 - \sigma_{t_i}^2} - t_{i-1} \right) \hat{\epsilon}}_{\text{方差补偿项}} + \underbrace{\sigma_{t_i} \epsilon_i}_{\text{注入的随机噪声}}$$
 
-   其中 $\hat{\epsilon} = x_{t_i} + (1-t_i)v_{t_i}$ 是模型预测的当前噪声。
+   其中 $\hat{\epsilon} = x_{t_i} + (1-t_i)v_{t_i}$ 是模型预测的当前噪声。CPS 严格保持 Rectified Flow 的线性插值结构，确保均值和方差守恒，有效缓解 SDE 颗粒感伪影。
 
-   **核心优势**：CPS 严格保持 Rectified Flow 的线性插值结构，在给定方差预算内自动调整权重，确保均值和方差守恒，有效缓解 SDE 颗粒感伪影。
+**从公式到代码的推导**
 
-   > **公式与代码的等价性**：在实际代码中，CPS 均值常写成另一种等价形式 $\mu = (1-t_{i-1})\hat{x}_0 + \sqrt{t_{i-1}^2 - \sigma^2}\,\hat{\epsilon}$。两者等价的关键在于 Rectified Flow 中 $\hat{x}_0 = x_t - t \cdot v_t = x_0$，$\hat{\epsilon} = x_t + (1-t)v_t = \epsilon$。
-   >
-   > **为什么 $x_t - t \cdot v_t = x_0$（干净图像）？** 因为 Rectified Flow 的路径是直线：$x_t = (1-t)x_0 + t\epsilon$，速度 $v_t = \epsilon - x_0$ 是常数。$x_t - t \cdot v_t = (1-t)x_0 + t\epsilon - t(\epsilon - x_0) = x_0$。注意这里减去的是 $t \cdot v_t$（从当前位置**沿直线回到起点**的完整距离），而非 $\Delta t \cdot v_t$（回到上一步的一小段距离）。
-   >
-   > 展开公式形式的 ODE 基础步：$x_t - v\Delta t = (1-t_i)x_0 + t_i\epsilon - (\epsilon - x_0)(t_i - t_{i-1}) = (1-t_{i-1})x_0 + t_{i-1}\epsilon$。加上补偿项 $(\sqrt{t_{i-1}^2 - \sigma^2} - t_{i-1})\epsilon$ 后，$\epsilon$ 系数合并为 $\sqrt{t_{i-1}^2 - \sigma^2}$——与代码形式完全一致。
+在 Rectified Flow 中，路径是直线 $x_t = (1-t)x_0 + t\epsilon$，速度 $v_t = \epsilon - x_0$ 是常数。由此可以定义两个"锚点"：
+
+- **预测干净图** $\hat{x}_0 = x_t - t \cdot v_t$。这里减去的是 $t \cdot v_t$（沿直线回到**起点**的完整距离），而非 $\Delta t \cdot v_t$（回到上一步的一小段）。展开验证：$x_t - t \cdot v_t = (1-t)x_0 + t\epsilon - t(\epsilon - x_0) = x_0$。
+- **预测噪声** $\hat{\epsilon} = x_t + (1-t)v_t$。展开：$(1-t)x_0 + t\epsilon + (1-t)(\epsilon - x_0) = \epsilon$。
+
+将公式中的前两项（ODE 基础步 + 方差补偿项）合并为均值 $\mu$，用 $\hat{x}_0$ 和 $\hat{\epsilon}$ 重写：
+
+$$\mu = \underbrace{(x_t - v\Delta t)}_{\text{ODE 步}} + \underbrace{(\sqrt{t_{i-1}^2 - \sigma^2} - t_{i-1})\hat{\epsilon}}_{\text{补偿项}}$$
+
+展开 ODE 步：$(1-t_i)x_0 + t_i\epsilon - (\epsilon - x_0)(t_i - t_{i-1}) = (1-t_{i-1})x_0 + t_{i-1}\epsilon$
+
+加上补偿项后，$\epsilon$ 系数从 $t_{i-1}$ 变为 $\sqrt{t_{i-1}^2 - \sigma^2}$：
+
+$$\mu = (1-t_{i-1})\hat{x}_0 + \sqrt{t_{i-1}^2 - \sigma^2}\,\hat{\epsilon}$$
+
+最终的 CPS 采样是 $x_{t_{i-1}} = \underbrace{\mu}_{\text{均值}} + \underbrace{\sigma_{t_i} \epsilon_i}_{\text{新噪声}}$，与代码中的实现完全一致：
+
+```python
+# μ = (1-sigma_prev) * x̂_0 + √(sigma_prev² - std²) * ε̂
+prev_sample_mean = pred_original_sample * (1 - sigma_prev) + noise_estimate * sqrt(sigma_prev**2 - std_dev_t**2)
+# x_{t_{i-1}} = μ + σ * ε_new
+prev_sample = prev_sample_mean + std_dev_t * variance_noise
+```
 
 ### MixGRPO 的实验成果
 
