@@ -98,74 +98,15 @@ mathjax: true
 下一篇将深入 **Dreamer 系列**——目前 Model-based RL 方向最成功的世界模型家族，看它是如何真正在想象中学会控制的。
 
 > 参考文献：
->
-> 经典与基础
-> 1. Craik, K. (1943). The Nature of Explanation. Cambridge University Press.
-> 2. Shannon, C. E. (1959). Coding Theorems for a Discrete Source with a Fidelity Criterion. IRE National Convention Record.
-> 3. Ha, D. & Schmidhuber, J. (2018). World Models. arXiv:1803.10122.
->
-> 综述论文
-> 4. Ding, Z. et al. (2025). Understanding World or Predicting Future? A Comprehensive Survey of World Models. ACM Computing Surveys. arXiv:2411.14499.
-> 5. Li, X. et al. (2025). A Comprehensive Survey on World Models for Embodied AI. arXiv:2510.16732.
-> 6. Shang, J. et al. (2025). A Survey of Embodied World Models. ResearchGate.
-> 7. Yue, Y. et al. (2025). Simulating the Visual World with Artificial Intelligence: A Roadmap. arXiv:2511.08585.
->
-> Model-based RL
-> 8. Hafner, D. et al. (2020). Dream to Control: Learning Behaviors by Latent Imagination. ICLR 2020.
-> 9. Hafner, D. et al. (2021). Mastering Atari with Discrete World Models. ICLR 2021.
-> 10. Hafner, D. et al. (2023). Mastering Diverse Domains through World Models. arXiv:2301.04104.
-> 11. Wu, P. et al. (2022). DayDreamer: World Models for Physical Robot Learning. arXiv:2206.14176.
-> 12. Micheli, V. et al. (2023). Transformers are Sample-Efficient World Models. ICLR 2023. arXiv:2209.00588.
-> 13. Hansen, N. et al. (2024). TD-MPC2: Scalable, Robust World Models for Continuous Control. ICLR 2024.
-> 14. Chen, C. et al. (2022). TransDreamer: Reinforcement Learning with Transformer World Models. arXiv:2202.09481.
->
-> JEPA 系列
-> 15. LeCun, Y. (2022). A Path Towards Autonomous Machine Intelligence. OpenReview.
-> 16. Assran, M. et al. (2023). Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture. CVPR 2023. arXiv:2301.08243.
-> 17. Bardes, A. et al. (2024). V-JEPA: Video Joint Embedding Predictive Architecture. Meta AI.
-> 18. Assran, M. et al. (2025). V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction and Planning. arXiv:2506.09985.
-> 19. (2025). LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels. arXiv:2603.19312.
-> 20. (2026). Var-JEPA: A Variational Formulation of the Joint-Embedding Predictive Architecture. arXiv:2603.20111.
->
-> 视频生成世界模型
-> 21. OpenAI (2024). Video Generation Models as World Simulators. Technical Report.
-> 22. Bruce, J. et al. (2024). Genie: Generative Interactive Environments. DeepMind.
-> 23. DeepMind (2024). Genie 2: A Large-Scale Foundation World Model. Blog post.
-> 24. NVIDIA (2025). World Simulation with Video Foundation Models for Physical AI. arXiv:2511.00062.
-> 25. Du, Y. et al. (2023). Learning Universal Policies via Text-Guided Video Generation. NeurIPS 2023.
->
-> 物理化世界模型
-> 26. Zhang, T. et al. (2024). PhysDreamer: Physics-Based Interaction with 3D Objects via Video Generation. ECCV 2024. arXiv:2404.13026.
-> 27. (2025). AI-Newton: A Concept-Driven Physical Law Discovery System without Prior Physical Knowledge. arXiv:2504.01538.
-> 28. (2025). Think Before You Diffuse: Infusing Physical Rules into Video Diffusion (DiffPhy). arXiv:2505.21653.
-> 29. (2026). Physical Simulator In-the-Loop Video Generation (PSIVG). arXiv:2603.06408.
-> 30. (2025). PhysMaster: Mastering Physical Representation for Video Generation via Reinforcement Learning.
-> 31. (2025). How Far is Video Generation from World Model: A Physical Law Perspective.
->
-> 自动驾驶世界模型
-> 32. Hu, A. et al. (2023). GAIA-1: A Generative World Model for Autonomous Driving. arXiv:2309.17080.
-> 33. Wang, X. et al. (2023). DriveDreamer: Towards Real-world-driven World Models for Autonomous Driving. arXiv:2309.09777.
-> 34. Gao, S. et al. (2024). Vista: A Generalizable Driving World Model with High Fidelity and Versatile Controllability. NeurIPS 2024. arXiv:2405.17398.
-> 35. Zheng, W. et al. (2024). OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving. ECCV 2024.
->
-> 3D/空间智能
-> 36. Li, F.-F. (2024). From Words to Worlds: Spatial Intelligence is AI's Next Frontier. Substack.
-> 37. (2025). PointWorld: Scaling 3D World Models for In-The-Wild Robotic Manipulation. arXiv:2601.03782.
-> 38. Tencent (2026). HY-World 2.0: A Multi-Modal World Model for Reconstructing, Generating, and Simulating 3D Worlds.
-> 39. Tencent (2025). Hunyuan-GameCraft-2: Instruction-following Interactive Game World Model.
->
-> LLM 与世界模型
-> 40. Hao, S. et al. (2023). Reasoning with Language Model is Planning with World Model. EMNLP 2023. arXiv:2305.14992.
-> 41. Guan, L. et al. (2023). Language Models, Agent Models, and World Models: The LAW for Machine Reasoning and Planning. arXiv:2312.05230.
->
-> 中国工业界
-> 42. (2025). WorldVLA: Towards Autoregressive Action World Model. arXiv:2506.21539.
-> 43. Alibaba (2026). RynnBrain: Open-sourced Embodied Foundation Model for Robotics.
->
-> 评估
-> 44. Duan, H. et al. (2025). WorldScore: A Unified Evaluation Benchmark for World Generation. Stanford / ICCV 2025.
->
-> 哲学与反思
-> 45. (2024). Sora and V-JEPA Have Not Learned The Complete Real World Model — A Philosophical Analysis of Video AIs. arXiv.
+> 1. Craik, K. (1943). The Nature of Explanation.
+> 2. Ha, D. & Schmidhuber, J. (2018). World Models. arXiv:1803.10122.
+> 3. Hafner, D. et al. (2020/2021/2023). Dreamer 系列 (v1–v3). ICLR 2020/2021, arXiv:2301.04104.
+> 4. LeCun, Y. (2022). A Path Towards Autonomous Machine Intelligence.
+> 5. Bardes, A. et al. (2024). V-JEPA. Meta AI.
+> 6. Var-JEPA (2026). arXiv:2603.20111. ICML 2026.
+> 7. OpenAI (2024). Video Generation Models as World Simulators.
+> 8. DeepMind (2024/2025). Genie 系列 (1–3).
+> 9. Zheng, W. et al. (2024). OccWorld. ECCV 2024.
+> 10. Ding, Z. et al. (2025). A Comprehensive Survey of World Models. arXiv:2411.14499.
 
 > 下一篇：[笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制](/chengYi-xun/posts/102-dreamer/)
