@@ -53,7 +53,7 @@ Flow-GRPO（前文已详细讨论）首次将 GRPO 引入 Flow Matching 模型�
 因此，本文讨论的算法（如 Flow-GRPO）虽然在理论上适用于所有 Flow Matching 模型，但在工程落地时，都是在 Rectified Flow（结合 OT 配对）的架构上进行验证的（详见[《笔记｜生成模型（十三）：Flow Matching理论与实现》](/chengYi-xun/posts/13-flow_matching/)）。
 {% endnote %}
 
-1. **范式局限**：Flow-GRPO 的 ODE→SDE 转换要求模型预测速度场 $v_t$，这是 Flow Matching 模型的特征。传统 Diffusion 模型（如 SD v1.4）使用噪声预测 $\epsilon$-prediction 和不同的前向过程（$z_t = \alpha_t x + \sigma_t \epsilon$），其 SDE 形式（Langevin 动力学）与 Flow Matching 的 SDE 在数学结构上不同。Flow-GRPO 未对 Diffusion 模型进行适配和验证。
+1. **范式局限**：Flow-GRPO 的 ODE→SDE 转换要求模型预测速度场 $v_t$，这是 Flow Matching 模型的特征。传统 Diffusion 模型（如 SD v1.4）使用噪声预测 $\epsilon$-prediction 和不同的前向过程（$z_t = \alpha_t x + \sigma_t \epsilon$），其 SDE 形式与 Flow Matching 在数学结构上不同。Flow-GRPO 未对 Diffusion 模型进行适配。
 2. **模态局限**：仅处理文生图（T2I），未触及视频生成（T2V、I2V），而视频的高维度、高算力需求和更复杂的评价标准是全新的挑战。
 3. **方法局限**：先前的 RL 方法（DDPO、DPOK）在大规模 Prompt 集上训练不稳定，且未在 Flow Matching 模型上被充分验证。
 
@@ -119,10 +119,8 @@ DanceGRPO 改为：同一 Prompt 的所有 $G$ 个样本共享**同一个初始�
 
 完整的去噪轨迹需要 $T$ 步（如 25~50 步）。如果每步都反向传播计算梯度，显存需求将不可承受，尤其是视频任务。DanceGRPO 提出**随机子采样**：
 
-1. **全轨迹采样与记录**：首先，模型在不计算梯度（`torch.no_grad()`）的情况下，用 SDE 完整走完 $T$ 步去噪采样过程，生成最终的图像/视频。在这个过程中，记录下每一步的隐状态（latent）、时间步（timestep）以及旧策略给出的动作概率（`log_prob`）。
-2. **打乱时间步顺序（打破时间相关性）**：将这 $T$ 步的数据在时间维度上随机打乱。这一步非常关键，因为相邻时间步的梯度高度相关，打乱顺序可以打破这种相关性，让模型在优化时看到的样本更加独立（类似于强化学习中的经验回放池 Experience Replay）。
-3. **按比例截断（随机子采样）**：由于视频生成所需显存极大，如果对所有 $T$ 步都计算梯度，显存会直接 OOM（Out Of Memory）。因此，DanceGRPO 设定了一个比例 $\tau$（默认 0.6），只取打乱后的前 $K = \lfloor T \times \tau \rfloor$ 步进行优化。相当于在整条轨迹中随机“抽查”了 60% 的步骤。
-4. **单步独立反向传播（极致的显存优化）**：对于选中的这 $K$ 步，并不把它们拼接成一个巨大的计算图。相反，DanceGRPO 采用了一个极其节省显存的策略：每次只拿出一个时间步 $t$，用当前最新的策略网络重新计算其动作概率（`new_log_prob`），计算 PPO 的 Clip Loss，然后立刻执行 `.backward()` 反向传播，并**立即释放该步的计算图**。这样，无论 $K$ 有多大，显存占用始终只相当于单步前向+反向的开销。
+1. **全轨迹 Rollout + 随机子集**：先用 SDE 无梯度走完 $T$ 步，记录每步的 latent、timestep 和 `log_prob`；再将时间步打乱，按比例 $\tau$（默认 0.6）截取前 $K = \lfloor T \times \tau \rfloor$ 步用于优化，打破相邻步的梯度相关性。
+2. **单步独立反传**：对选中的 $K$ 步逐步计算 PPO Clip Loss 并立刻 `.backward()`，不拼接大计算图，显存占用始终相当于单步。
 
 论文 Fig. 4(b) 的消融实验揭示了一个关键规律：**前 30% 时间步（靠近噪声端、构图阶段）贡献最大**，后期步贡献递减。随机 60% 可以接近全量的性能。
 
@@ -144,26 +142,13 @@ DanceGRPO 在四个基础模型（SD v1.4、FLUX、HunyuanVideo、SkyReels-I2V�
 
 ### DanceGRPO 的遗留问题
 
-尽管贡献显著，DanceGRPO 存在三个核心瓶颈——它们是 MixGRPO 的直接动机：
+尽管贡献显著，DanceGRPO 存在两个核心瓶颈——它们是 MixGRPO 的直接动机：
 
-**问题一：全轨迹 SDE 带来的“推理算力浪费”**
-在强化学习中，我们需要用旧策略 $\pi_{\theta_\text{old}}$ 生成一批图像供奖励模型打分（即 Rollout 数据收集阶段）。DanceGRPO 为了让整个轨迹满足强化学习的 MDP（马尔可夫决策过程），强制要求在 $T$ 步去噪的**每一步**都注入 SDE 随机噪声。
-这就带来了一个致命问题：SDE 必须老老实实地一步步积分（比如走完 25 步）。我们原本可以用高阶 ODE 求解器（如 DPM-Solver++，只需要 8-10 步就能生成高质量图像）来大幅加速这个 Rollout 过程，但因为 SDE 噪声的干扰，高阶求解器完全失效了。这导致数据收集阶段耗时极长。
+**问题一：全轨迹 SDE 的算力浪费 + 不必要的随机性**
+Rollout 阶段必须在 $T$ 步去噪的**每一步**注入 SDE 噪声以满足 MDP 建模，导致无法使用 DPM-Solver++ 等高阶 ODE 求解器加速数据收集。更根本的是，生成过程具有阶段性（早期定构图、后期修细节），却在所有时间步都注入探索噪声——**在不需要探索的步上浪费了算力**。
 
-**问题二：随机抽样导致的“策略偏移（Policy Shift）”**
-DanceGRPO 在采样时，整条轨迹 $T$ 步都注入了探索噪声；但在训练时为了省显存，只随机挑选了其中 $K$ 步（比如 4 步）进行梯度更新。
-这就好比一个学生做了一套包含 25 道题的试卷，老师最后给了一个总分，但却只随机挑了 4 道题给他讲解正确答案。那剩下的 21 道题呢？模型在这些未被选中的步骤上产生的错误探索（策略偏移）完全没有得到纠正。
-实验证明，这种“偷工减料”会直接损害模型性能：当优化步数从 14 降到 4 时，ImageReward 显著下降了 7%。正如 MixGRPO 论文一针见血的评价：*“这种方法并没有从根本上解决计算开销的问题。”*
-
-**问题三：随机打乱带来的“梯度冲突（Gradient Conflict）”**
-DanceGRPO 把整条轨迹的 $T$ 步打乱，随机抽取 $K$ 步放在同一个 Batch 里优化。
-然而，扩散/流模型的生成过程具有极强的**阶段性特征**：
-
-- **早期高噪声阶段**（如 $t \to 1$）：模型在努力确定画面的**全局构图和大结构**。
-- **后期低噪声阶段**（如 $t \to 0$）：模型在努力刻画**局部纹理和光影细节**。
-这两种任务的目标截然不同，所需的梯度更新方向甚至可能是相反的。把它们强行塞进同一个 Batch 里同时优化，就像让一个人左手画圆右手画方，会导致严重的梯度冲突，拖慢模型的收敛速度。
-
-三个问题的共同根源：**在不需要探索的时间步上注入了不必要的随机性。**
+**问题二：随机抽样导致的策略偏移与梯度冲突**
+采样时整条轨迹 $T$ 步都注入探索噪声，训练时却只随机优化其中 $K$ 步（如 4 步），未被选中的步上的错误探索无法纠正；同时，打乱后的 $K$ 步混在同一 Batch 中，早期构图步与后期细节步的梯度方向可能冲突。实验证明：优化步数从 14 降到 4 时，ImageReward 下降 7%。MixGRPO 论文评价：*“这种方法并没有从根本上解决计算开销的问题。”*
 
 ---
 
@@ -197,27 +182,7 @@ GRPO 优化的范围缩小为仅 $S$ 内的步：
 
 $$J_\text{MixGRPO}(\theta) = \mathbb{E}\left[\frac{1}{N}\sum_{i=1}^{N}\frac{1}{|S|}\sum_{t\in S}\min\left(r_t^i\hat{A}^i,\ \text{clip}(r_t^i, 1-\varepsilon, 1+\varepsilon)\hat{A}^i\right) - \beta J_\text{KL}\right]$$
 
-**收敛性保证：** MixGRPO 在 Supplementary 中严格证明了混合 ODE-SDE 采样与纯 ODE 采样产生**完全相同的边缘分布**。证明的核心在于利用 Kolmogorov 方程（Fokker-Planck 方程）来分析概率密度 $q_t(x)$ 随时间的演化。
-
-**严格的数学推导如下：**
-
-对于纯 ODE 采样（Probability Flow ODE 的逆向过程）：$d\bar{x}_t = [-f(x_t, t) + \frac{1}{2}g^2(t)\nabla \log q_t(x_t)]d\bar{t}$，其中 $\bar{t}$ 为逆向时间（$d\bar{t} = -dt > 0$），其对应的连续性方程（Liouville 方程）为：
-$$\frac{\partial q_t(x)}{\partial \bar{t}} = -\nabla_x \cdot \left[ \left( -f(x, t) + \frac{1}{2}g^2(t)\nabla_x \log q_t(x) \right) q_t(x) \right]$$
-
-对于 SDE 采样（逆向 SDE）：$d\bar{x}_t = [-f(x_t, t) + g^2(t)\nabla \log q_t(x_t)]d\bar{t} + g(t)d\bar{w}_t$，根据 Fokker-Planck 方程，其概率密度演化为：
-$$\frac{\partial q_t(x)}{\partial \bar{t}} = \underbrace{-\nabla_x \cdot \left[ \left( -f(x, t) + g^2(t)\nabla_x \log q_t(x) \right) q_t(x) \right]}_{\text{漂移项贡献}} + \underbrace{\frac{1}{2}g^2(t)\nabla_x^2 q_t(x)}_{\text{扩散噪声项贡献}}$$
-
-利用数学恒等式 $\nabla_x \log q_t(x) = \frac{\nabla_x q_t(x)}{q_t(x)}$，我们可以将上式展开并合并：
-$$
-\begin{aligned}
-\frac{\partial q_t(x)}{\partial \bar{t}} &= \nabla_x \cdot [f(x, t)q_t(x)] - g^2(t)\nabla_x \cdot [\nabla_x q_t(x)] + \frac{1}{2}g^2(t)\nabla_x^2 q_t(x) \\
-&= \nabla_x \cdot [f(x, t)q_t(x)] - g^2(t)\nabla_x^2 q_t(x) + \frac{1}{2}g^2(t)\nabla_x^2 q_t(x) \\
-&= \nabla_x \cdot [f(x, t)q_t(x)] - \frac{1}{2}g^2(t)\nabla_x^2 q_t(x) \\
-&= -\nabla_x \cdot \left[ \left( -f(x, t) + \frac{1}{2}g^2(t)\nabla_x \log q_t(x) \right) q_t(x) \right]
-\end{aligned}
-$$
-
-可以看到，SDE 中多出来的漂移项（$g^2 \nabla \log q_t$）与注入的随机噪声项（$\frac{1}{2}g^2 \nabla^2 q_t$）在 Fokker-Planck 方程中**精确对消了一半**，最终化简得到的形式与纯 ODE 的连续性方程**完全一致**。因此，无论在哪个时间段切换 SDE 或 ODE，整个系统在宏观上的概率密度演化轨迹 $q_t(x)$ 是完全相同的。
+**收敛性保证：** MixGRPO 在 Supplementary 中利用 Fokker-Planck 方程证明：SDE 中多出的漂移项与扩散噪声项**精确对消一半**，混合 ODE-SDE 采样与纯 ODE 采样产生**完全相同的边缘分布** $q_t(x)$——无论在哪个时间段切换，宏观概率密度演化轨迹一致。
 
 ### 关键贡献二：滑动窗口作为优化调度器
 
@@ -225,28 +190,21 @@ $S$ 不是固定的——它是一个**滑动窗口** $W(l) = \{t_l, t_{l+1}, \l
 
 $$l \leftarrow \min(l + s,\; T - w) \quad \text{every } \tau \text{ iterations}$$
 
-{% note info no-icon %}
-**什么是 SNR（信噪比）？**
-
-SNR（Signal-to-Noise Ratio）即**信噪比**，用来衡量当前图像中“真实信号”与“随机噪声”的能量比例。
-
-- **低 SNR（低信噪比）**：噪声远多于信号。这通常对应于去噪过程的**早期**（$t \approx 1$），此时图像几乎全是纯噪声，模型正在努力“无中生有”地勾勒出大体的轮廓和构图。
-- **高 SNR（高信噪比）**：信号远多于噪声。这通常对应于去噪过程的**后期**（$t \approx 0$），此时图像的主体已经非常清晰，模型只是在做最后的微调，比如增加毛发纹理、修正光影细节。
-{% endnote %}
-
 这等价于一种**隐式课程学习**（analogous to temporal discounting in RL）：
 
 - **在训练早期**，窗口位于低 SNR 区域（靠近纯噪声端，$l \approx 0$）。此时模型主要优化全局构图和物体布局，探索空间大，具有较高的随机性。
 - **在训练后期**，窗口滑动到高 SNR 区域（靠近干净图像端，$l \rightarrow T-w$）。此时模型主要优化纹理细节和色彩精修，探索空间小，随机性更低。
 
-MixGRPO 论文的消融实验验证了这种直觉。作者对比了四种不同的窗口策略：
+MixGRPO 论文的消融实验验证了这种直觉：
 
-1. **Frozen（固定在开头）**：窗口始终停留在低 SNR 区域。这种策略在 HPS-v2.1（0.354）和 ImageReward（1.580）上的表现最差，说明缺乏后期细节优化的探索。
-2. **Random（每轮随机位置）**：窗口在每次迭代时随机跳跃。虽然 HPS-v2.1 有所提升（0.365），但 ImageReward 却大幅下降（1.513），说明随机跳跃破坏了学习的连贯性。
-3. **Progressive + Constant $\tau$（恒定步长滑动）**：窗口按照固定的迭代次数 $\tau$ 逐步向后滑动。这种策略在 HPS-v2.1 上取得了最高分（0.367），ImageReward 也达到了 1.629。
-4. **Progressive + Exp Decay $\tau$（指数衰减滑动）**：滑动速度越来越快。这种策略在 ImageReward 上取得了最高分（1.632），HPS-v2.1 为 0.360。
+| 窗口策略 | HPS-v2.1 | ImageReward | 要点 |
+|:---|:---:|:---:|:---|
+| Frozen（固定开头） | 0.354 | 1.580 | 缺乏后期细节优化 |
+| Random（随机跳跃） | 0.365 | 1.513 | 破坏学习连贯性 |
+| Progressive + Constant $\tau$ | **0.367** | 1.629 | HPS 最优 |
+| Progressive + Exp Decay $\tau$ | 0.360 | **1.632** | ImageReward 最优 |
 
-Progressive 一致优于 Random，**验证了课程学习优于随机抽样的假设**。更值得注意的是，即使 Frozen 策略（仅优化最前面几步）也超过了 DanceGRPO（NFE=4 时的 1.335），说明**定向优化前几步比全轨迹 SDE + 随机抽样更有效**。
+Progressive 一致优于 Random，**验证了课程学习优于随机抽样**。即使 Frozen 也超过 DanceGRPO（NFE=4 时 1.335），说明**定向优化前几步比全轨迹 SDE + 随机抽样更有效**。
 
 MixGRPO 还提出**指数衰减调度**：$\tau(l) = \tau_0 \cdot \exp(-k \cdot \text{ReLU}(l - \lambda_\text{thr}))$，让模型在影响最大的构图阶段停留更久。
 
@@ -256,21 +214,9 @@ MixGRPO 的混合策略带来了一个巨大的工程收益：**窗口外的 ODE
 
 在 Flow-GRPO 和 DanceGRPO 中，由于全轨迹都注入了 SDE 噪声，模型必须老老实实地走完几十步（比如 25 步），无法使用任何加速算法。而在 MixGRPO 中，只有滑动窗口 $W$ 内是 SDE 随机探索，窗口外都是确定性的 ODE。
 
-MixGRPO 将 DPM-Solver++ 适配到了 Flow Matching 框架中。简单来说，DPM-Solver++ 是一种“预测-校正”算法，它利用前几步的速度场信息，可以一步跨越原来需要好几步才能走完的距离，从而大幅缩短推理时间。
+MixGRPO 将 DPM-Solver++ 适配到 Flow Matching 框架。**关键约束：只加速窗口后（post-window）的 ODE 步**——窗口前的 ODE 大步长误差会被后续 SDE 随机性放大，窗口后结构已定，误差影响可忽略。
 
-**关键约束：只加速窗口后面（post-window）的 ODE 步。**
-为什么不能加速窗口前面的 ODE 步？
-
-- **窗口前的 ODE**：此时图像还处于高噪声阶段，如果用大步长（高阶求解器）跨越，不可避免会产生一些数值计算误差。当这些带有误差的图像进入滑动窗口（SDE 阶段）时，SDE 的随机噪声注入会把这些微小的误差**成倍放大**，最终导致生成的图像崩溃。
-- **窗口后的 ODE**：此时 SDE 探索已经结束，图像的大体结构已经定型。此时再用高阶求解器加速，即使有一点微小的数值误差，也不会被后续的随机性放大，对最终生成质量的影响微乎其微。
-
-基于这个发现，作者提出了两种加速变体：
-
-- **MixGRPO-Flash**：使用 Progressive（渐进式滑动）策略，仅对滑动窗口之后的 ODE 步进行 DPM-Solver++ 加速。
-- **MixGRPO-Flash\***：为了追求极致速度，采用 Frozen 策略（把窗口死死固定在最开头）。这样一来，除了开头几步是 SDE，后面所有的步骤都可以用高阶求解器全速狂飙，训练时间被压缩到了极致。
-
-**哪种效果更好？**
-直觉上，MixGRPO-Flash 使用了更科学的课程学习（滑动窗口），效果应该更好。但论文的实验结果（Table 9）却给出了一个反直觉的结论：**MixGRPO-Flash\* 的整体表现反而更优！**
+两种加速变体：**MixGRPO-Flash**（Progressive 滑动 + 窗口后加速）与 **MixGRPO-Flash\***（Frozen 固定开头 + 后续全加速）。
 
 | 方法 | NFE（采样步数） | 单图耗时 (s) | HPS-v2.1 | ImageReward |
 |:---|:---:|:---:|:---:|:---:|
@@ -278,10 +224,7 @@ MixGRPO 将 DPM-Solver++ 适配到了 Flow Matching 框架中。简单来说，D
 | MixGRPO-Flash | 16 (平均) | 6.43 | **0.362** | 1.578 |
 | MixGRPO-Flash\* | **8** | **3.79** | 0.357 | **1.624** |
 
-**为什么 MixGRPO-Flash\* 更强？**
-1. **极致的效率**：因为窗口固定在开头，它能最大程度地利用高阶求解器。单图生成耗时从基线的 9.3 秒降到了 3.79 秒（加速近 60%），采样步数从 25 步降到了 8 步。
-2. **早期探索的决定性作用（粗到细的生成直觉）**：在生成模型中，去噪是一个“粗到细（Coarse-to-Fine）”的过程。在低 SNR 阶段（纯噪声附近），模型每一步去噪都在注入巨大的“语义信息量”（决定画面主体是猫还是狗）；而在高 SNR 阶段，模型注入的主要是“高频纹理信息”。因为代理奖励模型（如 ImageReward）对核心语义和全局构图更敏感，所以将 SDE 探索（RL 优化的计算力）全部集中在早期（低 SNR），而在后期使用高阶 ODE 快速滑过，是信息论视角下的最优算力分配。只要在开头几步（窗口内）做好了 SDE 探索和优化，即使后面全用确定性加速跳过，依然能拿到极高的 RM 分数（1.624）。
-3. **权衡**：MixGRPO-Flash 在 HPS-v2.1 上略高一点（0.362 vs 0.357），说明滑动窗口确实对某些细节指标有帮助。但综合考虑巨大的时间收益和 ImageReward 的显著提升，MixGRPO-Flash\* 是性价比最高的选择。
+反直觉地，**MixGRPO-Flash\* 整体更优**：窗口固定开头可最大化高阶求解器收益（NFE 25→8，耗时降 60%）；代理 RM 对早期语义/构图更敏感，将 SDE 探索集中在低 SNR 阶段、后期 ODE 快速滑过是更优的算力分配。Flash 在 HPS-v2.1 略高（0.362 vs 0.357），但 Flash\* 综合性价比最高。
 
 ### 补充发展：Flow-CPS 采样替代标准 SDE
 
@@ -292,38 +235,16 @@ MixGRPO 将 DPM-Solver++ 适配到了 Flow Matching 框架中。简单来说，D
 1. **标准 SDE 的做法（强行叠加 + 估算补丁）**：
    标准 SDE（Euler-Maruyama 离散化）是在确定性步进上**强行叠加**一个独立的噪声：
    $$x_{t_{i-1}} = x_{t_i} - v_{t_i} \Delta t + \underbrace{\sqrt{2\sigma^2 \Delta t} \epsilon_i}_{\text{强行加噪}} - \underbrace{\frac{1}{2}\sigma^2 s_{t_i}(x_{t_i}) \Delta t}_{\text{Score 修正项}}$$
-   由于强行加噪会让总方差变大（图像变糊），SDE 必须引入一个基于 Score Function（分数函数 $s_t$）的**漂移修正项**。但 Score 往往是靠 Tweedie 公式估算出来的，存在极大的理论和数值误差。
+   由于强行加噪会让总方差变大（图像变糊），SDE 必须引入基于 Score Function 的**漂移修正项**。但 Score 靠 Tweedie 公式估算（$s_t \approx -(x_t - \hat{x}_0)/\sigma_t^2$），存在后验均值坍缩、模型低频偏好和大步长离散化误差，导致高频噪声残留→颗粒感伪影，进而**欺骗**对纹理敏感的代理 RM（Reward Hacking）。
 
-   {% note info no-icon %}
-   **深度解析：Score 估算为什么存在误差？**
-   
-   SDE 的漂移修正项依赖于精确的 Score（数据分布的对数梯度 $\nabla_{x_t} \log p_t(x_t)$）。在实际工程中，我们通常用神经网络预测出干净图像 $\hat{x}_0$，再通过 Tweedie 公式反推 Score：$s_t(x_t) \approx -(x_t - \hat{x}_0) / \sigma_t^2$。这种估算在底层存在三大致命缺陷：
-   
-   1. **理论陷阱（Tweedie 的后验均值坍缩）**：数学上，神经网络预测的 $\hat{x}_0$ 实际上是给定带噪图像 $x_t$ 时，所有可能干净图像的**后验期望（均值）** $\mathbb{E}[x_0 | x_t]$。当噪声较大时，真实的后验分布是多峰的（一个带噪轮廓既可能是黑猫也可能是白猫）。用一个平滑的“均值”（灰色猫）去替代真实的多峰分布来计算 Score，这在数学上是一种极大的近似，丢失了高频细节信息。
-   2. **模型盲区（神经网络的频谱偏好）**：深度学习模型（如 U-Net 或 DiT）天生具有“低频偏好”，更容易拟合轮廓和颜色，而难以精确预测毛发、纹理等高频细节。SDE 注入的是全频段的纯高斯白噪声，当 Score 试图将其抵消时，低频噪声被成功去除了，但**高频噪声没能被有效抵消，残留在了图像里**。
-   3. **数值截断（大步长离散化）**：SDE 在数学上建立在连续时间（$\Delta t \to 0$）上。但在现代大模型极少步数（大 $\Delta t$）的采样中，我们用 Euler-Maruyama 离散化，假设在这一大步内 Score 的方向恒定不变。在高维非线性空间中，沿着一个错误的、恒定的方向走一大步，会直接导致样本偏离真实的数据流形（Data Manifold）。
-   
-   **恶性循环与 Reward Hacking**：SDE 强行注入全频段噪声（推离流形），Score 试图拉回但由于上述三大误差拉不准（尤其是高频细节拉不回）。每走一步，高频噪声就残留一点。步数走完，图像上就铺满了一层“颗粒感伪影”。像 PickScore 这样的代理奖励模型（RM）对高频纹理非常敏感，当图像出现这种异常的高频颗粒时，RM 会被“欺骗”，误以为这是某种丰富的纹理细节，从而给出虚高分（Reward Hacking）。
-   {% endnote %}
+2. **CPS 的做法（系数守恒，重新分配）**：
+   **Flow-CPS** 借鉴 DDIM 的**待定系数法**，**绕开显式 Score 估算**，通过代数层面隐式修正分布发散。最终 CPS 采样公式为：
 
-2.    **CPS 的做法（系数守恒，重新分配）**：
-   **Flow-CPS** 提出的系数保持采样借鉴了 DDIM 的核心思想（**待定系数法**）。正如 DDIM 在 Diffusion 中通过待定系数法（令 $x_{t-1} = \lambda x_0 + k x_t + \sigma \epsilon$）来严格保证边缘分布一致，CPS 也在 Flow Matching 中使用了同样的思路：它**绕开了误差极大的显式 Score 估算（Tweedie 近似）**，转而通过待定系数法在代数层面隐式地实现了对分布发散的修正。它严格解出了在注入噪声 $\sigma_{t_i}\epsilon_i$ 时，图像信号 $x_{t_i}$ 和速度场 $v_{t_i}$ 应该缩小的精确比例。
-
-   **CPS 的待定系数法推导过程：**
-   
-   在 Flow Matching 中，理论上的理想路径为 $x_t = (1-t)x_0 + t \epsilon$。当我们从 $t_i$ 步走到下一步 $t_{i-1}$ 时，我们希望生成的 $x_{t_{i-1}}$ 必须严格满足这个理论分布：
-   $$x_{t_{i-1}} = (1-t_{i-1})x_0 + t_{i-1} \cdot \text{Noise}$$
-   
-   CPS 假设下一步状态是当前状态 $x_{t_i}$、模型预测速度场 $v_{t_i}$ 和新注入噪声 $\epsilon_i$ 的线性组合：
-   $$x_{t_{i-1}} = A \cdot x_{t_i} + B \cdot v_{t_i} + C \cdot \epsilon_i$$
-   
-   通过将 $x_{t_i}$ 和 $v_{t_i}$ 展开为 $x_0$ 和 $\hat{\epsilon}$ 的表达式，并代入上述方程，我们可以列出一个关于均值和方差的二元一次方程组。解这个方程组（设定 $C = \sigma_{t_i}$），就能得到严格保证边缘分布一致的系数 $A, B$。最终的 CPS 采样公式为：
-   
    $$x_{t_{i-1}} = \underbrace{x_{t_i} - v_{t_i} \Delta t}_{\text{ODE 基础步}} + \underbrace{\left( \sqrt{t_{i-1}^2 - \sigma_{t_i}^2} - t_{i-1} \right) \hat{\epsilon}}_{\text{方差补偿项}} + \underbrace{\sigma_{t_i} \epsilon_i}_{\text{注入的随机噪声}}$$
-   
+
    其中 $\hat{\epsilon} = x_{t_i} + (1-t_i)v_{t_i}$ 是模型预测的当前噪声。
-   
-   **核心优势**：通过待定系数法，CPS 严格保持了 Rectified Flow 的**线性插值结构**（$x_t = (1-t)x_0 + tx_1$）。其数学本质是**在给定的方差预算内，寻找一种不改变边缘分布均值和方差的噪声注入流形**。无论注入多大的噪声 $\sigma_{t_i}$，公式都能自动调整 $x_{t_i}$ 和 $v_{t_i}$ 的权重，确保最终图像的方差和均值守恒。这有效缓解了 SDE 带来的颗粒感伪影，提供了更干净的图像供 RM 打分。
+
+   **核心优势**：CPS 严格保持 Rectified Flow 的线性插值结构，在给定方差预算内自动调整权重，确保均值和方差守恒，有效缓解 SDE 颗粒感伪影。
 
 ### MixGRPO 的实验成果
 
@@ -377,8 +298,9 @@ def cps_step_with_logprob(model_output, timestep, sample, noise_level=0.8, prev_
     pred_original_sample = sample - sigma * model_output
     noise_estimate = sample + model_output * (1 - sigma)  # ε̂ = x + v·(1-σ)
 
-    # CPS 均值：在干净图和噪声之间做"系数保持"插值
+    # CPS 均值（与前文公式等价的另一种分解形式）：
     # μ = (1-σ_prev)·x̂_0 + √(σ_prev² - std²)·ε̂
+    # 等价于公式中的 (x_t - v·Δt) + (√(t²_{i-1} - σ²) - t_{i-1})·ε̂
     # 严格保证 μ 的范数不会因后续的噪声注入而膨胀
     prev_sample_mean = (
         pred_original_sample * (1 - sigma_prev)
@@ -490,28 +412,17 @@ else:
 
 ## Part IV: 2026 年最新前沿——从稀疏奖励到密集奖励（Dense Reward）
 
-在 DanceGRPO 和 MixGRPO 之后，2026 年初的最新研究主要聚焦于解决 GRPO 在图像/视频生成中的另一个核心痛点：**信用分配（Credit Assignment）问题**。
+DanceGRPO 和 MixGRPO 之后，2026 年初的研究聚焦**信用分配（Credit Assignment）**：标准 GRPO 只在 $t=0$ 给出稀疏奖励并平摊给所有步，但早期步决定全局结构、后期步负责纹理——某步破坏结构却可能被错误奖励。
 
-在标准的 Flow-GRPO 或 MixGRPO 中，奖励（Reward）只有在生成完最后一步（$t=0$）的完整图像/视频后才能由奖励模型给出。这种**稀疏奖励（Sparse Reward）**被平均分配给了去噪轨迹上的所有步骤。然而，去噪过程的每一步贡献是完全不同的：早期的高噪声阶段决定了全局结构和语义布局（低频信息），而后期的低噪声阶段主要负责纹理和细节的生成（高频信息）。如果某一步实际上破坏了图像结构，但最终生成的图像依然得到了高分，这一步的错误行为也会被错误地“奖励”。
+为实现步级信用分配，2026 年涌现三篇代表性工作：
 
-为了实现精确的步级信用分配（Step-wise Credit Assignment），2026 年涌现了多篇重磅工作：
+1. **DenseGRPO (arXiv:2601.20218)**：用 ODE 在中间步预测 $\hat{x}_0$ 并打分，以相邻步得分差 $g_t = r_{t-1} - r_t$ 作为**密集奖励**；同时根据步级表现**自适应调整** SDE 随机性大小。
 
-1. **DenseGRPO (arXiv:2601.20218, 2026年1月)**
+2. **Stepwise-Flow-GRPO (arXiv:2603.28718)**：同样计算奖励增益 $g_t = r_{t-1} - r_t$，利用 Tweedie 公式高效获得中间步 $\hat{x}_0$；引入 DDIM 启发的改进 SDE，在保持策略梯度随机性的同时提高中间步图像质量，使 RM 打分更准确。
 
-   - **核心机制：预测步级奖励增益**。DenseGRPO 不再把最终奖励平摊给所有步骤，而是通过 ODE 求解器在中间步骤预测出干净图像，并用奖励模型对其打分。它将相邻两步的得分差值（Reward Gain）作为当前时间步的**密集奖励（Dense Reward）**。这样，如果某一步的去噪操作让图像质量变好了，它就会得到正奖励；如果变差了，就会得到负惩罚。
-   - **自适应探索空间校准**：作者发现，在不同的时间步，模型需要的探索空间是不同的。DenseGRPO 引入了一种“奖励感知（Reward-aware）”的机制，根据当前时间步的奖励情况，**自适应地调整 SDE 采样器中的随机性（Stochasticity）大小**。在模型表现不佳的步骤注入更多噪声以鼓励探索，在表现较好的步骤减少噪声以稳定利用。
+3. **TempFlow-GRPO (ICLR 2026)**：在中间步进行**轨迹分支**采样获取过程奖励；提出噪声感知加权，让模型在早期高噪声阶段集中学习——与 MixGRPO 滑动窗口思想类似，但通过显式损失加权实现。
 
-2. **Stepwise-Flow-GRPO (arXiv:2603.28718, 2026年3月)**
-
-   - **核心机制：基于 Tweedie 公式的增益分配**。与 DenseGRPO 类似，它也致力于计算每一步的奖励增益 $g_t = r_{t-1} - r_t$。为了高效获得中间步骤的得分，它巧妙地利用了 **Tweedie 公式**（即我们在代码中看到的 `pred_original_sample = latents - sigma * model_output`），在任意中间步骤 $t$ 直接单步估计出干净图像 $\hat{x}_0$，并送入奖励模型打分。
-   - **改进版 DDIM-SDE**：标准的 SDE 采样在中间步骤引入的噪声往往会导致 Tweedie 估计出的 $\hat{x}_0$ 质量较差，从而让奖励模型给出不准确的低分。为此，作者引入了一种受 DDIM 启发的改进版 SDE，它在保持策略梯度所需的随机性的同时，显著提高了中间步骤图像的质量，使得奖励模型的打分更加精准。
-
-3. **TempFlow-GRPO (ICLR 2026)**
-
-   - **核心机制：轨迹分支（Trajectory Branching）与过程监督**。它通过在中间步骤进行多次分支采样，显式地获取过程奖励（Process Reward），从而捕捉 Flow 生成过程中的时间结构。
-   - **噪声感知加权方案**：提出了一种基于噪声水平的加权机制，强制让模型在影响最大的早期生成阶段（高噪声、决定全局构图的阶段）集中学习。这与 MixGRPO 的滑动窗口课程学习思想有异曲同工之妙，但它是通过显式的损失加权来实现的。
-
-这些 2026 年的新工作标志着视觉生成领域的 RL 正在经历与 LLM 推理（如 OpenAI o1, DeepSeek-R1）类似的演进：从简单的“结果监督（Outcome Supervision, ORM）”全面转向更精细的“过程监督（Process Supervision, PRM）”。
+这些工作标志着视觉生成 RL 从"结果监督（ORM）"转向"过程监督（PRM）"，与 LLM 推理（o1、DeepSeek-R1）的演进方向一致。
 
 ---
 
