@@ -835,12 +835,36 @@ PPO 中 $r_t = \frac{\pi_\theta}{\pi_\text{old}}$ 就是重要性权重，使旧
 
 | | On-policy | Off-policy |
 |:---|:---|:---|
-| 数据来源 | 必须用当前策略采集 | 可用任意策略采集的数据 |
-| 代表算法 | PPO、TRPO、GRPO | DQN、SAC、DPO |
-| 样本效率 | 低（数据用完即丢） | 高（可复用历史数据） |
-| 稳定性 | 高（数据分布匹配） | 低（需要修正分布偏差） |
+| 数据来源 | 必须用**当前策略**采集 | 可用**任意策略**（包括历史策略）采集的数据 |
+| 核心机制 | 采完即用即丢，策略更新后数据失效 | 用 Replay Buffer 存储历史数据反复学习 |
+| 代表算法 | PPO、TRPO、GRPO、REINFORCE | DQN、SAC、TD3 |
+| 样本效率 | 低（数据不可复用） | 高（历史数据反复利用） |
+| 稳定性 | 高（数据分布与当前策略匹配） | 低（数据来自旧策略，存在分布偏差，需 IS 修正） |
 
-PPO 通过 IS + Clip 实现了"伪 Off-policy"——同一批数据复用 K 个 epoch，但仍需约束在旧策略附近。
+**注意区分三个容易混淆的概念：**
+
+**第一层：Online vs Offline（按是否与环境交互划分）**
+
+- **Online RL（在线强化学习）**：训练过程中**持续与环境交互**采集新数据。PPO、DQN、SAC 都属于在线
+- **Offline RL（离线强化学习）**：训练时**完全不与环境交互**，只从一个固定的历史数据集中学习。代表算法：CQL、IQL、Decision Transformer。DPO 也属于这一类——直接在固定偏好数据集上做监督学习
+
+**第二层：On-policy vs Off-policy（Online RL 内部，按数据来源划分）**
+
+- **On-policy**（在策略）：数据**必须来自当前正在优化的策略**，用完即丢。PPO/GRPO/TRPO 都是 on-policy
+- **Off-policy**（离策略）：数据**可以来自任意策略**（包括历史策略），通过 Replay Buffer 存储 + 重要性采样（IS）修正分布偏差。DQN、SAC、TD3 是经典 off-policy
+
+**关系图：**
+
+```
+强化学习
+├── Online RL（在线，与环境交互）
+│   ├── On-policy（只用当前策略的数据）：PPO, TRPO, GRPO
+│   └── Off-policy（可用任意策略的数据）：DQN, SAC, TD3
+└── Offline RL（离线，不与环境交互，固定数据集）：CQL, IQL, DT
+    └── DPO（更极端：连 RL 目标都没有，纯监督学习）
+```
+
+PPO 通过 IS ratio + Clip 实现了"伪 Off-policy"——同一批 on-policy 数据复用 K 个 epoch 更新，但 Clip 确保策略不偏离采样时的旧策略太远。严格来说仍是 on-policy（数据来自当前策略），只是在一批数据内做了多步优化。
 
 ---
 
