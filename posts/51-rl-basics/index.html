@@ -1,0 +1,883 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（一）：强化学习基础与策略梯度 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，为后续深入理解 REINFORCE、Actor-Critic、PPO 和 GRPO 打下坚实的理论基础。 ⬅️ 上一篇：笔记｜生成模型（十五）：Flux 架构解析 ➡️ 下一篇：笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic  强化学习基础概念：从&quot;训狗&quot;说起 对于纯">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（一）：强化学习基础与策略梯度">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，为后续深入理解 REINFORCE、Actor-Critic、PPO 和 GRPO 打下坚实的理论基础。 ⬅️ 上一篇：笔记｜生成模型（十五）：Flux 架构解析 ➡️ 下一篇：笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic  强化学习基础概念：从&quot;训狗&quot;说起 对于纯">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2025-08-16T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-06-22T06:28:40.597Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css?v=4.10.0-b1"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.10.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（一）：强化学习基础与策略梯度',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-06-22 14:28:40'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（一）：强化学习基础与策略梯度</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-06-22T06:28:40.597Z" title="更新于 2026-06-22 14:28:40">2026-06-22</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（一）：强化学习基础与策略梯度"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为大模型对齐与强化学习系列的第一篇，主要回顾强化学习（RL）的基础概念，并严格推导策略梯度定理，为后续深入理解
+REINFORCE、Actor-Critic、PPO 和 GRPO 打下坚实的理论基础。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/15-flux/">笔记｜生成模型（十五）：Flux
+架构解析</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/51-reinforce-ac/">笔记｜强化学习（一续）：从
+REINFORCE 到 Actor-Critic</a></p>
+</blockquote>
+<h1 id="强化学习基础概念从训狗说起">强化学习基础概念：从"训狗"说起</h1>
+<p>对于纯小白读者来说，理解强化学习（Reinforcement Learning,
+RL）最直观的例子就是<strong>"训狗"</strong>。</p>
+<ul>
+<li><strong>智能体（Agent）</strong>：就是那只狗（在 AI
+中就是我们的模型）。</li>
+<li><strong>环境（Environment）</strong>：狗所处的现实世界。</li>
+<li><strong>状态（State）</strong>：狗当前看到的画面、听到的口令（比如你喊"坐下"）。</li>
+<li><strong>动作（Action）</strong>：狗做出的反应（比如坐下、趴下、或者跑开）。</li>
+<li><strong>奖励（Reward）</strong>：如果狗做对了，你给它一块肉（正奖励）；做错了，你呵斥它（负奖励或零奖励）。</li>
+</ul>
+<p>强化学习的核心目标，就是让这只狗（模型）在不断的"尝试-犯错-获得奖励"的过程中，自己摸索出一条规律：<strong>在什么情况下，做什么动作，能吃到最多的肉</strong>。这条规律，在数学上就叫做<strong>策略（Policy）</strong>。</p>
+<p><img src="/chengYi-xun/img/rl_loop.png"
+alt="强化学习智能体与环境交互循环" /></p>
+<h2 id="马尔可夫决策过程-mdp">马尔可夫决策过程 (MDP)</h2>
+<p>强化学习问题通常被建模为<strong>马尔可夫决策过程（Markov Decision
+Process, MDP）</strong>（参考 <a
+target="_blank" rel="noopener" href="https://www.cs.cmu.edu/~15281-s25/coursenotes/mdps/index.html">CMU
+15-281 Lecture Notes: MDPs</a>）。一个 MDP 可以用一个元组 <span
+class="math inline">\(\langle \mathcal{S}, \mathcal{A}, \mathcal{P},
+\mathcal{R}, \gamma \rangle\)</span> 来表示：</p>
+<ul>
+<li><span class="math inline">\(\mathcal{S}\)</span>：状态空间（State
+Space），包含所有可能的状态 <span
+class="math inline">\(s\)</span>。</li>
+<li><span class="math inline">\(\mathcal{A}\)</span>：动作空间（Action
+Space），包含所有可能的动作 <span
+class="math inline">\(a\)</span>。</li>
+<li><span
+class="math inline">\(\mathcal{P}\)</span>：状态转移概率（Transition
+Probability），<span class="math inline">\(\mathcal{P}(s&#39;|s,
+a)\)</span> 表示在状态 <span class="math inline">\(s\)</span> 执行动作
+<span class="math inline">\(a\)</span> 后转移到状态 <span
+class="math inline">\(s&#39;\)</span> 的概率。</li>
+<li><span class="math inline">\(\mathcal{R}\)</span>：奖励函数（Reward
+Function），<span class="math inline">\(\mathcal{R}(s, a)\)</span>
+表示在状态 <span class="math inline">\(s\)</span> 执行动作 <span
+class="math inline">\(a\)</span> 后获得的即时奖励。</li>
+<li><span class="math inline">\(\gamma\)</span>：折扣因子（Discount
+Factor），<span class="math inline">\(\gamma \in [0,
+1]\)</span>，用于权衡即时奖励与未来奖励的重要性。</li>
+</ul>
+<p>智能体的目标是学习一个策略 <span
+class="math inline">\(\pi(a|s)\)</span>，即在状态 <span
+class="math inline">\(s\)</span> 下选择动作 <span
+class="math inline">\(a\)</span>
+的概率分布，使得期望的累积折扣奖励（Return）最大化： <span
+class="math display">\[
+J(\pi) = \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{\infty} \gamma^t
+r_t \right]
+\]</span> 其中，<strong><span class="math inline">\(\tau = (s_0, a_0,
+r_0, s_1, a_1, r_1, \dots)\)</span>
+表示一条完整的交互轨迹（Trajectory）</strong>。</p>
+<h2
+id="价值函数与优势函数怎么判断一个动作是好是坏">价值函数与优势函数：怎么判断一个动作是好是坏？</h2>
+<p>在训狗的过程中，狗不仅要看眼前的肉，还要考虑长远的利益（比如现在乖乖坐下，等会儿可能有大骨头）。为了评估策略的好坏，我们引入两个重要的价值函数：</p>
+<ol type="1">
+<li><strong>状态价值函数（State-Value Function）</strong> <span
+class="math inline">\(V^\pi(s)\)</span>：表示在状态 <span
+class="math inline">\(s\)</span> 下，遵循策略 <span
+class="math inline">\(\pi\)</span>
+所能获得的期望累积奖励。它实际上是该状态下所有可能动作的动作价值 <span
+class="math inline">\(Q^\pi(s, a)\)</span> 按照策略概率 <span
+class="math inline">\(\pi(a|s)\)</span> 的加权平均： <span
+class="math display">\[
+V^\pi(s) = \mathbb{E}_{\pi} \left[ \sum_{k=0}^{\infty} \gamma^k r_{t+k}
+\Big| s_t = s \right] = \sum_{a} \pi(a|s) Q^\pi(s, a)
+\]</span></li>
+<li><strong>动作价值函数（Action-Value Function）</strong> <span
+class="math inline">\(Q^\pi(s, a)\)</span>：表示在状态 <span
+class="math inline">\(s\)</span> 下执行动作 <span
+class="math inline">\(a\)</span>，随后遵循策略 <span
+class="math inline">\(\pi\)</span> 所能获得的期望累积奖励。 <span
+class="math display">\[
+Q^\pi(s, a) = \mathbb{E}_{\pi} \left[ \sum_{k=0}^{\infty} \gamma^k
+r_{t+k} \Big| s_t = s, a_t = a \right]
+\]</span></li>
+</ol>
+<p><strong>优势函数（Advantage Function）</strong> <span
+class="math inline">\(A^\pi(s, a)\)</span>
+定义为动作价值与状态价值之差，用于衡量在状态 <span
+class="math inline">\(s\)</span> 下执行特定动作 <span
+class="math inline">\(a\)</span>
+相比于"让策略自己盲选动作的平均表现"（即 <span
+class="math inline">\(V^\pi(s)\)</span>）的"优势"程度： <span
+class="math display">\[
+A^\pi(s, a) = Q^\pi(s, a) - V^\pi(s)
+\]</span> 如果 <span class="math inline">\(A^\pi(s, a) &gt;
+0\)</span>，说明动作 <span class="math inline">\(a\)</span> 比策略 <span
+class="math inline">\(\pi\)</span>
+随机选出来的平均动作表现更好；反之则说明动作 <span
+class="math inline">\(a\)</span>
+不如策略的平均水平。这里并不是指"执行动作"与"不执行动作"的对比，而是"执行特定动作
+<span
+class="math inline">\(a\)</span>"与"按策略概率分布执行动作"的对比。</p>
+<hr />
+<h1
+id="策略梯度定理如何让模型变聪明">策略梯度定理：如何让模型"变聪明"？</h1>
+<p><strong>核心思考出发点</strong>：既然我们知道了什么是"好动作"（优势函数
+<span class="math inline">\(A &gt;
+0\)</span>），什么是"坏动作"（优势函数 <span class="math inline">\(A
+&lt;
+0\)</span>），那我们该如何修改模型（神经网络）的参数，让它以后多做"好动作"，少做"坏动作"呢？</p>
+<p>这就是<strong>策略梯度（Policy
+Gradient）</strong>的意义所在。它提供了一种数学上的指导，告诉模型参数应该往哪个方向调整。</p>
+<p>在深度强化学习中，我们通常使用神经网络来参数化策略，记为 <span
+class="math inline">\(\pi_\theta(a|s)\)</span>，其中 <span
+class="math inline">\(\theta\)</span>
+是网络参数。我们的目标是找到最优参数 <span
+class="math inline">\(\theta^*\)</span>，使得目标函数 <span
+class="math inline">\(J(\theta)\)</span> 最大化。这里的目标函数 <span
+class="math inline">\(J(\theta)\)</span> 通常定义为策略 <span
+class="math inline">\(\pi_\theta\)</span>
+下的<strong>期望累积奖励（即初始状态的价值）</strong>： <span
+class="math display">\[
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{\infty}
+\gamma^t r_t \right] = V^{\pi_\theta}(s_0)
+\]</span></p>
+<h3 id="深入理解目标函数-jtheta">深入理解目标函数 <span
+class="math inline">\(J(\theta)\)</span></h3>
+<p>很多人可能会有疑问：既然 <span class="math inline">\(J(\theta) =
+V^{\pi_\theta}(s_0)\)</span>，那训练的目标难道是"让所有动作的价值都变大"吗？为了理清这个问题，我们需要深入理解以下三点：</p>
+<ol type="1">
+<li><p><strong>"初始状态的价值" <span
+class="math inline">\(V^{\pi_\theta}(s_0)\)</span> 的真正含义</strong>：
+在强化学习中，一个状态的"价值"就是指<strong>从这个状态出发，按照策略一直执行下去，所能获得的"期望累积奖励"</strong>。所以，目标函数
+<span class="math inline">\(J(\theta)\)</span> 正是从初始状态 <span
+class="math inline">\(s_0\)</span> 开始，遵循策略 <span
+class="math inline">\(\pi_\theta\)</span>
+所能获得的期望总奖励。</p></li>
+<li><p><strong><span class="math inline">\(J(\theta)\)</span>
+是期望值，不是单条轨迹的回报</strong>： 上面公式中的 <span
+class="math inline">\(\mathbb{E}_{\tau \sim \pi_\theta}[\sum \gamma^t
+r_t]\)</span> <strong>不是</strong>"某一条轨迹的累积奖励"——那个是 <span
+class="math inline">\(R(\tau) = \sum \gamma^t
+r_t\)</span>，它会因为采样的随机性而每次不同。前面的 <span
+class="math inline">\(\mathbb{E}\)</span>（期望）意味着：<strong>对所有可能轨迹的回报取加权平均</strong>。每次从
+<span class="math inline">\(s_0\)</span>
+出发，策略的随机采样和环境的随机转移会产生不同的轨迹，<span
+class="math inline">\(J(\theta)\)</span>
+是这些无穷多条可能轨迹回报的平均值。</p></li>
+<li><p><strong>等价展开：按第一步动作分组（全概率公式）</strong>：
+这个"对所有轨迹取平均"的期望，可以按第一步选择的动作来分组展开。对于初始状态
+<span class="math inline">\(s_0\)</span>： <span class="math display">\[
+J(\theta) = V^{\pi_\theta}(s_0) = \sum_{a} \pi_\theta(a|s_0)
+Q^{\pi_\theta}(s_0, a)
+\]</span>
+这个公式和上面的期望公式是<strong>完全等价的</strong>，只是换了一种展开方式：把所有可能的轨迹按"第一步选了哪个动作"分成若干组，每组轨迹的平均回报恰好是
+<span class="math inline">\(Q^{\pi_\theta}(s_0,
+a)\)</span>，每组出现的概率是 <span
+class="math inline">\(\pi_\theta(a|s_0)\)</span>——各组概率乘以各组平均再求和，就是全概率公式。</p>
+<p>虽然公式只对 <span class="math inline">\(s_0\)</span>
+下的<strong>第一步动作</strong>求和，但 <span
+class="math inline">\(Q^{\pi_\theta}(s_0, a)\)</span>
+已经包含了"执行动作 <span class="math inline">\(a\)</span>
+之后，沿整条轨迹遵循策略 <span class="math inline">\(\pi_\theta\)</span>
+所能获得的全部未来奖励的期望"——<span class="math inline">\(Q\)</span>
+值把未来"打包"进去了。</p></li>
+</ol>
+<p><strong>举个直观的例子：</strong> 假设在某个状态下只有两个动作：</p>
+<ul>
+<li>动作 A 是"吃金币"，环境给的真实价值 <span class="math inline">\(Q(s,
+A) = 10\)</span>。</li>
+<li>动作 B 是"跳悬崖"，环境给的真实价值 <span class="math inline">\(Q(s,
+B) = -10\)</span>。</li>
+</ul>
+<p>动作本身的价值是由环境规则决定的，<strong>我们无法改变 <span
+class="math inline">\(Q\)</span> 值本身</strong>。
+但我们可以改变神经网络的参数 <span
+class="math inline">\(\theta\)</span>，从而改变策略输出的<strong>概率（权重）</strong>：</p>
+<ul>
+<li><strong>训练前（瞎猜）</strong>：策略可能各给 50% 的概率，此时 <span
+class="math inline">\(J = 0.5 \times 10 + 0.5 \times (-10) =
+0\)</span>。</li>
+<li><strong>训练后（变聪明）</strong>：策略学会了 99% 选 A，1% 选
+B，此时 <span class="math inline">\(J = 0.99 \times 10 + 0.01 \times
+(-10) = 9.8\)</span>。</li>
+</ul>
+<p><strong>结论：</strong>
+强化学习的训练目标，<strong>不是去放大动作本身的价值，而是通过调整网络参数
+<span
+class="math inline">\(\theta\)</span>，把高价值动作的"选择概率"调大，把低价值动作的"选择概率"调小</strong>，从而让这个加权平均值
+<span class="math inline">\(J(\theta)\)</span> 达到最大。</p>
+<p>为了使用梯度上升法更新参数：<span class="math inline">\(\theta
+\leftarrow \theta + \alpha \nabla_\theta
+J(\theta)\)</span>，我们需要计算目标函数的梯度 <span
+class="math inline">\(\nabla_\theta J(\theta)\)</span>。</p>
+<p>但这里面临一个根本性困难：<span
+class="math inline">\(J(\theta)\)</span>
+是一个<strong>期望值</strong>——它取决于策略 <span
+class="math inline">\(\pi_\theta\)</span>
+生成的轨迹分布，而轨迹中涉及随机采样和环境交互，无法直接对 <span
+class="math inline">\(\theta\)</span> 求导。<strong>策略梯度定理（Policy
+Gradient Theorem）</strong>
+正是为了解决这个问题而诞生的：它给出了一个<strong>不需要对环境求导</strong>、可以通过采样近似的梯度表达式。换句话说，即使环境是一个完全不可微的黑盒（物理引擎、游戏模拟器、大模型评分器），我们依然能精确计算策略梯度的方向。</p>
+<p>根据<strong>策略梯度定理</strong>，梯度的解析表达式为： <span
+class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot Q^{\pi_\theta}(s_t, a_t) \right]
+\]</span></p>
+<p><strong>一句话直觉</strong>：用当前策略跑很多局，对于轨迹上每一步——如果这步的动作后来拿了高分（<span
+class="math inline">\(Q\)</span>
+大），就调整参数让这个动作下次更可能被选到；如果拿了低分（<span
+class="math inline">\(Q\)</span>
+小甚至为负），就让这个动作下次更不可能被选到。所有时间步的这些「推力」加在一起、取平均，就是让总回报上升最快的参数更新方向。</p>
+<p><strong>推导的核心：对数导数技巧 (Log-Derivative Trick)</strong></p>
+<p>上面的公式中出现了 <span class="math inline">\(\nabla_\theta \log
+\pi_\theta\)</span>——为什么对概率分布求梯度会变成对 <span
+class="math inline">\(\log\)</span>
+概率求梯度？（<em>注：本文及后续强化学习相关文章中，<span
+class="math inline">\(\log\)</span> 均指代以 <span
+class="math inline">\(e\)</span> 为底的自然对数 <span
+class="math inline">\(\ln\)</span></em>）下面的推导将严格证明这个结论，其核心贡献有三点：<strong>(1)</strong>
+把"对轨迹概率分布求导"转化为"对 <span
+class="math inline">\(\log\)</span>
+概率求期望"，从而可以通过<strong>蒙特卡洛采样</strong>近似；<strong>(2)</strong>
+证明环境的状态转移概率 <span
+class="math inline">\(P(s&#39;|s,a)\)</span> 对 <span
+class="math inline">\(\theta\)</span>
+的梯度为零，因此<strong>完全不需要知道环境的内部规则</strong>——这为后面
+REINFORCE 的代理损失（Surrogate
+Loss）设计提供了数学保证；<strong>(3)</strong>
+引入因果性裁剪，降低梯度估计的方差。</p>
+<p>我们从目标函数 <span class="math inline">\(J(\theta)\)</span>
+的期望定义出发。根据前面的定义，目标函数是整条轨迹累积奖励的期望： <span
+class="math display">\[
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{\infty}
+\gamma^t r_t \right]
+\]</span> 为了书写简洁，我们记轨迹 <span class="math inline">\(\tau =
+(s_0, a_0, s_1, a_1, \dots)\)</span> 的总累积奖励为 <span
+class="math inline">\(R(\tau) = \sum_{t=0}^{\infty} \gamma^t
+r_t\)</span>。
+由于期望的本质是对所有可能轨迹的概率加权求和（积分），且参数 <span
+class="math inline">\(\theta\)</span> 决定了轨迹出现的概率分布 <span
+class="math inline">\(P(\tau|\theta)\)</span>，所以我们必须将期望展开为积分形式才能对
+<span class="math inline">\(\theta\)</span> 求导：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\nabla_\theta J(\theta) &amp;= \nabla_\theta \mathbb{E}_{\tau \sim
+\pi_\theta} [R(\tau)] \\
+&amp;= \nabla_\theta \int P(\tau|\theta) R(\tau) d\tau \\
+&amp;= \int \nabla_\theta P(\tau|\theta) R(\tau) d\tau
+\end{aligned}
+\]</span></p>
+<p>此时，我们引入微积分中的链式法则 <span class="math inline">\(\nabla
+f(x) = f(x) \nabla \log
+f(x)\)</span>（即<strong>对数导数技巧</strong>），将其应用于概率 <span
+class="math inline">\(P(\tau|\theta)\)</span>： <span
+class="math display">\[
+\begin{aligned}
+\nabla_\theta J(\theta) &amp;= \int P(\tau|\theta) \nabla_\theta \log
+P(\tau|\theta) R(\tau) d\tau \\
+&amp;= \mathbb{E}_{\tau \sim \pi_\theta} \left[ \nabla_\theta \log
+P(\tau|\theta) R(\tau) \right]
+\end{aligned}
+\]</span></p>
+<p>接下来，我们需要计算 <span class="math inline">\(\nabla_\theta \log
+P(\tau|\theta)\)</span>。根据马尔可夫决策过程，一条轨迹发生的概率可以分解为初始状态概率、策略选择概率和环境转移概率的乘积：
+<span class="math display">\[
+P(\tau|\theta) = P(s_0) \prod_{t=0}^{\infty} \pi_\theta(a_t|s_t)
+P(s_{t+1}|s_t, a_t)
+\]</span> 对其两边取对数（<span class="math inline">\(\log\)</span>
+将乘积变为求和）： <span class="math display">\[
+\log P(\tau|\theta) = \log P(s_0) + \sum_{t=0}^{\infty} \log
+\pi_\theta(a_t|s_t) + \sum_{t=0}^{\infty} \log P(s_{t+1}|s_t, a_t)
+\]</span> 对参数 <span class="math inline">\(\theta\)</span>
+求梯度时，由于环境的初始状态分布 <span
+class="math inline">\(P(s_0)\)</span> 和状态转移概率 <span
+class="math inline">\(P(s_{t+1}|s_t, a_t)\)</span>
+都与我们的策略网络参数 <span class="math inline">\(\theta\)</span>
+无关，它们的梯度为 0，直接消失： <span class="math display">\[
+\nabla_\theta \log P(\tau|\theta) = \sum_{t=0}^{\infty} \nabla_\theta
+\log \pi_\theta(a_t|s_t)
+\]</span></p>
+<p>将展开后的梯度代回期望公式，我们得到： <span class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\left( \sum_{t=0}^{\infty} \nabla_\theta \log \pi_\theta(a_t|s_t)
+\right) R(\tau) \right]
+\]</span></p>
+<p>最后一步，结合<strong>因果性（Causality）</strong>：未来的动作不能影响过去的奖励。即
+<span class="math inline">\(t\)</span> 时刻的动作 <span
+class="math inline">\(a_t\)</span> 只能影响 <span
+class="math inline">\(t\)</span>
+时刻及之后的累积奖励。因此，我们可以将总奖励 <span
+class="math inline">\(R(\tau)\)</span> 替换为从 <span
+class="math inline">\(t\)</span> 时刻开始的累积奖励（这正是动作价值
+<span class="math inline">\(Q^{\pi_\theta}(s_t, a_t)\)</span>
+的无偏估计），最终得到策略梯度定理的严谨表达式： <span
+class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot Q^{\pi_\theta}(s_t, a_t) \right]
+\]</span></p>
+<p><strong>逐项拆解这个公式：</strong></p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">组成部分</th>
+<th style="text-align: left;">写法</th>
+<th style="text-align: left;">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">外层期望</td>
+<td style="text-align: left;"><span
+class="math inline">\(\mathbb{E}_{\tau \sim
+\pi_\theta}[\cdots]\)</span></td>
+<td style="text-align: left;">用当前策略 <span
+class="math inline">\(\pi_\theta\)</span>
+跑很多条轨迹，对括号内的量取平均</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">时间求和</td>
+<td style="text-align: left;"><span
+class="math inline">\(\sum_{t=0}^{\infty}\)</span></td>
+<td style="text-align: left;">对轨迹上每个时间步 <span
+class="math inline">\(t\)</span> 的贡献求和</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">折扣因子</td>
+<td style="text-align: left;"><span
+class="math inline">\(\gamma^t\)</span>（<span
+class="math inline">\(\gamma \in [0,1)\)</span>）</td>
+<td style="text-align: left;">越远的未来贡献越小，<span
+class="math inline">\(\gamma=0.99\)</span> 表示 100 步后衰减到约 <span
+class="math inline">\(\frac{1}{3}\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">策略梯度方向</td>
+<td style="text-align: left;"><span class="math inline">\(\nabla_\theta
+\log \pi_\theta(a_t \mid s_t)\)</span></td>
+<td style="text-align: left;">"让动作 <span
+class="math inline">\(a_t\)</span> 在状态 <span
+class="math inline">\(s_t\)</span> 下更可能"的参数更新方向</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">信用分配权重</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q^{\pi_\theta}(s_t, a_t)\)</span></td>
+<td style="text-align: left;">在状态 <span
+class="math inline">\(s_t\)</span> 下执行动作 <span
+class="math inline">\(a_t\)</span>
+后，<strong>未来能获得的期望总回报</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>整体物理意义</strong>：对轨迹上的每个时刻 <span
+class="math inline">\(t\)</span>——</p>
+<p><span class="math display">\[
+\underbrace{\gamma^t}_{\text{时刻}\,t\,\text{的重要性}} \times
+\underbrace{\nabla_\theta \log
+\pi_\theta(a_t|s_t)}_{\text{增大}\,a_t\,\text{概率的方向}} \times
+\underbrace{Q^{\pi_\theta}(s_t, a_t)}_{\text{这个动作有多好}}
+\]</span></p>
+<ul>
+<li>如果 <span class="math inline">\(Q\)</span>
+值<strong>大</strong>（这个动作带来高回报）→ 沿梯度方向走大步 →
+<strong>强化</strong>这个动作</li>
+<li>如果 <span class="math inline">\(Q\)</span>
+值<strong>小</strong>（甚至为负） → 沿反方向走 →
+<strong>抑制</strong>这个动作</li>
+<li><span class="math inline">\(\gamma^t\)</span> 有两个作用：(1)
+越早的决策权重越大（因为早期决策影响整条轨迹）；(2) 让 <span
+class="math inline">\(\sum_{t=0}^{\infty}\)</span>
+这个理论上的无穷求和收敛——因为 <span class="math inline">\(\gamma &lt;
+1\)</span>，所以 <span class="math inline">\(\gamma^t\)</span>
+指数级衰减到零，总和有界。实际应用中回答长度有限（如最多 2048
+token），<span class="math inline">\(\sum\)</span>
+自然截断，不需要担心发散</li>
+</ul>
+<p><strong>因果性为什么重要？</strong>
+上一步的公式里，每个时刻的梯度都乘以<strong>整条轨迹的总奖励</strong>
+<span class="math inline">\(R(\tau)\)</span>。但 <span
+class="math inline">\(t=5\)</span> 时刻的动作根本不可能影响 <span
+class="math inline">\(t=0 \sim 4\)</span>
+时已经发生的奖励，把这些"过去的奖励"也算进去纯粹是噪声。因果性裁剪掉这些无关项，只保留
+<span class="math inline">\(t\)</span> 时刻及之后的累积回报 <span
+class="math inline">\(Q^{\pi_\theta}(s_t, a_t) =
+\mathbb{E}\left[\sum_{k=t}^{\infty} \gamma^{k-t} r_k \mid s_t,
+a_t\right]\)</span>——<strong>方差更小，学习更快</strong>。</p>
+<p>通过这个技巧，我们将原本难以计算的"概率梯度的积分"，转化为了可以通过<strong>蒙特卡洛采样（让智能体自己在环境里跑几圈收集数据）</strong>来近似计算的"期望值"。</p>
+<blockquote>
+<p><strong>延伸阅读：</strong>
+关于策略梯度定理的更详细推导和直觉理解，推荐以下两篇经典文章：</p>
+<ul>
+<li><a
+target="_blank" rel="noopener" href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html">Part
+3: Intro to Policy Optimization — OpenAI Spinning Up</a>：OpenAI
+官方教程，从最简形式出发逐步引入 baseline 和优势函数。</li>
+<li><a
+target="_blank" rel="noopener" href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/">Policy
+Gradient Algorithms — Lil'Log</a>：Lilian Weng 的经典博客，覆盖从
+REINFORCE 到 PPO 的完整策略梯度算法族。</li>
+</ul>
+</blockquote>
+<h3 id="梯度的直观理解">梯度的直观理解</h3>
+<p>我们可以将上式中的 <span class="math inline">\(Q^{\pi_\theta}(s_t,
+a_t)\)</span> 替换为优势函数 <span
+class="math inline">\(A^{\pi_\theta}(s_t, a_t)\)</span>。
+为什么可以这样替换？因为 <span class="math inline">\(A(s, a) = Q(s, a) -
+V(s)\)</span>，相当于减去了一个只与状态 <span
+class="math inline">\(s\)</span> 有关的<strong>基线（Baseline）</strong>
+<span class="math inline">\(V(s)\)</span>。</p>
+<p><strong>物理直觉：为什么减去基线不影响期望？</strong>
+想象一下，你在某个状态 <span class="math inline">\(s\)</span>
+下，对所有可能的动作都加上了一个固定的奖励 <span
+class="math inline">\(b(s)\)</span>（比如每个动作都多给 10
+分）。因为所有动作的相对好坏没有改变，策略更新的方向也不应该改变。在数学上，由于策略是一个概率分布（所有动作的概率之和永远为
+1），如果你试图把所有动作的概率都往上推，这种"整体推力"的总和必然是
+0。</p>
+<p>我们可以通过下面的推导，严格证明减去任何基线 <span
+class="math inline">\(b(s)\)</span> 后的期望梯度为
+0。这里的推导关键在于：<strong>基线 <span
+class="math inline">\(b(s)\)</span> 只与状态有关，在对动作 <span
+class="math inline">\(a\)</span>
+求和时，它相当于一个常数，可以被直接提取到求和符号外面</strong>： <span
+class="math display">\[
+\begin{aligned}
+\mathbb{E}_{a \sim \pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a|s)
+\cdot b(s) \right]
+&amp;= \sum_a \pi_\theta(a|s) \left( \nabla_\theta \log \pi_\theta(a|s)
+\cdot b(s) \right) \\
+&amp;= b(s) \sum_a \pi_\theta(a|s) \left( \frac{\nabla_\theta
+\pi_\theta(a|s)}{\pi_\theta(a|s)} \right) \\
+&amp;= b(s) \sum_a \nabla_\theta \pi_\theta(a|s) \\
+&amp;= b(s) \nabla_\theta \left( \sum_a \pi_\theta(a|s) \right) \\
+&amp;= b(s) \nabla_\theta (1) \\
+&amp;= 0
+\end{aligned}
+\]</span> 既然减去 <span class="math inline">\(V(s)\)</span>
+后期望不变，为什么还要减呢？因为这能<strong>显著降低采样的方差</strong>，让训练更加稳定。</p>
+<p><strong>为什么减去基线能降低方差？</strong>
+想象一下，如果环境给的所有奖励都是非常大的正数（比如所有动作的 <span
+class="math inline">\(Q\)</span> 值都在 1000
+左右）。那么每次采样，无论动作好坏，梯度都会被乘以一个巨大的正数，导致网络参数剧烈震荡（方差极大）。
+当我们减去平均值 <span class="math inline">\(V(s)\)</span>（假设也是
+1000）后，原本的 <span class="math inline">\(Q(s, a)\)</span>
+就变成了优势 <span class="math inline">\(A(s, a)\)</span>，它的值会围绕
+0 波动（比如 +5 或
+-3）。这样一来，好动作会得到一个温和的正向推动，坏动作会得到一个温和的负向惩罚。梯度的绝对数值大大减小，更新过程自然就变得更加平稳了。</p>
+<p>替换后的公式如下： <span class="math display">\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[
+\sum_{t=0}^{\infty} \gamma^t \nabla_\theta \log \pi_\theta(a_t|s_t)
+\cdot A^{\pi_\theta}(s_t, a_t) \right]
+\]</span> 这个公式的物理意义非常直观：</p>
+<ul>
+<li><span class="math inline">\(\nabla_\theta \log
+\pi_\theta(a_t|s_t)\)</span> 指示了增加动作 <span
+class="math inline">\(a_t\)</span> 概率的参数更新方向。</li>
+<li><span class="math inline">\(A^{\pi_\theta}(s_t, a_t)\)</span>
+作为权重。如果优势为正，说明该动作好于平均，梯度会推动网络增加该动作的概率；如果优势为负，则降低该动作的概率。</li>
+</ul>
+<hr />
+<blockquote>
+<p><strong>参考资料：</strong></p>
+<ol type="1">
+<li>Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement
+Learning: An Introduction</em>. MIT press. Chapter 13.</li>
+<li><a
+target="_blank" rel="noopener" href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html">Part
+3: Intro to Policy Optimization — OpenAI Spinning Up</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/">Policy
+Gradient Algorithms — Lil'Log</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/51-reinforce-ac/">笔记｜强化学习（一续）：从
+REINFORCE 到 Actor-Critic</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/">https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜生成模型（十五）：Flux 架构解析</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/51-reinforce-ac/" title="笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-06-11</div><div class="title">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div><div><a href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%BB%8E%E8%AE%AD%E7%8B%97%E8%AF%B4%E8%B5%B7"><span class="toc-number">1.</span> <span class="toc-text">强化学习基础概念：从&quot;训狗&quot;说起</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A9%AC%E5%B0%94%E5%8F%AF%E5%A4%AB%E5%86%B3%E7%AD%96%E8%BF%87%E7%A8%8B-mdp"><span class="toc-number">1.1.</span> <span class="toc-text">马尔可夫决策过程 (MDP)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%B7%E5%80%BC%E5%87%BD%E6%95%B0%E4%B8%8E%E4%BC%98%E5%8A%BF%E5%87%BD%E6%95%B0%E6%80%8E%E4%B9%88%E5%88%A4%E6%96%AD%E4%B8%80%E4%B8%AA%E5%8A%A8%E4%BD%9C%E6%98%AF%E5%A5%BD%E6%98%AF%E5%9D%8F"><span class="toc-number">1.2.</span> <span class="toc-text">价值函数与优势函数：怎么判断一个动作是好是坏？</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%E5%AE%9A%E7%90%86%E5%A6%82%E4%BD%95%E8%AE%A9%E6%A8%A1%E5%9E%8B%E5%8F%98%E8%81%AA%E6%98%8E"><span class="toc-number">2.</span> <span class="toc-text">策略梯度定理：如何让模型&quot;变聪明&quot;？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E7%9B%AE%E6%A0%87%E5%87%BD%E6%95%B0-jtheta"><span class="toc-number">2.0.1.</span> <span class="toc-text">深入理解目标函数 \(J(\theta)\)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A2%AF%E5%BA%A6%E7%9A%84%E7%9B%B4%E8%A7%82%E7%90%86%E8%A7%A3"><span class="toc-number">2.0.2.</span> <span class="toc-text">梯度的直观理解</span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-reinforce-ac/" title="笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic">笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic</a><time datetime="2025-08-16T03:00:00.000Z" title="发表于 2025-08-16 11:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js?v=4.10.0-b1"></script><script src="/chengYi-xun/js/main.js?v=4.10.0-b1"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/51-rl-basics/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/51-rl-basics/',
+      title: '笔记｜强化学习（一）：强化学习基础与策略梯度',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

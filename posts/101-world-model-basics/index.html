@@ -1,0 +1,524 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="系列说明：本文是世界模型系列的第一篇，也是一篇面向初学者的全景综述。本文从最直觉的类比出发，剥离了繁复的数学，带你看懂世界模型的核心架构、两大路线之争以及它的前世今生。 ⬅️ 上一篇：笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速 ➡️ 下一篇：笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制  闭眼踢球——大脑里的物理模拟器 闭上">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/101-world-model-basics/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="系列说明：本文是世界模型系列的第一篇，也是一篇面向初学者的全景综述。本文从最直觉的类比出发，剥离了繁复的数学，带你看懂世界模型的核心架构、两大路线之争以及它的前世今生。 ⬅️ 上一篇：笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速 ➡️ 下一篇：笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制  闭眼踢球——大脑里的物理模拟器 闭上">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T16:30:00.000Z">
+<meta property="article:modified_time" content="2026-06-22T06:28:40.595Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="World Model">
+<meta property="article:tag" content="Model-based RL">
+<meta property="article:tag" content="Latent Space">
+<meta property="article:tag" content="Generative Model">
+<meta property="article:tag" content="JEPA">
+<meta property="article:tag" content="Autonomous Driving">
+<meta property="article:tag" content="Video Generation">
+<meta property="article:tag" content="Survey">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/101-world-model-basics/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css?v=4.10.0-b1"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.10.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-06-22 14:28:40'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-06-22T06:28:40.595Z" title="更新于 2026-06-22 14:28:40">2026-06-22</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Tutorials/">Tutorials</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>系列说明：本文是世界模型系列的第一篇，也是一篇面向初学者的全景综述。本文从最直觉的类比出发，剥离了繁复的数学，带你看懂世界模型的核心架构、两大路线之争以及它的前世今生。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/59-dance-mix-grpo/">笔记｜强化学习（九）：DanceGRPO
+与 MixGRPO——视觉生成 GRPO 的扩展与加速</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/102-dreamer/">笔记｜世界模型（二）：Dreamer
+系列——在想象中学习控制</a></p>
+</blockquote>
+<h2 id="闭眼踢球大脑里的物理模拟器">闭眼踢球——大脑里的物理模拟器</h2>
+<p>闭上眼睛，想象你在踢一个足球。球从脚尖飞出，在空中画一条抛物线，弹地后滚动减速。你不需要真的看到球，就能在脑海中预测它的轨迹。这种能力，来自你大脑中的<strong>世界模型</strong>——一个关于物理世界如何运作的内部模拟器。</p>
+<p>认知科学家 Kenneth Craik 在 1943
+年就提出了这个概念："如果生物体能在头脑中构建一个外部现实的微型模型，它就能在行动前先在模型中尝试各种方案，预测哪种最优。"</p>
+<p>在深度学习中，世界模型就是这个内部模拟器的计算实现：<strong>一个能够预测环境在你的动作下会如何变化的神经网络</strong>。这个定义虽然简单，却引出了
+AI 领域最激动人心的研究路线之一。从 DeepMind 的 Dreamer
+在虚拟想象中训练机器人，到 OpenAI 的 Sora
+将视频生成重新定义为世界模拟，再到 LeCun 提出的 JEPA 试图改变 AI
+理解世界的方式——世界模型正在成为通往通用人工智能（AGI）的关键拼图。</p>
+<h2 id="世界模型的核心架构">世界模型的核心架构</h2>
+<p>无论技术路线怎么变，世界模型的底层架构大多包含四个核心组件：</p>
+<ol type="1">
+<li><strong>推断模型（编码器）</strong>：从“看到的东西”反推“世界真正的样子”。智能体的视野总是局部的，它需要把复杂的像素画面，压缩成只保留关键信息的低维潜状态（Latent
+State）。</li>
+<li><strong>动力学模型（模拟器）</strong>：在脑中模拟“如果我这样做，世界会怎么变”。给定当前状态和动作，向前推演下一步。这是世界模型的核心引擎，它能纯凭想象推演未来。</li>
+<li><strong>观测模型（解码器）</strong>：把脑中推演出的状态，重新渲染成像素画面。这主要用来检验模型有没有瞎想——如果无法还原画面，说明想象已经脱离了现实。</li>
+<li><strong>奖励模型（裁判）</strong>：评估脑中推演出的未来局面对自己有多好。这样智能体就能在不实际采取行动的情况下，选出最佳方案。</li>
+</ol>
+<p><strong>训练的核心痛点</strong>：
+模型需要学会在脑中做梦（预测未来），但又要防止乱做梦。训练的底层逻辑就是在<strong>追求预测准确性</strong>和<strong>不丢弃环境随机性</strong>之间找平衡。为此，学术界（特别是著名的
+Dreamer 系列）摸索出了几个重要技巧：</p>
+<ul>
+<li><strong>拆分确定与随机（RSSM）</strong>：把对未来的预测拆成两部分，一部分像物理定律一样必然发生（确定性），另一部分允许有多种可能性（随机性）。</li>
+<li><strong>非对称优化（KL
+Balancing）</strong>：在调整预测时，多去惩罚那些“闭卷乱猜”的部分，少去苛求那些本来就很难预测的环境细节。</li>
+</ul>
+<h2 id="经典起源ha-schmidhuber-2018">经典起源：Ha &amp; Schmidhuber
+(2018)</h2>
+<p><img src="/chengYi-xun/img/world_model_arch.png"
+alt="World Models V-M-C Architecture" /></p>
+<p>2018 年，David Ha 和 Jürgen Schmidhuber
+首次将“世界模型”的概念在深度学习中系统化。他们用三个模块复现了人类的思维过程：</p>
+<ul>
+<li><strong>V
+模型（Vision，看）</strong>：用变分自编码器（VAE）把复杂的像素画面压缩成几十个数字的低维向量。</li>
+<li><strong>M 模型（Memory，想）</strong>：用 RNN
+预测这几十个数字在下一步会怎么变。</li>
+<li><strong>C
+模型（Controller，做）</strong>：一个极简的控制器，根据压缩后的状态做出决策。</li>
+</ul>
+<p>他们最惊艳的实验是：先让 V 和 M 看看真实游戏，然后完全在 M
+模型生成的“梦境”中训练控制器，最后把这个控制器丢回真实游戏里，直接通关了。这完美证明了：只要学懂了世界的运作规律，就可以在想象中无限练习。</p>
+<h2 id="为什么要在潜空间做梦">为什么要在“潜空间”做梦？</h2>
+<p>为什么不直接预测下一帧的像素？</p>
+<ol type="1">
+<li><strong>维度太高，学不动</strong>：一帧画面动辄上万个像素，其中绝大多数是风吹草动、光影变化等无关紧要的废话细节。把像素压缩成低维特征（潜空间），就是过滤掉这些废话，只保留“前面有辆车在左转”这样的核心语义。</li>
+<li><strong>误差会滚雪球</strong>：连续预测 50
+步未来，如果在像素层面上预测，哪怕每步错一点点，几十步后画面就彻底糊了。而在低维空间里，只有几十个核心数字，误差累积极慢，长程预测稳定得多。</li>
+</ol>
+<h2 id="路线之争预测派-vs-生成派">路线之争：预测派 vs 生成派</h2>
+<p>截至 2026
+年，世界模型百花齐放。但褪去外衣，其核心分歧只有一条：<strong>世界模型到底需不需要“看得见”（重建像素）？</strong>
+这将整个领域分成了两大阵营：</p>
+<h3 id="预测派predictive-决策不需要看清细节">1. 预测派（Predictive）——
+决策不需要看清细节</h3>
+<p>预测派认为：真实世界有太多不可预测的废话细节（比如树叶的摆动）。强行预测每一个像素纯属浪费算力。所以，<strong>预测派既不预测你的下一个动作，也不预测下一帧具体的像素画面，而是预测“世界未来的抽象状态（潜变量）”</strong>。只要模型在脑海里预测的这个抽象状态是符合物理规律的，能用来做决策就行了。</p>
+<ul>
+<li><strong>Model-based RL（在想象中控制）</strong>：代表作
+<strong>Dreamer</strong>
+系列。它在抽象空间里做梦、训练策略，甚至通过数值缩放等工程技巧，用一套死磕的参数横扫了上百个不同领域的任务。</li>
+<li><strong>JEPA 架构（完全抛弃像素）</strong>：Yann LeCun 主导的
+<strong>V-JEPA</strong>。它连解码器都不要了，直接预测未来的抽象特征。因为不生成像素，它的效率极高，但训练时为了防止模型“偷懒”（把所有特征都预测成
+0），引入了非对称的动量更新机制。</li>
+</ul>
+<h3 id="生成派generative-完美重建即完美理解">2. 生成派（Generative）——
+完美重建即完美理解</h3>
+<p>生成派（以 OpenAI
+为代表）则坚信大力出奇迹：只要模型能完美生成高保真的未来视频，它在内部就必然已经学懂了物理规律。</p>
+<ul>
+<li><strong>视频生成即世界模拟器</strong>：代表作 <strong>Sora, Genie 3,
+Cosmos</strong>。它们能生成极其逼真的视频，Genie 3
+甚至能从无标注视频中反推出潜在动作，让你能像打游戏一样和生成的视频交互。</li>
+<li><strong>物理化世界模型（进阶补丁）</strong>：因为纯靠看视频很难学懂牛顿定律（容易出现穿模、重力异常），2025-2026
+年的最新研究开始往生成模型里强行注入物理常识。方法包括：直接外挂物理引擎跑出真轨迹引导生成、用大模型当物理裁判给错误梯度惩罚，甚至用强化学习（DPO）去对齐物理定律。</li>
+</ul>
+<p>这不仅在基础大模型中爆发，还一路延伸到了<strong>自动驾驶</strong>（例如
+OccWorld，不看像素，直接预测 3D
+占据栅格里哪里有障碍物）和<strong>3D空间智能</strong>（李飞飞团队的
+World Labs，致力于生成几何与物理一致的 3D 空间）。</p>
+<h3 id="终局万物归一">终局：万物归一</h3>
+<p>生成派和预测派真的是水火不容吗？2026 年的 <strong>Var-JEPA</strong>
+给出了一统的数学证明：两者其实共享同一套变分推断框架，区别仅在于一个旋钮——<strong>观测噪声的大小</strong>。当观测噪声较大时，潜变量必须保持概率分布以应对不确定性，模型需要解码器来重建观测，这就是生成派的完整形态；当观测噪声趋近于零时，概率分布坍缩为确定性的点，解码器变得多余，模型退化为直接在抽象空间中预测未来状态——这就是
+JEPA（预测派）。换句话说，JEPA
+是变分推断在"零噪声"极限下的确定性特例，预测派与生成派不过是同一套数学框架在这个旋钮不同位置上的表现。</p>
+<h2 id="开放问题与总结">开放问题与总结</h2>
+<p>尽管进展神速，世界模型仍面临几个核心挑战：</p>
+<ol type="1">
+<li><strong>长期一致性</strong>：当前模型在长时间跨度的想象预测上仍易崩溃。</li>
+<li><strong>因果 vs
+相关</strong>：如何证明模型真正掌握了因果推理，而非仅是海量数据的相关性插值？</li>
+<li><strong>Sim2Real
+鸿沟</strong>：在完美的梦境中学到的策略，如何无缝迁移到嘈杂的真实机器人上。</li>
+</ol>
+<p>本文从最直觉的类比出发，剥离了繁复的数学，梳理了世界模型的核心架构（看、想、做、评），回顾了其经典起源，并清晰地划分了当前的两大核心阵营：预测派与生成派。</p>
+<p>下一篇将深入 <strong>Dreamer 系列</strong>——目前 Model-based RL
+方向最成功的世界模型家族，看它是如何真正在想象中学会控制的。</p>
+<blockquote>
+<p>参考文献： 1. Craik, K. (1943). The Nature of Explanation. 2. Ha, D.
+&amp; Schmidhuber, J. (2018). World Models. arXiv:1803.10122. 3. Hafner,
+D. et al. (2020/2021/2023). Dreamer 系列 (v1–v3). ICLR 2020/2021,
+arXiv:2301.04104. 4. LeCun, Y. (2022). A Path Towards Autonomous Machine
+Intelligence. 5. Bardes, A. et al. (2024). V-JEPA. Meta AI. 6. Var-JEPA
+(2026). arXiv:2603.20111. ICML 2026. 7. OpenAI (2024). Video Generation
+Models as World Simulators. 8. DeepMind (2024/2025). Genie 系列 (1–3).
+9. Zheng, W. et al. (2024). OccWorld. ECCV 2024. 10. Ding, Z. et al.
+(2025). A Comprehensive Survey of World Models. arXiv:2411.14499.</p>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/102-dreamer/">笔记｜世界模型（二）：Dreamer
+系列——在想象中学习控制</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/101-world-model-basics/">https://chengyi-xun.github.io/chengYi-xun/posts/101-world-model-basics/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/World-Model/">World Model</a><a class="post-meta__tags" href="/chengYi-xun/tags/Model-based-RL/">Model-based RL</a><a class="post-meta__tags" href="/chengYi-xun/tags/Latent-Space/">Latent Space</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-Model/">Generative Model</a><a class="post-meta__tags" href="/chengYi-xun/tags/JEPA/">JEPA</a><a class="post-meta__tags" href="/chengYi-xun/tags/Autonomous-Driving/">Autonomous Driving</a><a class="post-meta__tags" href="/chengYi-xun/tags/Video-Generation/">Video Generation</a><a class="post-meta__tags" href="/chengYi-xun/tags/Survey/">Survey</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div><div><a href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</div></div></a></div><div><a href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</div></div></a></div><div><a href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</div></div></a></div><div><a href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-06</div><div class="title">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AD%E7%9C%BC%E8%B8%A2%E7%90%83%E5%A4%A7%E8%84%91%E9%87%8C%E7%9A%84%E7%89%A9%E7%90%86%E6%A8%A1%E6%8B%9F%E5%99%A8"><span class="toc-number">1.</span> <span class="toc-text">闭眼踢球——大脑里的物理模拟器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E7%9A%84%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84"><span class="toc-number">2.</span> <span class="toc-text">世界模型的核心架构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%8F%E5%85%B8%E8%B5%B7%E6%BA%90ha-schmidhuber-2018"><span class="toc-number">3.</span> <span class="toc-text">经典起源：Ha &amp; Schmidhuber
+(2018)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%9C%A8%E6%BD%9C%E7%A9%BA%E9%97%B4%E5%81%9A%E6%A2%A6"><span class="toc-number">4.</span> <span class="toc-text">为什么要在“潜空间”做梦？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B7%AF%E7%BA%BF%E4%B9%8B%E4%BA%89%E9%A2%84%E6%B5%8B%E6%B4%BE-vs-%E7%94%9F%E6%88%90%E6%B4%BE"><span class="toc-number">5.</span> <span class="toc-text">路线之争：预测派 vs 生成派</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%A2%84%E6%B5%8B%E6%B4%BEpredictive-%E5%86%B3%E7%AD%96%E4%B8%8D%E9%9C%80%E8%A6%81%E7%9C%8B%E6%B8%85%E7%BB%86%E8%8A%82"><span class="toc-number">5.1.</span> <span class="toc-text">1. 预测派（Predictive）——
+决策不需要看清细节</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%94%9F%E6%88%90%E6%B4%BEgenerative-%E5%AE%8C%E7%BE%8E%E9%87%8D%E5%BB%BA%E5%8D%B3%E5%AE%8C%E7%BE%8E%E7%90%86%E8%A7%A3"><span class="toc-number">5.2.</span> <span class="toc-text">2. 生成派（Generative）——
+完美重建即完美理解</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%88%E5%B1%80%E4%B8%87%E7%89%A9%E5%BD%92%E4%B8%80"><span class="toc-number">5.3.</span> <span class="toc-text">终局：万物归一</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%80%E6%94%BE%E9%97%AE%E9%A2%98%E4%B8%8E%E6%80%BB%E7%BB%93"><span class="toc-number">6.</span> <span class="toc-text">开放问题与总结</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/102-dreamer/" title="笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制">笔记｜世界模型（二）：Dreamer 系列——在想象中学习控制</a><time datetime="2026-04-05T16:35:00.000Z" title="发表于 2026-04-06 00:35:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/101-world-model-basics/" title="笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能">笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能</a><time datetime="2026-04-05T16:30:00.000Z" title="发表于 2026-04-06 00:30:00">2026-04-06</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js?v=4.10.0-b1"></script><script src="/chengYi-xun/js/main.js?v=4.10.0-b1"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/101-world-model-basics/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/101-world-model-basics/',
+      title: '笔记｜世界模型（一）：世界模型全景综述——从认知科学到通用物理智能',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

@@ -1,0 +1,1323 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单 | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为 RL 系列第十一篇。前文详细介绍了 MDP 路线的代表作（Flow-GRPO、DanceGRPO、MixGRPO），它们通过将去噪过程建模为 MDP，利用 SDE 的高斯转移核提取 \(\log\pi_\theta\)。然而，这条路线受限于 SDE 采样器、收敛效率低、算法复杂度高。V-GRPO 另辟蹊径，回归扩散模型的变分根基，用 ELBO 代理 替代 MDP 建模，实现了更简单、更快">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/60-v-grpo/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为 RL 系列第十一篇。前文详细介绍了 MDP 路线的代表作（Flow-GRPO、DanceGRPO、MixGRPO），它们通过将去噪过程建模为 MDP，利用 SDE 的高斯转移核提取 \(\log\pi_\theta\)。然而，这条路线受限于 SDE 采样器、收敛效率低、算法复杂度高。V-GRPO 另辟蹊径，回归扩散模型的变分根基，用 ELBO 代理 替代 MDP 建模，实现了更简单、更快">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-06-11T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-06-22T06:28:40.599Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta property="article:tag" content="Flow Matching">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/60-v-grpo/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css?v=4.10.0-b1"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.10.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-06-22 14:28:40'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-06-22T06:28:40.599Z" title="更新于 2026-06-22 14:28:40">2026-06-22</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为 RL 系列第十一篇。前文详细介绍了 MDP
+路线的代表作（Flow-GRPO、DanceGRPO、MixGRPO），它们通过将去噪过程建模为
+MDP，利用 SDE 的高斯转移核提取 <span
+class="math inline">\(\log\pi_\theta\)</span>。然而，这条路线受限于 SDE
+采样器、收敛效率低、算法复杂度高。V-GRPO
+另辟蹊径，回归扩散模型的变分根基，用 <strong>ELBO 代理</strong> 替代 MDP
+建模，实现了更简单、更快、更强的在线 RL 后训练。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/61-reward-model/">笔记｜强化学习（十）：奖励模型全景——从基础架构到
+Reward Hacking 与前沿进阶</a></p>
+<p>论文：<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2604.23380">V-GRPO: Online
+Reinforcement Learning for Denoising Generative Models Is Easier than
+You Think</a>（Stanford &amp; Tsinghua, 2026.04）</p>
+<p>代码：<a
+target="_blank" rel="noopener" href="https://github.com/tang-bd/v-grpo">github.com/tang-bd/v-grpo</a></p>
+</blockquote>
+<hr />
+<h1 id="一句话理解-v-grpo">一句话理解 V-GRPO</h1>
+<p><strong>V-GRPO 证明了一件事：用扩散模型预训练目标（ELBO）作为
+log-likelihood
+的代理，配合三个方差缩减技巧和三个梯度步调节技巧，就能在图像生成的在线
+RL 中全面超越所有 MDP 路线方法——而且实现更简单、训练更快。</strong></p>
+<p><strong>Table 1：V-GRPO
+性能与效率总览</strong>（结果为所有评估奖励函数的均值，在测试集上报告）</p>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">方法</th>
+<th style="text-align: center;">训练步数</th>
+<th style="text-align: center;">NFE<span
+class="math inline">\(_{\pi_{\theta_\text{old}}}\)</span></th>
+<th style="text-align: center;">NFE<span
+class="math inline">\(_{\pi_\theta}\)</span></th>
+<th style="text-align: center;">平均奖励</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>FLUX.1-dev</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">1.25</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ BranchGRPO</td>
+<td style="text-align: center;">300</td>
+<td style="text-align: center;">13.68</td>
+<td style="text-align: center;">13.68</td>
+<td style="text-align: center;">1.40</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ MixGRPO</td>
+<td style="text-align: center;">300</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">1.41</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ <strong>V-GRPO</strong></td>
+<td style="text-align: center;"><strong>150</strong></td>
+<td style="text-align: center;">16 + 4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">1.42</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ <strong>V-GRPO</strong></td>
+<td style="text-align: center;">300</td>
+<td style="text-align: center;">16 + 4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>1.45</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>SD 3.5 M (w/o CFG)</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">0.95</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ DiffusionNFT</td>
+<td style="text-align: center;">1.7K</td>
+<td style="text-align: center;">40 + 40</td>
+<td style="text-align: center;">40</td>
+<td style="text-align: center;">1.71</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ <strong>V-GRPO</strong></td>
+<td style="text-align: center;"><strong>580</strong></td>
+<td style="text-align: center;">40 + 6.9</td>
+<td style="text-align: center;">6.9</td>
+<td style="text-align: center;"><strong>1.71</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>NFE<span class="math inline">\(_{\pi_{\theta_\text{old}}}\)</span> =
+采样阶段的函数评估次数（V-GRPO 包含采样步数 + <span
+class="math inline">\(N_\text{MC}\)</span>）；NFE<span
+class="math inline">\(_{\pi_\theta}\)</span> =
+训练阶段的函数评估次数。V-GRPO 在 150 步时即超越 MixGRPO 300
+步的性能。</p>
+</blockquote>
+<hr />
+<h1 id="为什么需要-v-grpomdp-路线的困境">为什么需要 V-GRPO：MDP
+路线的困境</h1>
+<p>在<a href="/chengYi-xun/posts/55-flow-grpo/">第五篇</a>和<a
+href="/chengYi-xun/posts/59-dance-mix-grpo/">第九篇</a>中，我们详细推导了
+MDP 路线的核心机制：将去噪过程建模为马尔可夫决策过程，通过 ODE→SDE
+转换注入随机性，利用高斯转移核的对数概率累加得到 <span
+class="math inline">\(\log\pi_\theta\)</span>。</p>
+<p>这条路线在概念上是清晰的，但在工程中暴露了三个根本性问题：</p>
+<p><strong>问题一：收敛慢，训练效率低。</strong> MDP
+目标将整条去噪轨迹拆分为逐步的状态-动作序列，每步的梯度信号极其稀疏。即便
+MixGRPO 用滑动窗口将 MDP 缩短到 4 步，仍然需要 300 个 iteration
+才能收敛。</p>
+<p><strong>问题二：采样器被锁死。</strong> MDP 建模要求使用一阶 SDE
+离散化（Euler-Maruyama），因为只有 SDE
+步才有可计算的高斯转移核概率。这直接排除了更高效的高阶 ODE 求解器（如
+DPM-Solver++）在训练采样中的使用。即使 MixGRPO
+允许窗口外用高阶求解器，窗口内仍被限制在一阶 SDE。</p>
+<p><strong>问题三：优化与采样高度耦合。</strong> importance ratio
+的计算依赖 rollout 时每步的转移核参数（<span
+class="math inline">\(\mu_\theta,
+\sigma_t\)</span>），这意味着采样配置的任何改动（步数、求解器类型、噪声调度）都直接影响训练目标。为了修补这种耦合，MixGRPO
+引入了滑动窗口+课程学习，BranchGRPO
+设计了分支树——但代价是越来越复杂的算法和更多的超参数。</p>
+<p>这些问题的根源是同一个：<strong>MDP
+路线把"如何采样"和"如何优化"绑在了一起。</strong></p>
+<p>V-GRPO 的核心洞察是：<strong>完全可以跳过 MDP
+建模</strong>，直接用扩散模型预训练时就在用的 ELBO 作为 log-likelihood
+的可解析代理——这让优化与采样彻底解耦。</p>
+<hr />
+<h1 id="v-grpo-的理论框架">V-GRPO 的理论框架</h1>
+<h2 id="从-elbo-到-likelihood-代理">从 ELBO 到 likelihood 代理</h2>
+<p>在<a
+href="/chengYi-xun/posts/5-ddpm/">扩散模型理论篇</a>中我们知道，扩散模型的预训练本质上是在最大化数据的证据下界（ELBO）：</p>
+<p><span class="math display">\[\text{ELBO}_\theta(x) \leq \log
+\pi_\theta(x)\]</span></p>
+<p>对于连续时间的扩散模型，ELBO 有一个简洁的形式：</p>
+<p><span class="math display">\[\text{ELBO}_\theta(x) =
+-\frac{1}{2}\mathbb{E}_{t,
+\epsilon}\left[-\frac{d\lambda_t}{dt}\|\epsilon_\theta(z_t) -
+\epsilon\|_2^2\right] + C\]</span></p>
+<p>其中 <span class="math inline">\(\lambda_t =
+\log(a_t^2/b_t^2)\)</span> 是 log 信噪比，<span
+class="math inline">\(C\)</span> 是与模型参数无关的常数。</p>
+<p><strong>V-GRPO 的关键操作</strong>：在 GRPO 的 importance ratio
+中，将不可解析的 <span
+class="math inline">\(\log\pi_\theta(o_i|c)\)</span>
+替换为条件化的预训练损失（负加权 ELBO）：</p>
+<p><span class="math display">\[\log\pi_\theta(o_i|c) \leftarrow
+-\mathcal{L}_w(\theta|o_i, c) = -\mathbb{E}_{t,
+\epsilon}\left[w_t\|\text{NN}_t^\theta(z_t, c) - r_t(o_i,
+\epsilon)\|_2^2\right]\]</span></p>
+<p>其中 <span class="math inline">\(o_i\)</span>
+是已生成的输出图像，<span class="math inline">\(c\)</span>
+是文本条件，<span class="math inline">\(z_t = a_t \cdot o_i + b_t \cdot
+\epsilon\)</span> 是对 <span class="math inline">\(o_i\)</span>
+加噪后的中间状态。</p>
+<p><strong>importance ratio 变成了</strong>：</p>
+<p><span class="math display">\[\rho_i^\theta =
+\exp\left(-\hat{\mathcal{L}}(\theta|o_i, c) +
+\hat{\mathcal{L}}(\theta_\text{old}|o_i, c)\right)\]</span></p>
+<p>在实践中，用 Monte Carlo 采样 <span
+class="math inline">\(N_\text{MC}\)</span>
+个时间步-噪声对来近似期望：</p>
+<p><span class="math display">\[\hat{\mathcal{L}}_w(\theta|o_i, c) =
+\frac{1}{N_\text{MC}}\sum_{j=1}^{N_\text{MC}} \ell_i^\theta(t_j,
+\epsilon_j)\]</span></p>
+<p>其中 <span class="math inline">\(\ell_i^\theta(t_j, \epsilon_j) =
+w_{t_j}\|\text{NN}_{t_j}^\theta(z_{t_j}, c) - r_{t_j}(o_i,
+\epsilon_j)\|_2^2\)</span>。</p>
+<div class="note info no-icon flat"><p><strong>与 MDP 路线的本质区别</strong></p>
+<p>对比 Flow-GRPO/MixGRPO 的 MDP 框架：</p>
+<table>
+<colgroup>
+<col style="width: 38%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">维度</th>
+<th style="text-align: left;">MDP 路线</th>
+<th style="text-align: left;">V-GRPO（ELBO 路线）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong><span
+class="math inline">\(\log\pi_\theta\)</span> 来源</strong></td>
+<td style="text-align: left;">SDE 每步高斯转移核 <span
+class="math inline">\(\log\mathcal{N}(x_{t-1}; \mu_\theta, \sigma_t^2
+I)\)</span> 的逐步累加</td>
+<td style="text-align: left;">预训练损失 <span
+class="math inline">\(-\mathcal{L}_w(\theta\|o_i, c)\)</span>
+作为整体代理</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>生成过程</strong></td>
+<td style="text-align: left;">必须是一阶 SDE 离散化</td>
+<td
+style="text-align: left;"><strong>任意采样器</strong>（ODE/SDE/高阶求解器均可）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>优化-采样耦合</strong></td>
+<td style="text-align: left;">紧密耦合（ratio 依赖 rollout 转移核）</td>
+<td style="text-align: left;"><strong>完全解耦</strong>（ratio
+只依赖最终输出 <span class="math inline">\(o_i\)</span>）</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>实现复杂度</strong></td>
+<td style="text-align: left;">需要 Score 估计、SDE 转换、窗口调度等</td>
+<td style="text-align: left;">只需在生成图像上算预训练损失</td>
+</tr>
+</tbody>
+</table>
+<p>V-GRPO 将整个多步生成视为一个<strong>原子动作（atomic
+action）</strong>——它不关心图像是怎么一步步生成的，只关心最终的输出
+<span class="math inline">\(o_i\)</span>
+在当前策略下的"likelihood"高不高。这使得优化过程与采样过程彻底解耦。</p>
+</div>
+<h2 id="为什么直接用-elbo-代理会失败">为什么直接用 ELBO 代理会失败</h2>
+<p>尽管 ELBO
+代理在理论上很优美，但之前的工作（DDPO、FPO）在视觉生成任务上用这种方法时效果很差。V-GRPO
+通过实验诊断出了根本原因：<strong>ELBO 代理的方差过大。</strong></p>
+<p><img src="/chengYi-xun/img/vgrpo_fig1.png"
+alt="Fig. 1：不同时间步的 per-sample loss 量级差异巨大，FLUX.1-dev 在 t \approx 0.2 时 loss 接近 0，t \approx 1.0 时可达 1.4（摘自 Tang et al., arXiv:2604.23380 图 1）" /></p>
+<p>如上图所示，per-sample loss <span
+class="math inline">\(\ell_i^\theta(t_j, \epsilon_j)\)</span>
+在不同时间步 <span class="math inline">\(t_j\)</span>
+上的量级差异极大（可达数量级）。当为每个输出 <span
+class="math inline">\(o_i\)</span> 独立采样时间步-噪声对 <span
+class="math inline">\(\{(t_j, \epsilon_j)\}\)</span>
+时，同一组内不同输出的代理值因为采样到不同的时间步区域而产生巨大差异——这种差异不反映真实的
+likelihood 差别，而是来自随机采样的噪声。</p>
+<p>更糟糕的是，梯度范数与代理量级呈强正相关（Fig.
+2a）：代理值的随机波动直接传导为高方差的梯度，淹没了来自奖励的真实学习信号。</p>
+<p><img src="/chengYi-xun/img/vgrpo_fig2.png"
+alt="Fig. 2：Naive baseline（左）的梯度范数随代理量级呈强正相关，V-GRPO（右）有效降低了这种相关性（摘自 Tang et al., arXiv:2604.23380 图 2）" /></p>
+<hr />
+<h1 id="三个方差缩减技术让-elbo-代理变得稳定">三个方差缩减技术：让 ELBO
+代理变得稳定</h1>
+<p>V-GRPO
+提出三个简单但关键的方差缩减技术，每个单独看都不起眼，但组合起来效果显著。</p>
+<h2 id="组内共享时间步-噪声对group-shared-timestep-noise-pairs">1.
+组内共享时间步-噪声对（Group-Shared Timestep-Noise Pairs）</h2>
+<p><strong>问题</strong>：如果为同一 prompt 的 <span
+class="math inline">\(G\)</span> 个输出各自独立采样 <span
+class="math inline">\(\{(t_j,
+\epsilon_j)\}\)</span>，不同输出可能采到完全不同的时间步区域，导致代理值的差异来自采样噪声而非真实
+likelihood 差别。</p>
+<p><strong>解决方案</strong>：对于同一个 prompt <span
+class="math inline">\(c\)</span>，随机采样一组固定的时间步-噪声对 <span
+class="math inline">\(\{(t_j,
+\epsilon_j)\}_{j=1}^{N_\text{MC}}\)</span>，并在该 prompt 下所有 <span
+class="math inline">\(G\)</span> 个输出上<strong>共享使用</strong>。</p>
+<p><strong>效果</strong>：通过锚定所有输出到相同的随机基底，消除了组内方差的主要来源，使不同输出的代理值具有直接可比性。</p>
+<p>在代码中，这对应 <code>grpo_init_same</code> 参数设为
+<code>"batch"</code> 时的行为：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 同一个 batch 共享时间步和噪声</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">minibatch_sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> stratified_sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(sigmas, </span><span style="color:#383A42;--shiki-dark:#D19A66">N_MC</span><span style="color:#383A42;--shiki-dark:#ABB2BF">).</span><span style="color:#383A42;--shiki-dark:#61AFEF">repeat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(batch_size, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">minibatch_noise </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> randn</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#383A42;--shiki-dark:#D19A66">N_MC</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">).</span><span style="color:#383A42;--shiki-dark:#61AFEF">repeat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(batch_size, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 广播到所有 GPU</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">broadcast</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(minibatch_sigmas, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">src</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">dist.</span><span style="color:#383A42;--shiki-dark:#61AFEF">broadcast</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(minibatch_noise, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">src</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span></code></pre></div>
+<h2 id="分层时间步采样stratified-timestep-sampling">2.
+分层时间步采样（Stratified Timestep Sampling）</h2>
+<p><strong>问题</strong>：标准的均匀时间步采样可能导致所有 <span
+class="math inline">\(N_\text{MC}\)</span>
+个样本聚集在某个时间区域，造成覆盖不均。</p>
+<p><strong>解决方案</strong>：将离散化的时间步调度表等分为 <span
+class="math inline">\(N_\text{MC}\)</span>
+段，从每段中恰好抽取一个时间步。这保证了噪声调度的全局均匀覆盖。</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> args.stratified_sampling:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    minibatch_sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">cat</span><span style="color:#383A42;--shiki-dark:#ABB2BF">([</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        chunk[torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">randint</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#0184BC;--shiki-dark:#56B6C2">len</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(chunk), (</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,))]</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> chunk </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">tensor_split</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(sigmas, train_timesteps)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    ], </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span></code></pre></div>
+<h2 id="自适应损失加权adaptive-loss-weighting">3.
+自适应损失加权（Adaptive Loss Weighting）</h2>
+<p><strong>问题</strong>：不同时间步的 loss 量级差异巨大（Fig.
+1），直接平均会让高噪声步主导梯度。</p>
+<p><strong>解决方案</strong>分两步：</p>
+<p><strong>(a) x-prediction 重参数化</strong>：将模型输出重新参数化为
+x-prediction（对 Rectified Flow：<span
+class="math inline">\(x_\theta(z_t) = z_t - t \cdot
+\text{NN}_t^\theta(z_t)\)</span>），在高噪声水平下隐式赋予更大权重。</p>
+<p><strong>(b) 自归一化</strong>：用 stop-gradient 的 L1
+范数归一化每个样本的损失，使不同量级的样本对梯度的贡献大致对齐：</p>
+<p><span class="math display">\[\mathcal{L}_\text{adaptive}(\theta|o_i,
+c) = \mathbb{E}_{t, \epsilon}\left[\frac{\|x_\theta(z_t) -
+o_i\|_2^2}{\text{sg}\left(\frac{1}{d}\|x_\theta(z_t) -
+o_i\|_1\right)}\right]\]</span></p>
+<p>其中 <span class="math inline">\(\text{sg}(\cdot)\)</span> 是
+stop-gradient 算子，<span class="math inline">\(d\)</span> 是 <span
+class="math inline">\(o_i\)</span> 的维度。</p>
+<p>在代码中的实现：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> calc_surrogate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">args</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-dark:#ABB2BF"> ..., </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">latents</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> noise</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> sigmas</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noisy_latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    model_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">noisy_latents, </span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # x-prediction 重参数化</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    x0_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noisy_latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_pred</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ((x0_pred.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">).</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noise.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">], </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">),</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 自归一化</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> args.self_normalize:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">abs</span><span style="color:#383A42;--shiki-dark:#ABB2BF">((x0_pred.</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">().</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">())</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                      .</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noise.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">], </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)),</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">            dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        )</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> surrogate</span></span></code></pre></div>
+<p><strong>三个技术的联合效果</strong>：代理值的变异系数（CV）从 0.230
+降至 0.128，组内 CV 从 0.170 降至
+0.038。梯度范数对代理量级的依赖性显著降低（二次拟合的 <span
+class="math inline">\(R^2\)</span> 从 0.406 降至
+0.328）。在训练中，naive baseline 出现严重振荡甚至发散，而 V-GRPO
+稳定收敛到更高的奖励值。</p>
+<p><img src="/chengYi-xun/img/vgrpo_fig4.png"
+alt="Fig. 4：消融实验。(a) 方差缩减技术缺一不可；(b) KL penalty 无法完全抑制 loss spike；(c-d) 优势软裁剪在特定场景下提升稳定性；(e) 软裁剪不适合粗粒度奖励；(f) N_\text{MC}=4 是最优平衡点（摘自 Tang et al., arXiv:2604.23380 图 4）" /></p>
+<hr />
+<h1
+id="三个梯度步调节技术控制策略更新幅度">三个梯度步调节技术：控制策略更新幅度</h1>
+<p>方差缩减解决了代理函数本身的噪声问题，但稳定的在线 RL
+还需要防止过激的策略更新。V-GRPO
+根据不同训练场景，选择性地启用以下三种技术。</p>
+<h2 id="重要性比率裁剪importance-ratio-clipping">1.
+重要性比率裁剪（Importance Ratio Clipping）</h2>
+<p>标准的 PPO 裁剪，将 importance ratio <span
+class="math inline">\(\rho_i^\theta\)</span> 限制在 <span
+class="math inline">\([1-\varepsilon, 1+\varepsilon]\)</span>
+范围内。在大多数标准训练配置中，这已经足够保证稳定性。</p>
+<div class="note warning no-icon flat"><p><strong>与 MDP 路线的裁剪范围差异</strong></p>
+<p>值得注意的是，V-GRPO 中 <span
+class="math inline">\(\varepsilon\)</span> 的典型值在 <span
+class="math inline">\(6\times 10^{-3}\)</span> 到 <span
+class="math inline">\(1\times 10^{-2}\)</span> 量级——远小于 LLM GRPO
+中常用的 0.2。这是因为 ELBO 代理的 importance ratio
+对策略变化更敏感（它度量的是整个图像在当前策略下的全局 likelihood
+变化，而非单步转移核的变化），需要更小的裁剪范围来防止过大的策略跳跃。</p>
+</div>
+<h2 id="kl-惩罚kl-penalty">2. KL 惩罚（KL Penalty）</h2>
+<p>当需要保留前序训练阶段习得的能力时（如 Stage 5 添加 OCR 奖励时不能让
+GenEval 能力退化），引入行为策略 <span
+class="math inline">\(\pi_{\theta_\text{old}}\)</span> 的 KL 惩罚：</p>
+<p><span
+class="math display">\[D_i^\text{simple}(\pi_\theta\|\pi_{\theta_\text{old}})
+= \mathbb{E}_{t, \epsilon}\left[\|x_\theta(z_t) -
+x_{\theta_\text{old}}(z_t)\|_2^2\right]\]</span></p>
+<p>这里使用的是 x-prediction 空间的 MSE，与 Flow-GRPO 中用速度场 MSE
+近似 KL 散度的思路类似，但 V-GRPO
+利用已存储的时间步-噪声对来计算，<strong>无需额外的参考模型推理</strong>——只需存储
+<span class="math inline">\(\theta_\text{old}\)</span> 下的预测结果
+<span class="math inline">\(\ell_i^{\theta_\text{old}}(t_j,
+\epsilon_j)\)</span>。</p>
+<h2 id="优势软裁剪advantage-soft-clipping">3. 优势软裁剪（Advantage
+Soft-Clipping）</h2>
+<p>当采用完全 on-policy 训练（每个 iteration 只做 1 次梯度步，<span
+class="math inline">\(\theta \equiv
+\theta_\text{old}\)</span>）时，前两种技术均失效（ratio 恒为 1，KL 恒为
+0）。V-GRPO 提出用双曲正切函数对优势值做软裁剪：</p>
+<p><span class="math display">\[A_i^\text{soft} = \eta \cdot
+\tanh\left(\frac{1}{\eta}A_i\right)\]</span></p>
+<p>小优势保持线性敏感，极端优势被平滑地压缩到 <span
+class="math inline">\([-\eta, \eta]\)</span> 范围内。实验表明，这在 SD
+3.5 M 的 Stage 1（完全 on-policy，150 次 iteration）中至关重要。</p>
+<p><strong>技术选择策略</strong>（来自 V-GRPO 论文的最佳实践）：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">训练场景</th>
+<th style="text-align: center;">裁剪</th>
+<th style="text-align: center;">KL 惩罚</th>
+<th style="text-align: center;">优势软裁剪</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">标准多步训练（FLUX.1-dev 主实验）</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">完全 on-policy 训练（SD 3.5 M Stage
+1/3）</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">需要保留先前能力（SD 3.5 M Stage 5）</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">减少采样步数时（16 步 FLUX.1-dev）</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="完整算法流程">完整算法流程</h1>
+<p>将上述所有组件组合在一起，V-GRPO 的完整训练流程如下：</p>
+<p><img src="/chengYi-xun/img/vgrpo_algorithm1.png"
+alt="Algorithm 1：V-GRPO 完整算法。关键技术已高亮——分层时间步采样（Step 5）、自适应加权（Step 9/14）、优势软裁剪（Step 8）、KL 惩罚（Step 17）（摘自 Tang et al., arXiv:2604.23380 算法 1）" /></p>
+<p><strong>与 MDP 路线训练流程的关键区别</strong>：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">"""</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">V-GRPO 训练主循环（精简伪代码）</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">与 Flow-GRPO/MixGRPO 的 5 个核心差异:</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">  1. 采样: 可用任意求解器（包括高阶 ODE），无需 SDE</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">  2. log_prob: 不依赖转移核，而是对最终输出 o_i 算预训练损失</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">  3. 噪声对: 组内共享 + 分层采样</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">  4. 损失权重: 自适应 x-prediction 归一化</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">  5. 解耦: 采样配置变化不影响训练目标</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> iteration </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(M):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    θ_old ← θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # Phase 1: 采样（可用任何求解器！）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> each prompt c:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        生成 G 个输出 &#123;o_i&#125; </span><span style="color:#383A42;--shiki-dark:#56B6C2">~</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> π_&#123;θ_old&#125;(·</span><span style="color:#383A42;--shiki-dark:#56B6C2">|</span><span style="color:#383A42;--shiki-dark:#ABB2BF">c)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 使用 DPM-Solver++ ODE</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 组内共享 + 分层采样时间步-噪声对</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        &#123;(t_j, ε_j)&#125; ← </span><span style="color:#383A42;--shiki-dark:#61AFEF">stratified_sample</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#D19A66">N_MC</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 共享！</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 计算 ELBO 代理（用 θ_old）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">        for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> each o_i:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#61AFEF">            L̂</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ_old </span><span style="color:#383A42;--shiki-dark:#56B6C2">|</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> o_i, c) = mean_j[ </span><span style="color:#383A42;--shiki-dark:#61AFEF">adaptive_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ_old, o_i, t_j, ε_j) ]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 计算奖励和优势</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        R_i = </span><span style="color:#383A42;--shiki-dark:#61AFEF">reward_model</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(o_i, c)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        A_i = </span><span style="color:#383A42;--shiki-dark:#61AFEF">normalize</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(R_i)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        A_i</span><span style="color:#383A42;--shiki-dark:#56B6C2">^</span><span style="color:#383A42;--shiki-dark:#ABB2BF">soft = η · </span><span style="color:#383A42;--shiki-dark:#61AFEF">tanh</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(A_i </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> η)  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 软裁剪</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # Phase 2: 梯度更新（N 步）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    for</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> gradient_step </span><span style="color:#A626A4;--shiki-dark:#C678DD">in</span><span style="color:#0184BC;--shiki-dark:#56B6C2"> range</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(N):</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        sample batch </span><span style="color:#A626A4;--shiki-dark:#C678DD">from</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> collected data</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 用当前 θ 重算 ELBO 代理</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#61AFEF">        L̂</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ </span><span style="color:#383A42;--shiki-dark:#56B6C2">|</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> o_i, c) = mean_j[ </span><span style="color:#383A42;--shiki-dark:#61AFEF">adaptive_loss</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ, o_i, t_j, ε_j) ]</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # importance ratio</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ρ_i = </span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#61AFEF">L̂</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ </span><span style="color:#383A42;--shiki-dark:#56B6C2">|</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> o_i, c) </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#61AFEF"> L̂</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ_old </span><span style="color:#383A42;--shiki-dark:#56B6C2">|</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> o_i, c))</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # PPO 裁剪目标</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        J = </span><span style="color:#0184BC;--shiki-dark:#56B6C2">min</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ρ_i · A_i</span><span style="color:#383A42;--shiki-dark:#56B6C2">^</span><span style="color:#383A42;--shiki-dark:#ABB2BF">soft, </span><span style="color:#383A42;--shiki-dark:#61AFEF">clip</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ρ_i, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF">ε, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF">ε) · A_i</span><span style="color:#383A42;--shiki-dark:#56B6C2">^</span><span style="color:#383A42;--shiki-dark:#ABB2BF">soft)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # KL 惩罚（可选）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#D19A66">        KL</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> = </span><span style="color:#50A14F;--shiki-dark:#FFFFFF">||</span><span style="color:#383A42;--shiki-dark:#61AFEF">x_θ</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(z_t) </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> x_&#123;θ_old&#125;(z_t)</span><span style="color:#50A14F;--shiki-dark:#FFFFFF">||</span><span style="color:#383A42;--shiki-dark:#ABB2BF">²</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">        # 更新</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        θ ← </span><span style="color:#383A42;--shiki-dark:#61AFEF">optimizer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(θ, ∇</span><span style="color:#383A42;--shiki-dark:#61AFEF">_θ</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(J </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> β·</span><span style="color:#383A42;--shiki-dark:#D19A66">KL</span><span style="color:#383A42;--shiki-dark:#ABB2BF">))</span></span></code></pre></div>
+<p><strong>注意 Phase 1 中的采样可以使用 DPM-Solver++ 等高阶 ODE
+求解器</strong>——这是 V-GRPO
+解耦优化与采样后获得的重大收益。虽然使用更高效的采样器意味着无法复用
+rollout 时的模型预测来计算 importance ratio（因为 ODE
+采样的轨迹中间状态与 ELBO 代理需要的 <span class="math inline">\((t_j,
+\epsilon_j)\)</span> 不对应），但 ELBO 代理只需要在最终输出 <span
+class="math inline">\(o_i\)</span> 上额外做 <span
+class="math inline">\(N_\text{MC}\)</span>
+次前向传播即可，总体仍然高效。</p>
+<hr />
+<h1 id="实验结果">实验结果</h1>
+<h2 id="flux.1-dev-主实验">FLUX.1-dev 主实验</h2>
+<p>V-GRPO 在 FLUX.1-dev 上训练 300 个 iteration，使用
+HPSv2.1、PickScore、ImageReward、UnifiedReward 四个奖励函数的组合。</p>
+<p><strong>Table 2：FLUX.1-dev 多奖励实验详细结果</strong>（所有方法训练
+300 步）</p>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">方法</th>
+<th style="text-align: center;">NFE<span
+class="math inline">\(_{\pi_{\theta_\text{old}}}\)</span></th>
+<th style="text-align: center;">NFE<span
+class="math inline">\(_{\pi_\theta}\)</span></th>
+<th style="text-align: center;">HPS-v2.1</th>
+<th style="text-align: center;">PickScore</th>
+<th style="text-align: center;">ImageReward</th>
+<th style="text-align: center;">UnifiedReward</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">FLUX.1-dev 基线</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">0.313</td>
+<td style="text-align: center;">0.227</td>
+<td style="text-align: center;">1.088</td>
+<td style="text-align: center;">3.370</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ DanceGRPO</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">0.334</td>
+<td style="text-align: center;">0.225</td>
+<td style="text-align: center;">1.335</td>
+<td style="text-align: center;">3.374</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ BranchGRPO</td>
+<td style="text-align: center;">13.68</td>
+<td style="text-align: center;">13.68</td>
+<td style="text-align: center;">0.363</td>
+<td style="text-align: center;">0.229</td>
+<td style="text-align: center;">1.603</td>
+<td style="text-align: center;">3.386</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ MixGRPO</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">0.367</td>
+<td style="text-align: center;">0.237</td>
+<td style="text-align: center;">1.629</td>
+<td style="text-align: center;">3.418</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ <strong>V-GRPO</strong></td>
+<td style="text-align: center;">16 + 4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>0.372</strong></td>
+<td style="text-align: center;"><strong>0.241</strong></td>
+<td style="text-align: center;"><strong>1.731</strong></td>
+<td style="text-align: center;"><strong>3.437</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>V-GRPO 在全部四个奖励指标上均超越所有基线。与 DanceGRPO
+相比，ImageReward 提升 30%（1.335→1.731）。</p>
+</blockquote>
+<p>关键结果：</p>
+<ul>
+<li>V-GRPO 在<strong>所有四个奖励指标上均超越所有基线方法</strong></li>
+<li>比 MixGRPO <strong>快 2 倍</strong>（150 个 iteration 即超越 MixGRPO
+300 个 iteration 的性能）</li>
+<li>与 DanceGRPO（NFE=25）相比，ImageReward 提升 30%（1.335→1.731）</li>
+</ul>
+<p><img src="/chengYi-xun/img/vgrpo_fig3.png"
+alt="Fig. 3：FLUX.1-dev 定性对比。V-GRPO 在对齐度、连贯性和风格上均优于 DanceGRPO 和 MixGRPO，且展示了强大的文字渲染能力（摘自 Tang et al., arXiv:2604.23380 图 3）" /></p>
+<p><img src="/chengYi-xun/img/vgrpo_fig7.png"
+alt="Fig. 7：更多 FLUX.1-dev 定性样本。V-GRPO 在复杂 prompt（如&quot;四个水槽&quot;、&quot;浣熊骑狐狸&quot;）上展示了更强的世界知识和构图能力（摘自 Tang et al., arXiv:2604.23380 图 7）" /></p>
+<h2 id="sd-3.5-m-多阶段实验">SD 3.5 M 多阶段实验</h2>
+<p>SD 3.5 M 采用 DiffusionNFT 的五阶段训练课程（GenEval → OCR →
+人类偏好），运行 580 次梯度更新。</p>
+<p><strong>Table 3：SD 3.5 M 多阶段多奖励实验详细结果</strong></p>
+<table>
+<colgroup>
+<col style="width: 9%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">方法</th>
+<th style="text-align: center;">步数</th>
+<th style="text-align: center;">GenEval</th>
+<th style="text-align: center;">OCR</th>
+<th style="text-align: center;">PickScore</th>
+<th style="text-align: center;">HPSv2.1</th>
+<th style="text-align: center;">Aesthetics</th>
+<th style="text-align: center;">ImgRwd</th>
+<th style="text-align: center;">UniRwd</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">SD 3.5 M (w/o CFG)</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">0.24</td>
+<td style="text-align: center;">0.12</td>
+<td style="text-align: center;">0.2051</td>
+<td style="text-align: center;">0.204</td>
+<td style="text-align: center;">5.13</td>
+<td style="text-align: center;">-0.58</td>
+<td style="text-align: center;">2.02</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ CFG</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">0.63</td>
+<td style="text-align: center;">0.59</td>
+<td style="text-align: center;">0.2234</td>
+<td style="text-align: center;">0.279</td>
+<td style="text-align: center;">5.36</td>
+<td style="text-align: center;">0.85</td>
+<td style="text-align: center;">3.03</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ FlowGRPO</td>
+<td style="text-align: center;">&gt;5K</td>
+<td style="text-align: center;">0.95</td>
+<td style="text-align: center;">0.66</td>
+<td style="text-align: center;">0.2251</td>
+<td style="text-align: center;">0.274</td>
+<td style="text-align: center;">5.32</td>
+<td style="text-align: center;">1.06</td>
+<td style="text-align: center;">3.18</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">+ DiffusionNFT</td>
+<td style="text-align: center;">1.7K</td>
+<td style="text-align: center;"><strong>0.94</strong></td>
+<td style="text-align: center;"><strong>0.91</strong></td>
+<td style="text-align: center;">0.2380</td>
+<td style="text-align: center;">0.331</td>
+<td style="text-align: center;">6.01</td>
+<td style="text-align: center;">1.49</td>
+<td style="text-align: center;"><strong>3.49</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">+ <strong>V-GRPO</strong></td>
+<td style="text-align: center;"><strong>580</strong></td>
+<td style="text-align: center;">0.91</td>
+<td style="text-align: center;"><strong>0.91</strong></td>
+<td style="text-align: center;">0.2350</td>
+<td style="text-align: center;"><strong>0.341</strong></td>
+<td style="text-align: center;"><strong>6.02</strong></td>
+<td style="text-align: center;"><strong>1.52</strong></td>
+<td style="text-align: center;">3.43</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>V-GRPO 仅用 580 步即匹配 DiffusionNFT 1700 步的性能，同时在 HPSv2.1
+和 ImageReward 上反超。</p>
+</blockquote>
+<p><img src="/chengYi-xun/img/vgrpo_fig8.png"
+alt="Fig. 8：SD 3.5 M 定性对比。V-GRPO 在涂鸦文字渲染（&quot;Street Art Rules&quot;、&quot;Google Research Pizza Cafe&quot;）和语义对齐上表现优异（摘自 Tang et al., arXiv:2604.23380 图 8）" /></p>
+<p>关键结果：</p>
+<ul>
+<li>V-GRPO <strong>匹配 DiffusionNFT 的性能</strong></li>
+<li>梯度步数仅为 DiffusionNFT 的 <strong>1/3</strong>（580 vs
+1700）</li>
+<li>平均 NFE 仅 53.8（DiffusionNFT 为 120）</li>
+</ul>
+<p><strong>Table 5：SD 3.5 M 各训练阶段的步数与 NFE 对比</strong></p>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">训练阶段</th>
+<th style="text-align: center;">DiffusionNFT 步数</th>
+<th style="text-align: center;">DiffusionNFT NFE</th>
+<th style="text-align: center;">V-GRPO 步数</th>
+<th style="text-align: center;">V-GRPO NFE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Stage 1（人类偏好）</td>
+<td style="text-align: center;">~800</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>150</strong></td>
+<td style="text-align: center;">48</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Stage 2（GenEval）</td>
+<td style="text-align: center;">~300</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>200</strong></td>
+<td style="text-align: center;">60</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Stage 3（人类偏好）</td>
+<td style="text-align: center;">~200</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>150</strong></td>
+<td style="text-align: center;">48</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Stage 4（GenEval）</td>
+<td style="text-align: center;">~200</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>50</strong></td>
+<td style="text-align: center;">60</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Stage 5（OCR）</td>
+<td style="text-align: center;">~100</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>30</strong></td>
+<td style="text-align: center;">60</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>总计</strong></td>
+<td style="text-align: center;"><strong>~1700</strong></td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;"><strong>580</strong></td>
+<td style="text-align: center;">53.8</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>DiffusionNFT 各阶段步数为近似值（因使用了 early stopping），V-GRPO
+为精确值。V-GRPO 实现了 <strong>3× 训练加速</strong>，同时平均每步的 NFE
+也更低（53.8 vs 120）。</p>
+</blockquote>
+<h2 id="消融实验">消融实验</h2>
+<p><img src="/chengYi-xun/img/vgrpo_fig5_fig6.png"
+alt="Fig. 5 &amp; 6：(左) SD 3.5 M 上的方差缩减消融——单个组件移除影响有限，但 naive baseline 严重不稳定；(右) 预测参数化对比——\epsilon-prediction 导致崩溃，x-prediction 最优（摘自 Tang et al., arXiv:2604.23380 图 5-6）" /></p>
+<p><strong>方差缩减技术的消融</strong>（Fig. 4a）： 在 FLUX.1-dev
+上，去掉任何一个方差缩减技术都会导致训练不稳定或性能下降。Naive
+baseline（不用任何技术）直接训练崩溃。</p>
+<p><strong><span class="math inline">\(N_\text{MC}\)</span>
+的敏感性</strong>（Fig. 4f）： <span class="math inline">\(N_\text{MC} =
+2\)</span> 时收敛困难，<span class="math inline">\(N_\text{MC} =
+4\)</span> 是性能与效率的最佳平衡点，<span
+class="math inline">\(N_\text{MC} = 8\)</span> 仅有边际提升。这与 MDP
+路线中"优化步数"的饱和效应一致。</p>
+<p><strong>预测参数化</strong>（Fig. 6）： <span
+class="math inline">\(\epsilon\)</span>-prediction 导致训练崩溃，<span
+class="math inline">\(v\)</span>-prediction 稳定但收敛稍慢，<span
+class="math inline">\(x\)</span>-prediction 表现最优。</p>
+<hr />
+<h1 id="v-grpo-的代码实现解析">V-GRPO 的代码实现解析</h1>
+<p>V-GRPO 的代码实现基于 <a
+target="_blank" rel="noopener" href="https://github.com/hao-ai-lab/FastVideo">FastVideo</a>
+框架。以下是核心函数 <code>calc_surrogate</code> 的完整解析，它计算 ELBO
+代理值：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">def</span><span style="color:#4078F2;--shiki-dark:#61AFEF"> calc_surrogate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">args</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-dark:#ABB2BF"> ..., </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic">latents</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> noise</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#D19A66;--shiki-dark-font-style:italic"> sigmas</span><span style="color:#383A42;--shiki-dark:#ABB2BF">):</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    计算 ELBO 代理值。</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    </span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    参数:</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">      latents: 最终输出 o_i 的 latent 表示 (B, seq, hidden)</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">      noise:   采样的噪声 ε_j (B, seq, hidden)</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">      sigmas:  采样的时间步 t_j (B,)</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    </span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    返回:</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">      surrogate: 代理值 (B,)，越大表示 likelihood 越高</span></span>
+<span class="line"><span style="color:#50A14F;--shiki-dark:#98C379">    """</span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 构造加噪 latent: z_t = (1-t)·o_i + t·ε</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    while</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas.ndim </span><span style="color:#383A42;--shiki-dark:#56B6C2">&#x3C;</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents.ndim:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas.</span><span style="color:#383A42;--shiki-dark:#61AFEF">unsqueeze</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    noisy_latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> (</span><span style="color:#986801;--shiki-dark:#D19A66">1.0</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas) </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noise</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 模型前向传播（预测速度场 v_θ）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    model_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> transformer</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">hidden_states</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF">noisy_latents, </span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # x-prediction 重参数化: x̂_0 = z_t - t·v_θ</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    x0_pred </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> noisy_latents </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sigmas </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> model_pred</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # L2 损失（取负号，因为 ELBO 是 likelihood 的下界）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        ((x0_pred.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">()) </span><span style="color:#383A42;--shiki-dark:#56B6C2">**</span><span style="color:#986801;--shiki-dark:#D19A66"> 2</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            .</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noise.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">], </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">),</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">        dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">    # 自归一化（stop-gradient）</span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    if</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> args.self_normalize:</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> surrogate </span><span style="color:#383A42;--shiki-dark:#56B6C2">/</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">abs</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                (x0_pred.</span><span style="color:#383A42;--shiki-dark:#61AFEF">detach</span><span style="color:#383A42;--shiki-dark:#ABB2BF">().</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">() </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> latents.</span><span style="color:#383A42;--shiki-dark:#61AFEF">float</span><span style="color:#383A42;--shiki-dark:#ABB2BF">())</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">                    .</span><span style="color:#383A42;--shiki-dark:#61AFEF">reshape</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(noise.shape[</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">], </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">            ),</span></span>
+<span class="line"><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">            dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">        )</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    </span></span>
+<span class="line"><span style="color:#A626A4;--shiki-dark:#C678DD">    return</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> surrogate  </span><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># (B,)</span></span></code></pre></div>
+<p>训练主循环中的 importance ratio 计算：</p>
+<div class="shiki-container"><div class="shiki-lang-label">python</div><button class="shiki-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)">Copy</button><pre class="shiki shiki-themes one-light one-dark-pro" style="background-color:#FAFAFA;--shiki-dark-bg:#282c34;color:#383A42;--shiki-dark:#abb2bf" tabindex="0"><code><span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 用当前策略 θ 计算新的代理值</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">pred, new_surrogates </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#61AFEF"> calc_surrogate</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    args, transformer, </span><span style="color:#383A42;--shiki-dark:#D19A66">...</span><span style="color:#383A42;--shiki-dark:#ABB2BF">,</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sample[</span><span style="color:#50A14F;--shiki-dark:#98C379">"latents"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">repeat_interleave</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#383A42;--shiki-dark:#D19A66">N_MC</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">),</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sample[</span><span style="color:#50A14F;--shiki-dark:#98C379">"noise"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">),</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">    sample[</span><span style="color:#50A14F;--shiki-dark:#98C379">"sigmas"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].</span><span style="color:#383A42;--shiki-dark:#61AFEF">flatten</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-dark:#D19A66">0</span><span style="color:#383A42;--shiki-dark:#ABB2BF">, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">),</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">new_surrogates </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> new_surrogates.</span><span style="color:#383A42;--shiki-dark:#61AFEF">view</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(*sample[</span><span style="color:#50A14F;--shiki-dark:#98C379">"log_probs"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">].shape)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># 已存储的 θ_old 代理值</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">old_surrogates </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> sample[</span><span style="color:#50A14F;--shiki-dark:#98C379">"log_probs"</span><span style="color:#383A42;--shiki-dark:#ABB2BF">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># importance ratio（对 N_MC 个时间步取平均后再 exp）</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">ratio </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">exp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(new_surrogates.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">) </span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> old_surrogates.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(</span><span style="color:#986801;--shiki-light-font-style:inherit;--shiki-dark:#E06C75;--shiki-dark-font-style:italic">dim</span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#ABB2BF">))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic"># PPO 裁剪</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">unclipped_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> ratio</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">clipped_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#56B6C2"> -</span><span style="color:#383A42;--shiki-dark:#ABB2BF">advantages </span><span style="color:#383A42;--shiki-dark:#56B6C2">*</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">clamp</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(ratio, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2">-</span><span style="color:#383A42;--shiki-dark:#ABB2BF">ε, </span><span style="color:#986801;--shiki-dark:#D19A66">1</span><span style="color:#383A42;--shiki-dark:#56B6C2">+</span><span style="color:#383A42;--shiki-dark:#ABB2BF">ε)</span></span>
+<span class="line"><span style="color:#383A42;--shiki-dark:#ABB2BF">policy_loss </span><span style="color:#383A42;--shiki-dark:#56B6C2">=</span><span style="color:#383A42;--shiki-dark:#ABB2BF"> torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">mean</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(torch.</span><span style="color:#383A42;--shiki-dark:#61AFEF">maximum</span><span style="color:#383A42;--shiki-dark:#ABB2BF">(unclipped_loss, clipped_loss))</span></span></code></pre></div>
+<div class="note warning no-icon flat"><p><strong>与 MDP 路线代码的最大差异</strong></p>
+<p>对比 Flow-GRPO 的 <code>flow_grpo_step</code> 函数（需要 Score
+估计、SDE 采样、逐步高斯 log-prob 累加），V-GRPO 的
+<code>calc_surrogate</code> 极其简洁：</p>
+<ol type="1">
+<li>对最终输出 <span class="math inline">\(o_i\)</span> 加噪 →
+模型前向传播 → 计算 MSE → 得到代理值</li>
+<li>无需 Score Function、无需 SDE 转换、无需逐步累加</li>
+<li>整个流程与预训练时的损失计算几乎完全一致</li>
+</ol>
+<p>这就是 V-GRPO 论文标题所说的 "Easier than You Think" 的含义。</p>
+</div>
+<hr />
+<h1 id="技术演进总结从-mdp-到-elbo">技术演进总结：从 MDP 到 ELBO</h1>
+<p>回顾整个系列的技术脉络，V-GRPO 代表了扩散模型在线 RL
+的一次范式转换：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">维度</th>
+<th style="text-align: left;">MDP 路线</th>
+<th style="text-align: left;">ELBO 路线 (V-GRPO)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>代表方法</strong></td>
+<td style="text-align: left;">Flow-GRPO → DanceGRPO → MixGRPO →
+BranchGRPO</td>
+<td style="text-align: left;"><strong>V-GRPO</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong><span
+class="math inline">\(\log\pi_\theta\)</span> 获取</strong></td>
+<td style="text-align: left;">SDE 转移核逐步累加</td>
+<td style="text-align: left;">预训练损失（ELBO 代理）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>采样器</strong></td>
+<td style="text-align: left;">限于一阶 SDE</td>
+<td style="text-align: left;">任意（ODE/高阶求解器）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>优化-采样耦合</strong></td>
+<td style="text-align: left;">紧密耦合</td>
+<td style="text-align: left;">完全解耦</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>实现复杂度</strong></td>
+<td style="text-align: left;">高（Score、SDE、窗口调度）</td>
+<td style="text-align: left;"><strong>低（仅需预训练损失）</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>FLUX.1-dev 收敛</strong></td>
+<td style="text-align: left;">300 iter (MixGRPO)</td>
+<td style="text-align: left;"><strong>150 iter</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>SD 3.5 M 梯度步</strong></td>
+<td style="text-align: left;">1700 (DiffusionNFT)</td>
+<td style="text-align: left;"><strong>580</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>与预训练的一致性</strong></td>
+<td style="text-align: left;">不一致（改用 SDE）</td>
+<td style="text-align: left;"><strong>完全一致</strong></td>
+</tr>
+</tbody>
+</table>
+<p>V-GRPO 的结果有力地证明：<strong>ELBO
+路线不是二等公民</strong>。之前的失败不是方法本身的缺陷，而是没有做好方差控制。当
+ELBO 代理的方差被正确缩减后，它在简洁性、效率和性能上全面超越复杂的 MDP
+方法，有望成为去噪生成模型后训练的新默认方案。</p>
+<hr />
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li>Tang, B., Zhang, Y., Wang, X., Mao, J., Schmidt, L., &amp;
+Yeung-Levy, S. (2026). <em>V-GRPO: Online Reinforcement Learning for
+Denoising Generative Models Is Easier than You Think</em>.
+arXiv:2604.23380.</li>
+<li>Liu, J., et al. (2025). <em>Flow-GRPO: Training Flow Matching Models
+via Online RL</em>. arXiv:2505.05470.</li>
+<li>Li, J., et al. (2025). <em>MixGRPO: Unlocking Flow-based GRPO
+Efficiency with Mixed ODE-SDE</em>. arXiv:2507.21802.</li>
+<li>Zheng, K., et al. (2025). <em>DiffusionNFT: Online Diffusion
+Reinforcement with Forward Process</em>. arXiv:2509.16117.</li>
+</ol>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/60-v-grpo/">https://chengyi-xun.github.io/chengYi-xun/posts/60-v-grpo/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Flow-Matching/">Flow Matching</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-full"><a href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</div></div></a></div><div><a href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-20</div><div class="title">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div><div><a href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%80%E5%8F%A5%E8%AF%9D%E7%90%86%E8%A7%A3-v-grpo"><span class="toc-number">1.</span> <span class="toc-text">一句话理解 V-GRPO</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81-v-grpomdp-%E8%B7%AF%E7%BA%BF%E7%9A%84%E5%9B%B0%E5%A2%83"><span class="toc-number">2.</span> <span class="toc-text">为什么需要 V-GRPO：MDP
+路线的困境</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#v-grpo-%E7%9A%84%E7%90%86%E8%AE%BA%E6%A1%86%E6%9E%B6"><span class="toc-number">3.</span> <span class="toc-text">V-GRPO 的理论框架</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%8E-elbo-%E5%88%B0-likelihood-%E4%BB%A3%E7%90%86"><span class="toc-number">3.1.</span> <span class="toc-text">从 ELBO 到 likelihood 代理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E7%9B%B4%E6%8E%A5%E7%94%A8-elbo-%E4%BB%A3%E7%90%86%E4%BC%9A%E5%A4%B1%E8%B4%A5"><span class="toc-number">3.2.</span> <span class="toc-text">为什么直接用 ELBO 代理会失败</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%89%E4%B8%AA%E6%96%B9%E5%B7%AE%E7%BC%A9%E5%87%8F%E6%8A%80%E6%9C%AF%E8%AE%A9-elbo-%E4%BB%A3%E7%90%86%E5%8F%98%E5%BE%97%E7%A8%B3%E5%AE%9A"><span class="toc-number">4.</span> <span class="toc-text">三个方差缩减技术：让 ELBO
+代理变得稳定</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%84%E5%86%85%E5%85%B1%E4%BA%AB%E6%97%B6%E9%97%B4%E6%AD%A5-%E5%99%AA%E5%A3%B0%E5%AF%B9group-shared-timestep-noise-pairs"><span class="toc-number">4.1.</span> <span class="toc-text">1.
+组内共享时间步-噪声对（Group-Shared Timestep-Noise Pairs）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%86%E5%B1%82%E6%97%B6%E9%97%B4%E6%AD%A5%E9%87%87%E6%A0%B7stratified-timestep-sampling"><span class="toc-number">4.2.</span> <span class="toc-text">2.
+分层时间步采样（Stratified Timestep Sampling）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%87%AA%E9%80%82%E5%BA%94%E6%8D%9F%E5%A4%B1%E5%8A%A0%E6%9D%83adaptive-loss-weighting"><span class="toc-number">4.3.</span> <span class="toc-text">3.
+自适应损失加权（Adaptive Loss Weighting）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%89%E4%B8%AA%E6%A2%AF%E5%BA%A6%E6%AD%A5%E8%B0%83%E8%8A%82%E6%8A%80%E6%9C%AF%E6%8E%A7%E5%88%B6%E7%AD%96%E7%95%A5%E6%9B%B4%E6%96%B0%E5%B9%85%E5%BA%A6"><span class="toc-number">5.</span> <span class="toc-text">三个梯度步调节技术：控制策略更新幅度</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%87%8D%E8%A6%81%E6%80%A7%E6%AF%94%E7%8E%87%E8%A3%81%E5%89%AAimportance-ratio-clipping"><span class="toc-number">5.1.</span> <span class="toc-text">1.
+重要性比率裁剪（Importance Ratio Clipping）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#kl-%E6%83%A9%E7%BD%9Akl-penalty"><span class="toc-number">5.2.</span> <span class="toc-text">2. KL 惩罚（KL Penalty）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BC%98%E5%8A%BF%E8%BD%AF%E8%A3%81%E5%89%AAadvantage-soft-clipping"><span class="toc-number">5.3.</span> <span class="toc-text">3. 优势软裁剪（Advantage
+Soft-Clipping）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E7%AE%97%E6%B3%95%E6%B5%81%E7%A8%8B"><span class="toc-number">6.</span> <span class="toc-text">完整算法流程</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%AE%9E%E9%AA%8C%E7%BB%93%E6%9E%9C"><span class="toc-number">7.</span> <span class="toc-text">实验结果</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#flux.1-dev-%E4%B8%BB%E5%AE%9E%E9%AA%8C"><span class="toc-number">7.1.</span> <span class="toc-text">FLUX.1-dev 主实验</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#sd-3.5-m-%E5%A4%9A%E9%98%B6%E6%AE%B5%E5%AE%9E%E9%AA%8C"><span class="toc-number">7.2.</span> <span class="toc-text">SD 3.5 M 多阶段实验</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%B6%88%E8%9E%8D%E5%AE%9E%E9%AA%8C"><span class="toc-number">7.3.</span> <span class="toc-text">消融实验</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#v-grpo-%E7%9A%84%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0%E8%A7%A3%E6%9E%90"><span class="toc-number">8.</span> <span class="toc-text">V-GRPO 的代码实现解析</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%8A%80%E6%9C%AF%E6%BC%94%E8%BF%9B%E6%80%BB%E7%BB%93%E4%BB%8E-mdp-%E5%88%B0-elbo"><span class="toc-number">9.</span> <span class="toc-text">技术演进总结：从 MDP 到 ELBO</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-reinforce-ac/" title="笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic">笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic</a><time datetime="2025-08-16T03:00:00.000Z" title="发表于 2025-08-16 11:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js?v=4.10.0-b1"></script><script src="/chengYi-xun/js/main.js?v=4.10.0-b1"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/60-v-grpo/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/60-v-grpo/',
+      title: '笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

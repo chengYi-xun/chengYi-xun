@@ -1,0 +1,666 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026） | 牛大帅的个人博客</title><meta name="author" content="牛大帅"><meta name="copyright" content="牛大帅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文为 RL 系列的图像生成篇。在第五篇中我们介绍了 Flow-GRPO，将 GRPO 应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进 SuperFlow，以及 2026 年图像&#x2F;视频生成 RL 的统一框架生态，最后回顾整个系列的完整技术脉络。 ⬅️ 上一篇：笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT ➡️ 下一篇：笔">
+<meta property="og:type" content="article">
+<meta property="og:title" content="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">
+<meta property="og:url" content="https://chengyi-xun.github.io/chengYi-xun/posts/58-superflow/index.html">
+<meta property="og:site_name" content="牛大帅的个人博客">
+<meta property="og:description" content="本文为 RL 系列的图像生成篇。在第五篇中我们介绍了 Flow-GRPO，将 GRPO 应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进 SuperFlow，以及 2026 年图像&#x2F;视频生成 RL 的统一框架生态，最后回顾整个系列的完整技术脉络。 ⬅️ 上一篇：笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT ➡️ 下一篇：笔">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png">
+<meta property="article:published_time" content="2026-04-05T06:00:00.000Z">
+<meta property="article:modified_time" content="2026-06-22T06:28:40.598Z">
+<meta property="article:author" content="牛大帅">
+<meta property="article:tag" content="Deep learning">
+<meta property="article:tag" content="Generative models theory">
+<meta property="article:tag" content="Reinforcement Learning">
+<meta property="article:tag" content="Flow Matching">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://chengyi-xun.github.io/chengYi-xun/img/avatar.png"><link rel="shortcut icon" href="/chengYi-xun/img/favicon64x64.png"><link rel="canonical" href="https://chengyi-xun.github.io/chengYi-xun/posts/58-superflow/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/chengYi-xun/css/index.css?v=4.10.0-b1"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/chengYi-xun/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.10.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-06-22 14:28:40'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+          const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+          const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+          if (t === undefined) {
+            if (isLightMode) activateLightMode()
+            else if (isDarkMode) activateDarkMode()
+            else if (isNotSpecified || hasNoSupport) {
+              const now = new Date()
+              const hour = now.getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addListener(e => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else if (t === 'light') activateLightMode()
+          else activateDarkMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><!-- hexo injector head_end start -->
+    <style>
+      .shiki-container {
+        position: relative;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .shiki-container pre.shiki {
+        margin: 0;
+        padding: 1.2rem 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .shiki-container pre.shiki code {
+        counter-reset: step;
+        counter-increment: step 0;
+      }
+      .shiki-container pre.shiki code .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1.5rem;
+        margin-right: 1rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115,138,148,.4);
+        user-select: none;
+      }
+      .shiki-lang-label {
+        position: absolute;
+        top: 6px;
+        right: 70px;
+        font-size: 0.75rem;
+        color: rgba(150,150,150,.8);
+        text-transform: uppercase;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .shiki-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid rgba(150,150,150,.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,.1);
+        color: rgba(150,150,150,.8);
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 1;
+      }
+      .shiki-container:hover .shiki-copy-btn { opacity: 1; }
+      .shiki-copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+      
+        [data-theme="dark"] .shiki,
+        [data-theme="dark"] .shiki span {
+          color: var(--shiki-dark) !important;
+          background-color: var(--shiki-dark-bg) !important;
+          font-style: var(--shiki-dark-font-style) !important;
+          font-weight: var(--shiki-dark-font-weight) !important;
+          text-decoration: var(--shiki-dark-text-decoration) !important;
+        }
+        @media (prefers-color-scheme: dark) {
+          .shiki,
+          .shiki span {
+            color: var(--shiki-dark) !important;
+            background-color: var(--shiki-dark-bg) !important;
+            font-style: var(--shiki-dark-font-style) !important;
+            font-weight: var(--shiki-dark-font-weight) !important;
+            text-decoration: var(--shiki-dark-text-decoration) !important;
+          }
+        }
+      
+    </style>
+  <!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/chengYi-xun/atom.xml" title="牛大帅的个人博客" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/chengYi-xun/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/chengYi-xun/img/top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/chengYi-xun/" title="牛大帅的个人博客"><span class="site-name">牛大帅的个人博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/chengYi-xun/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/chengYi-xun/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-06-22T06:28:40.598Z" title="更新于 2026-06-22 14:28:40">2026-06-22</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/chengYi-xun/categories/Notes/">Notes</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><blockquote>
+<p>本文为 RL 系列的图像生成篇。在第五篇中我们介绍了 Flow-GRPO，将 GRPO
+应用于基于 Flow Matching 的图像生成。本文将介绍其后续改进
+SuperFlow，以及 2026 年图像/视频生成 RL
+的统一框架生态，最后回顾整个系列的完整技术脉络。</p>
+<p>⬅️ 上一篇：<a
+href="/chengYi-xun/posts/57-grpo-variants/">笔记｜强化学习（七）：GRPO
+的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a></p>
+<p>➡️ 下一篇：<a
+href="/chengYi-xun/posts/59-dance-mix-grpo/">笔记｜强化学习（九）：DanceGRPO
+与 MixGRPO——视觉生成 GRPO 的扩展与加速</a></p>
+</blockquote>
+<blockquote>
+<p>论文：<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2512.17951">SuperFlow: Training
+Flow Matching Models with RL on the Fly</a>（2025.12, revised
+2026.01）</p>
+</blockquote>
+<h1 id="flow-grpo-的三个遗留问题">Flow-GRPO 的三个遗留问题</h1>
+<p><strong>延续之前"橘猫坐在蓝色沙发上"的例子。</strong> Flow-GRPO
+的做法是：对每个 Prompt 生成 <span class="math inline">\(G\)</span>
+张图像，用奖励模型打分，算出组内相对优势，然后用策略梯度更新模型。这个流程在大规模训练时暴露出三个问题：</p>
+<p><strong>问题一：固定组大小导致计算浪费。</strong> 所有 Prompt
+都生成固定 <span class="math inline">\(G = 16\)</span>
+张图，但太简单（16 张全满分）或太难（16 张全低分）的题目，组内方差 <span
+class="math inline">\(\sigma_R \approx 0\)</span>，优势值全为 0，梯度为
+0——模型完全没有更新，而图像生成的 50 步 SDE 求解已白白消耗了昂贵的 GPU
+算力。</p>
+<p><strong>问题二：轨迹级优势的"一刀切"。</strong> Flow-GRPO
+将最终奖励<strong>平均分配给去噪的每一步</strong>，但前期（定构图，<span
+class="math inline">\(\sigma_t\)</span> 大）和后期（修细节，<span
+class="math inline">\(\sigma_t\)</span>
+小）对最终结果的贡献天差地别。这是经典的<strong>信用分配（Credit
+Assignment）</strong>问题。</p>
+<p><strong>问题三：训练后期的"躺平"。</strong>
+后期模型能力整体提升，对同一 Prompt
+生成的图都很完美，组内方差再次趋零，优势信号消失，训练停滞甚至崩溃。</p>
+<hr />
+<h1 id="superflow-的三项改进">SuperFlow 的三项改进</h1>
+<p><img src="/chengYi-xun/img/superflow_overview.png"
+alt="SuperFlow 概览：方差感知组采样（左）与沿去噪路径的步级优势重估计（右）（摘自 SuperFlow, arXiv:2512.17951 图 1）" /></p>
+<h2
+id="改进一方差感知的动态采样把算力花在刀刃上">改进一：方差感知的动态采样（把算力花在刀刃上）</h2>
+<p><strong>核心思路：用 Beta 分布追踪每个 Prompt
+的历史得分率，据此动态分配算力。</strong></p>
+<p>SuperFlow 为每个 Prompt <span class="math inline">\(c\)</span>
+维护两个计数器——<span
+class="math inline">\(\alpha(c)\)</span>（累积成功次数）和 <span
+class="math inline">\(\beta(c)\)</span>（累积失败次数），用带遗忘因子
+<span class="math inline">\(\rho\)</span>
+的指数滑动平均更新（确保反映模型<strong>当前</strong>水平而非历史包袱）：</p>
+<p><span class="math display">\[
+\alpha \leftarrow \rho \cdot \alpha + r, \quad \beta \leftarrow \rho
+\cdot \beta + (1 - r)
+\]</span></p>
+<p>其中 <span class="math inline">\(r \in [0,1]\)</span>
+是归一化后的奖励（连续奖励被拆分为"<span
+class="math inline">\(r\)</span> 次成功"和"<span
+class="math inline">\(1-r\)</span> 次失败"）。历史平均得分率为 <span
+class="math inline">\(\hat{v}(c) = \frac{\alpha}{\alpha +
+\beta}\)</span>。</p>
+<p><strong>不确定性 →
+动态算力分配</strong>：将不确定性定义为伯努利标准差 <span
+class="math inline">\(w(c) \propto \sqrt{\hat{v}(c)(1 - \hat{v}(c)) +
+\epsilon}\)</span>，然后按 <span class="math inline">\(w(c)\)</span>
+分级分配组大小：</p>
+<ul>
+<li><span class="math inline">\(\hat{v}(c) \approx
+0.5\)</span>（半会半不会）→ <span class="math inline">\(w(c)\)</span>
+最大 → 分配<strong>最多的 rollout</strong>，重点训练</li>
+<li><span class="math inline">\(\hat{v}(c) \approx 0\)</span> 或 <span
+class="math inline">\(1\)</span>（太难或太简单）→ <span
+class="math inline">\(w(c)\)</span> 极小 → <strong>缩减
+rollout</strong>，节省算力</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Prompt</th>
+<th style="text-align: center;">历史得分率 <span
+class="math inline">\(\hat{v}(c)\)</span></th>
+<th style="text-align: center;">不确定性 <span
+class="math inline">\(w(c)\)</span></th>
+<th style="text-align: center;">组大小 <span
+class="math inline">\(m(c)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">"一只猫"（太简单）</td>
+<td style="text-align: center;">0.95</td>
+<td style="text-align: center;">低</td>
+<td style="text-align: center;">21 张（省算力）</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">"橘猫坐蓝色沙发"（中等）</td>
+<td style="text-align: center;">0.55</td>
+<td style="text-align: center;"><strong>最高</strong></td>
+<td style="text-align: center;"><strong>24 张（满配）</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">"穿西装猫弹钢琴"（太难）</td>
+<td style="text-align: center;">0.05</td>
+<td style="text-align: center;">低</td>
+<td style="text-align: center;">21 张（省算力）</td>
+</tr>
+</tbody>
+</table>
+<h2
+id="改进二步级优势重估计按劳分配">改进二：步级优势重估计（按劳分配）</h2>
+<p>SuperFlow
+不再对所有时间步使用同一个优势值，而是<strong>根据每一步的扩散噪声大小
+<span class="math inline">\(\sigma_t\)</span> 来分配功劳</strong>：</p>
+<p><span class="math display">\[
+\hat{A}_t = \eta \cdot \sigma_t \cdot A_\tau
+\]</span></p>
+<p>其中 <span class="math inline">\(A_\tau\)</span>
+是整张图的最终优势值，<span class="math inline">\(\sigma_t\)</span> 是第
+<span class="math inline">\(t\)</span> 步的 SDE 噪声标准差，<span
+class="math inline">\(\eta\)</span> 是缩放系数。</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">时间步 <span
+class="math inline">\(t\)</span></th>
+<th style="text-align: center;"><span
+class="math inline">\(\sigma_t\)</span></th>
+<th style="text-align: center;"><span
+class="math inline">\(\hat{A}_t\)</span></th>
+<th style="text-align: left;">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><span class="math inline">\(t =
+10\)</span>（从纯噪声开始）</td>
+<td style="text-align: center;">0.8</td>
+<td style="text-align: center;"><span
+class="math inline">\(1.2\eta\)</span></td>
+<td style="text-align: left;">选择构图方向 → 高权重</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><span class="math inline">\(t =
+5\)</span>（中间步）</td>
+<td style="text-align: center;">0.3</td>
+<td style="text-align: center;"><span
+class="math inline">\(0.45\eta\)</span></td>
+<td style="text-align: left;">细化结构 → 中权重</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><span class="math inline">\(t =
+1\)</span>（接近成品）</td>
+<td style="text-align: center;">0.05</td>
+<td style="text-align: center;"><span
+class="math inline">\(0.075\eta\)</span></td>
+<td style="text-align: left;">调整细节 → 低权重</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么按 <span class="math inline">\(\sigma_t\)</span>
+而非确定性步伐分配？</strong> 确定性步伐（<span
+class="math inline">\(\Delta t \cdot
+v_\theta\)</span>）是模型"本来就会做的事"，无法解释为什么这次生成的图"比平时更好"。真正产生好坏差异的是
+SDE 注入的随机噪声——前期 <span class="math inline">\(\sigma_t\)</span>
+大，一次"大赌博"改变了构图，对最终高分居功至伟；后期 <span
+class="math inline">\(\sigma_t\)</span>
+极小，只改了一根猫毛，贡献微乎其微。</p>
+<h2 id="改进三运行基线替代纯组相对">改进三：运行基线替代纯组相对</h2>
+<p>SuperFlow 用 Beta 追踪器 <span
+class="math inline">\(\hat{v}(c)\)</span> 作为<strong>每 Prompt
+的运行基线</strong>，而非纯粹依赖组内均值：</p>
+<p><span class="math display">\[
+A(c, y) = r(c, y) - \hat{v}(c)
+\]</span></p>
+<p><strong>为什么更好？</strong> 传统组内均值 <span
+class="math inline">\(\mu_R = \frac{1}{G}\sum r_i\)</span> 仅基于当前
+<span class="math inline">\(G\)</span> 张图，估计不稳定。而 <span
+class="math inline">\(\hat{v}(c)\)</span>
+综合了历史信息，更准确。更关键的是，它<strong>打破了零方差死局</strong>——即使当前组内都考了
+99 分，只要历史基线是 90 分，模型依然能获得 <span
+class="math inline">\(+9\)</span> 分的正向激励，不会"躺平"。</p>
+<hr />
+<h1 id="superflow-的训练效果">SuperFlow 的训练效果</h1>
+<p>在 SD3.5-Medium 骨干上使用 LoRA（<span class="math inline">\(r =
+32\)</span>，<span class="math inline">\(\alpha = 64\)</span>）进行 RL
+训练：</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">方法</th>
+<th style="text-align: center;">GenEval 综合</th>
+<th style="text-align: center;">OCR 准确率</th>
+<th style="text-align: center;">PickScore</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">SD3.5-M（基线）</td>
+<td style="text-align: center;">0.5814</td>
+<td style="text-align: center;">0.5717</td>
+<td style="text-align: center;">0.8304</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">Flow-GRPO</td>
+<td style="text-align: center;">0.7829</td>
+<td style="text-align: center;">0.7252</td>
+<td style="text-align: center;">0.8536</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">Flow-SPO</td>
+<td style="text-align: center;">0.7540</td>
+<td style="text-align: center;">0.7652</td>
+<td style="text-align: center;">0.8516</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>SuperFlow</strong></td>
+<td style="text-align: center;"><strong>0.8045</strong></td>
+<td style="text-align: center;"><strong>0.8413</strong></td>
+<td style="text-align: center;"><strong>0.8685</strong></td>
+</tr>
+</tbody>
+</table>
+<p>SuperFlow 在 OCR（图像中的文字渲染）上提升最为显著——相比 SD3.5-M 提升
+<strong>47.2%</strong>，相比 Flow-GRPO 提升
+<strong>16.0%</strong>。训练效率方面，比 Flow-GRPO 减少了
+<strong>5.4%-56.3%</strong> 的训练步数。</p>
+<p>消融实验显示，步级优势重估计对 OCR 贡献最大（移除后下降
+16.4%），动态采样对训练稳定性贡献最大（移除后后期出现性能崩溃）。</p>
+<hr />
+<h1 id="年图像视频生成-rl-的统一框架">2026 年图像/视频生成 RL
+的统一框架</h1>
+<p>SuperFlow 之外，两个开源框架正在将图像/视频生成的 RL
+训练推向工程化：</p>
+<p><strong><a
+target="_blank" rel="noopener" href="https://github.com/X-GenGroup/Flow-Factory">Flow-Factory</a></strong>：模块化统一框架，支持
+Flux/Qwen-Image/WAN Video 等模型，FlowGRPO/MixGRPO/CPS/AWM 等算法，覆盖
+T2I、T2V、I2V
+三种模态。核心设计是<strong>解耦算法、模型和奖励</strong>。</p>
+<p><strong><a
+target="_blank" rel="noopener" href="https://github.com/ModelTC/GenRL">GenRL</a></strong>：覆盖
+T2I/T2V/I2V 三种模态，支持 diffusion 和 rectified flow 两种范式，提供约
+20 万条 RL 训练 Prompt 和多节点 FSDP 分布式训练支持。</p>
+<p><strong>TRL v1.0（Hugging Face, 2026.03）</strong>：将 TRL
+升级为生产级框架，三阶段流水线（SFT → Reward Modeling → Alignment）支持
+DPO、GRPO、KTO 等主流算法。但注意 TRL v1.0 <strong>主要面向
+LLM/VLM</strong>，对 Flow Matching 图像/视频生成 RL，Flow-Factory 和
+GenRL 才是专用框架。</p>
+<hr />
+<p>至此，从 REINFORCE 到 SuperFlow
+的图像/视频生成技术旅程暂告一段落。</p>
+<hr />
+<blockquote>
+<p>参考资料：</p>
+<ol type="1">
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2512.17951">SuperFlow: Training Flow
+Matching Models with RL on the Fly</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/html/2602.12529v3">Flow-Factory: A
+Unified Framework for RL in Flow-Matching Models</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/ModelTC/GenRL">GenRL: Scalable RL for
+Generative Models</a></li>
+<li><a
+target="_blank" rel="noopener" href="https://www.marktechpost.com/2026/04/01/hugging-face-releases-trl-v1-0-a-unified-post-training-stack-for-sft-reward-modeling-dpo-and-grpo-workflows/">Hugging
+Face TRL v1.0</a></li>
+</ol>
+</blockquote>
+<blockquote>
+<p>下一篇：<a
+href="/chengYi-xun/posts/59-dance-mix-grpo/">笔记｜强化学习（九）：DanceGRPO
+与 MixGRPO——视觉生成 GRPO 的扩展与加速</a></p>
+</blockquote>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/chengYi-xun">牛大帅</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://chengyi-xun.github.io/chengYi-xun/posts/58-superflow/">https://chengyi-xun.github.io/chengYi-xun/posts/58-superflow/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://chengyi-xun.github.io/chengYi-xun" target="_blank">牛大帅的个人博客</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/chengYi-xun/tags/Deep-learning/">Deep learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Generative-models-theory/">Generative models theory</a><a class="post-meta__tags" href="/chengYi-xun/tags/Reinforcement-Learning/">Reinforcement Learning</a><a class="post-meta__tags" href="/chengYi-xun/tags/Flow-Matching/">Flow Matching</a></div><div class="post_share"><div class="social-share" data-image="/chengYi-xun/img/avatar.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div><div class="next-post pull-right"><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-06-11</div><div class="title">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</div></div></a></div><div><a href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</div></div></a></div><div><a href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-08-20</div><div class="title">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</div></div></a></div><div><a href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</div></div></a></div><div><a href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</div></div></a></div><div><a href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-05</div><div class="title">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</div></div></a></div></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="disqusjs-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/chengYi-xun/img/avatar.png" onerror="this.onerror=null;this.src='/chengYi-xun/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">牛大帅</div><div class="author-info__description">欢迎来到我的博客</div></div><div class="card-info-data site-data is-center"><a href="/chengYi-xun/archives/"><div class="headline">文章</div><div class="length-num">35</div></a><a href="/chengYi-xun/tags/"><div class="headline">标签</div><div class="length-num">35</div></a><a href="/chengYi-xun/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/chengYi-xun"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/chengYi-xun" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:ldq4399@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a><a class="social-icon" href="/chengYi-xun/atom.xml" target="_blank" title="RSS"><i class="fas fa-rss"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到牛大帅的猪舍~（昼伏夜出型）</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#flow-grpo-%E7%9A%84%E4%B8%89%E4%B8%AA%E9%81%97%E7%95%99%E9%97%AE%E9%A2%98"><span class="toc-number">1.</span> <span class="toc-text">Flow-GRPO 的三个遗留问题</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#superflow-%E7%9A%84%E4%B8%89%E9%A1%B9%E6%94%B9%E8%BF%9B"><span class="toc-number">2.</span> <span class="toc-text">SuperFlow 的三项改进</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%94%B9%E8%BF%9B%E4%B8%80%E6%96%B9%E5%B7%AE%E6%84%9F%E7%9F%A5%E7%9A%84%E5%8A%A8%E6%80%81%E9%87%87%E6%A0%B7%E6%8A%8A%E7%AE%97%E5%8A%9B%E8%8A%B1%E5%9C%A8%E5%88%80%E5%88%83%E4%B8%8A"><span class="toc-number">2.1.</span> <span class="toc-text">改进一：方差感知的动态采样（把算力花在刀刃上）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%94%B9%E8%BF%9B%E4%BA%8C%E6%AD%A5%E7%BA%A7%E4%BC%98%E5%8A%BF%E9%87%8D%E4%BC%B0%E8%AE%A1%E6%8C%89%E5%8A%B3%E5%88%86%E9%85%8D"><span class="toc-number">2.2.</span> <span class="toc-text">改进二：步级优势重估计（按劳分配）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%94%B9%E8%BF%9B%E4%B8%89%E8%BF%90%E8%A1%8C%E5%9F%BA%E7%BA%BF%E6%9B%BF%E4%BB%A3%E7%BA%AF%E7%BB%84%E7%9B%B8%E5%AF%B9"><span class="toc-number">2.3.</span> <span class="toc-text">改进三：运行基线替代纯组相对</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#superflow-%E7%9A%84%E8%AE%AD%E7%BB%83%E6%95%88%E6%9E%9C"><span class="toc-number">3.</span> <span class="toc-text">SuperFlow 的训练效果</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%B9%B4%E5%9B%BE%E5%83%8F%E8%A7%86%E9%A2%91%E7%94%9F%E6%88%90-rl-%E7%9A%84%E7%BB%9F%E4%B8%80%E6%A1%86%E6%9E%B6"><span class="toc-number">4.</span> <span class="toc-text">2026 年图像&#x2F;视频生成 RL
+的统一框架</span></a></li></ol></div></div><div class="card-widget card-post-series"><div class="item-headline"><i class="fa-solid fa-layer-group"></i><span>系列文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/61-reward-model/" title="笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶">笔记｜强化学习（十）：奖励模型全景——从基础架构到 Reward Hacking 与前沿进阶</a><time datetime="2026-04-05T10:00:00.000Z" title="发表于 2026-04-05 18:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/59-dance-mix-grpo/" title="笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速">笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速</a><time datetime="2026-04-05T08:00:00.000Z" title="发表于 2026-04-05 16:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/58-superflow/" title="笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）">笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）</a><time datetime="2026-04-05T06:00:00.000Z" title="发表于 2026-04-05 14:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/57-grpo-variants/" title="笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT">笔记｜强化学习（七）：GRPO 的三重面孔——从 2-GRPO 到 f-GRPO 与 GIFT</a><time datetime="2026-04-05T04:00:00.000Z" title="发表于 2026-04-05 12:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/56-dapo/" title="笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践">笔记｜强化学习（六）：DAPO：从 GRPO 到大规模推理 RL 的工程实践</a><time datetime="2026-04-05T02:00:00.000Z" title="发表于 2026-04-05 10:00:00">2026-04-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/55-flow-grpo/" title="笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）">笔记｜强化学习（五）：Flow-GRPO 与图像生成应用（基于 Flux 的代码解析）</a><time datetime="2025-08-20T02:00:00.000Z" title="发表于 2025-08-20 10:00:00">2025-08-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/54-grpo/" title="笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解">笔记｜强化学习（四）：大模型在线 RL 破局者：GRPO 算法详解</a><time datetime="2025-08-19T02:00:00.000Z" title="发表于 2025-08-19 10:00:00">2025-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/53-dpo/" title="笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)">笔记｜强化学习（三）：大模型对齐的另一条路：DPO (Direct Preference Optimization)</a><time datetime="2025-08-18T02:00:00.000Z" title="发表于 2025-08-18 10:00:00">2025-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/52-trpo-ppo/" title="笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)">笔记｜强化学习（二）：信任区域与近端策略优化 (从 TRPO 到 PPO)</a><time datetime="2025-08-17T02:00:00.000Z" title="发表于 2025-08-17 10:00:00">2025-08-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-reinforce-ac/" title="笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic">笔记｜强化学习（一续）：从 REINFORCE 到 Actor-Critic</a><time datetime="2025-08-16T03:00:00.000Z" title="发表于 2025-08-16 11:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/51-rl-basics/" title="笔记｜强化学习（一）：强化学习基础与策略梯度">笔记｜强化学习（一）：强化学习基础与策略梯度</a><time datetime="2025-08-16T02:00:00.000Z" title="发表于 2025-08-16 10:00:00">2025-08-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/15-flux/" title="笔记｜生成模型（十五）：Flux 架构解析">笔记｜生成模型（十五）：Flux 架构解析</a><time datetime="2025-08-15T02:00:00.000Z" title="发表于 2025-08-15 10:00:00">2025-08-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/14-sd3/" title="笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)">笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)</a><time datetime="2025-08-14T02:00:00.000Z" title="发表于 2025-08-14 10:00:00">2025-08-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/13-flow_matching/" title="笔记｜生成模型（十三）：Flow Matching理论与实现">笔记｜生成模型（十三）：Flow Matching理论与实现</a><time datetime="2025-08-13T02:00:00.000Z" title="发表于 2025-08-13 10:00:00">2025-08-13</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/12-Normalizing-flow/" title="笔记｜生成模型（十二）：Normalizing Flow理论与实现">笔记｜生成模型（十二）：Normalizing Flow理论与实现</a><time datetime="2025-08-12T02:00:00.000Z" title="发表于 2025-08-12 10:00:00">2025-08-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/11-UIT-VS-DIT/" title="笔记｜生成模型（十一）：UIT和DiT架构详解">笔记｜生成模型（十一）：UIT和DiT架构详解</a><time datetime="2025-08-11T02:00:00.000Z" title="发表于 2025-08-11 10:00:00">2025-08-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/" title="笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现">笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现</a><time datetime="2025-08-10T02:00:00.000Z" title="发表于 2025-08-10 10:00:00">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/9-classifier-guidance-for-diffusion-models/" title="笔记｜生成模型（九）：Classifier Guidance 理论与实现">笔记｜生成模型（九）：Classifier Guidance 理论与实现</a><time datetime="2025-08-09T02:00:00.000Z" title="发表于 2025-08-09 10:00:00">2025-08-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/8-SDE/" title="笔记｜生成模型（八）：SDE统一DDPM和SMLD">笔记｜生成模型（八）：SDE统一DDPM和SMLD</a><time datetime="2025-08-08T02:00:00.000Z" title="发表于 2025-08-08 10:00:00">2025-08-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/7-score-match/" title="笔记｜生成模型（七）：Score-Based理论">笔记｜生成模型（七）：Score-Based理论</a><time datetime="2025-08-07T02:00:00.000Z" title="发表于 2025-08-07 10:00:00">2025-08-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/6-ddim/" title="笔记｜生成模型（六）：DDIM理论">笔记｜生成模型（六）：DDIM理论</a><time datetime="2025-08-06T02:00:00.000Z" title="发表于 2025-08-06 10:00:00">2025-08-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/5-ddpm/" title="笔记｜生成模型（五）：DDPM理论">笔记｜生成模型（五）：DDPM理论</a><time datetime="2025-08-05T02:00:00.000Z" title="发表于 2025-08-05 10:00:00">2025-08-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/4-VAE-theory/" title="笔记｜生成模型（四）：变分自编码器理论">笔记｜生成模型（四）：变分自编码器理论</a><time datetime="2025-08-03T02:00:00.000Z" title="发表于 2025-08-03 10:00:00">2025-08-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/3-GAN-theory/" title="笔记｜生成模型（三）：生成对抗理论">笔记｜生成模型（三）：生成对抗理论</a><time datetime="2025-08-02T02:00:00.000Z" title="发表于 2025-08-02 10:00:00">2025-08-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/2-generation-model/" title="笔记｜生成模型（二）：生成模型的技术路线总览">笔记｜生成模型（二）：生成模型的技术路线总览</a><time datetime="2025-08-01T02:00:00.000Z" title="发表于 2025-08-01 10:00:00">2025-08-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/1-generation-basic-theory/" title="笔记｜生成模型（一）：一些概率论的基础概念和理论">笔记｜生成模型（一）：一些概率论的基础概念和理论</a><time datetime="2025-07-31T02:00:00.000Z" title="发表于 2025-07-31 10:00:00">2025-07-31</time></div></div></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/60-v-grpo/" title="笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单">笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单</a><time datetime="2026-06-11T02:00:00.000Z" title="发表于 2026-06-11 10:00:00">2026-06-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/106-driving-world-model/" title="笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测">笔记｜世界模型（六）：自动驾驶世界模型——从视频预测到占用预测</a><time datetime="2026-04-05T16:55:00.000Z" title="发表于 2026-04-06 00:55:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/105-physics-world-model/" title="笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律">笔记｜世界模型（五）：物理化的视频生成——让模型理解牛顿定律</a><time datetime="2026-04-05T16:50:00.000Z" title="发表于 2026-04-06 00:50:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/104-video-world-model/" title="笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos">笔记｜世界模型（四）：视频生成即世界模拟——从 Sora 到 Genie 与 Cosmos</a><time datetime="2026-04-05T16:45:00.000Z" title="发表于 2026-04-06 00:45:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/chengYi-xun/posts/103-jepa/" title="笔记｜世界模型（三）：JEPA——在嵌入空间预测世界">笔记｜世界模型（三）：JEPA——在嵌入空间预测世界</a><time datetime="2026-04-05T16:40:00.000Z" title="发表于 2026-04-06 00:40:00">2026-04-06</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2025 - 2026 By 牛大帅</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/chengYi-xun/js/utils.js?v=4.10.0-b1"></script><script src="/chengYi-xun/js/main.js?v=4.10.0-b1"></script><div class="js-pjax"><script>if (!window.MathJax) {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      tags: 'ams'
+    },
+    chtml: {
+      scale: 1.1
+    },
+    options: {
+      renderActions: {
+        findScript: [10, doc => {
+          for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+            const display = !!node.type.match(/; *mode=display/)
+            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+            const text = document.createTextNode('')
+            node.parentNode.replaceChild(text, node)
+            math.start = {node: text, delim: '', n: 0}
+            math.end = {node: text, delim: '', n: 0}
+            doc.math.push(math)
+          }
+        }, '']
+      }
+    }
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.min.js'
+  script.id = 'MathJax-script'
+  script.async = true
+  document.head.appendChild(script)
+} else {
+  MathJax.startup.document.state(0)
+  MathJax.texReset()
+  MathJax.typesetPromise()
+}</script><script>(() => {
+  const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+  if ($mermaid.length === 0) return
+  const runMermaid = () => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    Array.from($mermaid).forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = '%%{init:{ \'theme\':\'' + theme + '\'}}%%\n'
+      const mermaidID = 'mermaid-' + index
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+
+      const renderV10 = () => {
+        renderFn.then(({svg}) => {
+          mermaidSrc.insertAdjacentHTML('afterend', svg)
+        })
+      }
+
+      const renderV9 = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      typeof renderFn === 'string' ? renderV9(renderFn) : renderV10()
+    })
+  }
+
+  const loadMermaid = () => {
+    window.loadMermaid ? runMermaid() : getScript('https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js').then(runMermaid)
+  }
+
+  btf.addGlobalFn('themeChange', runMermaid, 'mermaid')
+
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const initDisqusjs = () => {
+    window.disqusjs = null
+    disqusjs = new DisqusJS(Object.assign({
+      shortname: 'daniuniu',
+      identifier: '/chengYi-xun/posts/58-superflow/',
+      url: 'https://chengyi-xun.github.io/chengYi-xun/posts/58-superflow/',
+      title: '笔记｜强化学习（八）：SuperFlow 与图像生成 RL 前沿（2026）',
+      apikey: 'Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw',
+    },null))
+
+    disqusjs.render(document.getElementById('disqusjs-wrap'))
+  }
+
+  const themeChange = () => {
+    const ele = document.getElementById('disqus_thread')
+    if(!ele) return
+    disqusjs.destroy()
+    initDisqusjs()
+  }
+
+  btf.addGlobalFn('themeChange', themeChange, 'disqusjs')
+
+  const loadDisqusjs = async() => {
+    if (window.disqusJsLoad) initDisqusjs()
+    else {
+      await getCSS('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/styles/disqusjs.min.css')
+      await getScript('https://cdn.jsdelivr.net/npm/disqusjs@3.0.2/dist/browser/disqusjs.es2015.umd.min.js')
+      initDisqusjs()
+      window.disqusJsLoad = true
+    }
+  }
+
+  const getCount = async() => {
+    try {
+      const eleGroup = document.querySelector('#post-meta .disqusjs-comment-count')
+      if (!eleGroup) return
+      const cleanedLinks = eleGroup.href.replace(/#post-comment$/, '')
+
+      const res = await fetch(`https://disqus.com/api/3.0/threads/set.json?forum=daniuniu&api_key=Ddx35LNYqc5BNc1ccxfuPQ51mkafhJ4OMIm3XPF8lQ6Jlx1s2Q7OgpMUENyJ2rRw&thread:link=${cleanedLinks}`,{
+        method: 'GET'
+      })
+      const result = await res.json()
+      const count = result.response.length ? result.response[0].posts : 0
+      eleGroup.textContent = count
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if ('Disqusjs' === 'Disqusjs' || !false) {
+    if (false) btf.loadComment(document.getElementById('disqusjs-wrap'), loadDisqusjs)
+    else {
+      loadDisqusjs()
+      
+    }
+  } else {
+    window.loadOtherComment = loadDisqusjs
+  }
+})()</script></div><script defer="defer" id="fluttering_ribbon" mobile="true" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/canvas-fluttering-ribbon.min.js"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/click-heart.min.js" async="async" mobile="true"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
