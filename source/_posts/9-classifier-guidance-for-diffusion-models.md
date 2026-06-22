@@ -20,11 +20,11 @@ series: Diffusion Models theory
 > ➡️ 下一篇：[笔记｜生成模型（十）：Classifier-Free Guidance 理论与实现](/chengYi-xun/posts/10-classifier-free-guidance-for-diffusion-models/)
 
 
-在前边的几篇文章中我们已经学习了DDPM和DDIM，不过这些方法都只能进行无条件生成，而无法对生成过程进行控制。我们这次学习的不再是无条件生成，而是通过一定方式对生成过程进行控制，比较常见的有两种：Classifier Guidance 与 Classifier-Free Guidance，本文首先介绍第一种。
+在前期的文章中，我们已经学习了 DDPM 和 DDIM。然而，这些方法只能进行无条件生成（Unconditional Generation），无法对生成结果进行精细化控制。为了实现可控生成，研究人员提出了多种条件生成（Conditional Generation）方法，其中最经典、最常用的两种是 Classifier Guidance 与 Classifier-Free Guidance。本文将首先介绍第一种方法。
 
 # 一些工作背景
 
-实际上 Classifier Guidance 是上边给出的论文工作中的一部分，虽然 Improved DDPM 已经比较有效地提升了 DDPM 的生成效果，但在一些大数据集上的效果仍然不如当时主流的生成模型 GAN。因此 OpenAI 在 Improved DDPM 的基础上继续进行了一些改进，主要是一些工程上的改进：
+实际上，Classifier Guidance 是 OpenAI 在论文《Diffusion Models Beat GANs on Image Synthesis》中提出的核心工作之一。虽然 Improved DDPM 已经有效提升了 DDPM 的生成质量，但在 ImageNet 等大型复杂数据集上的表现仍然逊于当时主流的生成对抗网络（GAN）。为此，OpenAI 在 Improved DDPM 的基础上进行了一系列工程和架构上的改进：
 
 - 在模型的尺寸基本不变的前提下，提升模型的深度与宽度之比，相当于使用更深的模型；
 - 增加多头注意力中 head 的数量；

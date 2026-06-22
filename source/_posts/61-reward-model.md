@@ -14,7 +14,7 @@ series: Diffusion Models theory
 
 > 本篇是强化学习系列中聚焦**奖励模型（Reward Model, RM）**的专题。我们将以前的 61 篇（基础架构）和 62 篇（进阶防攻击）合并精简，带你一文看懂：奖励模型是如何构建的？为什么大模型会“欺骗”裁判（Reward Hacking）？如何造出更强大的生成式裁判？视觉生成的奖励又难在哪里？
 >
-> ⬅️ 上一篇：[笔记｜强化学习（九）：DanceGRPO 与 MixGRPO——视觉生成 GRPO 的扩展与加速](/chengYi-xun/posts/59-dance-mix-grpo/)
+> ⬅️ 上一篇：[笔记｜强化学习（十一）：V-GRPO——用变分方法让扩散模型的在线 RL 变得简单](/chengYi-xun/posts/60-v-grpo/)
 
 ## 1. 奖励模型基础：从人类偏好到代理裁判
 
