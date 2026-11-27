@@ -43,6 +43,10 @@ tags:
 14. [笔记｜生成模型（十四）：Stable Diffusion 3 架构解析 (MMDiT)](../14-sd3)
 15. [笔记｜生成模型（十五）：Flux 架构解析](../15-flux)
 
+## 视觉自回归
+
+201. [讨论｜Next-scale Prediction：从 VAR 到长时程世界模型](../201-next-scale-prediction)
+
 ## 强化学习
 
 51. [笔记｜强化学习（一）：强化学习基础与策略梯度](../51-rl-basics)
@@ -70,4 +74,3 @@ tags:
 # 杂谈
 
 1. [杂谈｜写作的目的](../some_think)
-
